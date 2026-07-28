@@ -7,6 +7,7 @@ use axum::{
 };
 use chrono::{DateTime, TimeZone, Utc};
 use serde_json::{json, Map, Value};
+use sha2::{Digest, Sha256};
 use sqlx::SqlitePool;
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -331,6 +332,7 @@ async fn persist_api_requests(pool: &SqlitePool, payload: &Value) -> Result<usiz
                 let Some(external_id) = external_id else {
                     continue;
                 };
+                let session_key = string_attr(&values, "session.id").map(|id| hash_session_id(&id));
                 let input = int_attr(&values, "input_tokens").unwrap_or(0);
                 let output = int_attr(&values, "output_tokens").unwrap_or(0);
                 let cache_read = int_attr(&values, "cache_read_tokens").unwrap_or(0);
@@ -349,8 +351,8 @@ async fn persist_api_requests(pool: &SqlitePool, payload: &Value) -> Result<usiz
                     "INSERT OR IGNORE INTO ai_usage_events
                      (id, provider, occurred_at, input_tokens, output_tokens, cached_tokens,
                       source, confidence, external_event_id, model,
-                      cache_write_input_tokens, total_tokens, cost_usd_micros)
-                     VALUES (?, 'claude', ?, ?, ?, ?, ?, 'verified', ?, ?, ?, ?, ?)",
+                      cache_write_input_tokens, total_tokens, cost_usd_micros, session_key)
+                     VALUES (?, 'claude', ?, ?, ?, ?, ?, 'verified', ?, ?, ?, ?, ?, ?)",
                 )
                 .bind(Uuid::new_v4().to_string())
                 .bind(occurred_at.to_rfc3339())
@@ -363,6 +365,7 @@ async fn persist_api_requests(pool: &SqlitePool, payload: &Value) -> Result<usiz
                 .bind(cache_write)
                 .bind(total)
                 .bind(int_attr(&values, "cost_usd_micros"))
+                .bind(session_key)
                 .execute(pool)
                 .await
                 .map_err(|error| error.to_string())?;
@@ -374,6 +377,10 @@ async fn persist_api_requests(pool: &SqlitePool, payload: &Value) -> Result<usiz
         set_success(pool).await?;
     }
     Ok(inserted)
+}
+
+fn hash_session_id(session_id: &str) -> String {
+    format!("{:x}", Sha256::digest(session_id.as_bytes()))
 }
 
 fn attributes(items: Option<&Vec<Value>>) -> Map<String, Value> {
@@ -459,5 +466,57 @@ mod tests {
             string_attr(&values, "model").as_deref(),
             Some("claude-test")
         );
+    }
+
+    #[test]
+    fn hashes_session_ids_without_retaining_the_original() {
+        let key = hash_session_id("session-sensitive-id");
+        assert_eq!(key.len(), 64);
+        assert_eq!(key, hash_session_id("session-sensitive-id"));
+        assert_ne!(key, "session-sensitive-id");
+    }
+
+    #[tokio::test]
+    async fn persists_an_anonymous_session_key_once_per_request() {
+        let pool = sqlx::sqlite::SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect("sqlite::memory:")
+            .await
+            .unwrap();
+        sqlx::migrate!("./migrations").run(&pool).await.unwrap();
+        let payload = json!({
+            "resourceLogs": [{
+                "resource": {
+                    "attributes": [{
+                        "key": "session.id",
+                        "value": {"stringValue": "session-sensitive-id"}
+                    }]
+                },
+                "scopeLogs": [{
+                    "logRecords": [{
+                        "body": {"stringValue": "claude_code.api_request"},
+                        "timeUnixNano": "1785232800000000000",
+                        "attributes": [
+                            {"key": "request_id", "value": {"stringValue": "req-1"}},
+                            {"key": "input_tokens", "value": {"intValue": "10"}},
+                            {"key": "output_tokens", "value": {"intValue": "5"}}
+                        ]
+                    }]
+                }]
+            }]
+        });
+
+        assert_eq!(persist_api_requests(&pool, &payload).await.unwrap(), 1);
+        assert_eq!(persist_api_requests(&pool, &payload).await.unwrap(), 0);
+        let row: (i64, String) = sqlx::query_as(
+            "SELECT COUNT(*), MIN(session_key)
+             FROM ai_usage_events WHERE provider = 'claude'",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(row.0, 1);
+        assert_eq!(row.1, hash_session_id("session-sensitive-id"));
+        assert!(!row.1.contains("session-sensitive-id"));
     }
 }

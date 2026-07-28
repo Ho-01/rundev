@@ -45,7 +45,21 @@ export type ClaudeUsageToday = {
   outputTokens: number;
   cachedTokens: number;
   cacheWriteTokens: number;
+  sessionCount: number;
   lastReceivedAt: string | null;
   status: "disconnected" | "waiting" | "connected" | "error";
   error: string | null;
+};
+
+export type AiActivityStatus = {
+  activeProviderCount: number;
+  codexActive: boolean;
+  claudeActive: boolean;
+  claudeActiveSessions: number;
+};
+
+export type RunnerId = "coding-cat" | "coding-fish";
+
+export type RunnerSelection = {
+  runnerId: RunnerId;
 };

@@ -1,14 +1,42 @@
+use std::sync::atomic::{AtomicU8, Ordering};
 use tauri::{
     menu::{Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
     App, Manager, PhysicalPosition, Rect,
 };
 
+static SELECTED_RUNNER: AtomicU8 = AtomicU8::new(0);
+
+const CAT_FRAMES: [&[u8]; 4] = [
+    include_bytes!("../../icons/tray/coding/01.png").as_slice(),
+    include_bytes!("../../icons/tray/coding/02.png").as_slice(),
+    include_bytes!("../../icons/tray/coding/03.png").as_slice(),
+    include_bytes!("../../icons/tray/coding/04.png").as_slice(),
+];
+const FISH_FRAMES: [&[u8]; 4] = [
+    include_bytes!("../../icons/tray/coding-fish/01.png").as_slice(),
+    include_bytes!("../../icons/tray/coding-fish/02.png").as_slice(),
+    include_bytes!("../../icons/tray/coding-fish/03.png").as_slice(),
+    include_bytes!("../../icons/tray/coding-fish/04.png").as_slice(),
+];
+
+pub fn set_runner(runner: &str) {
+    SELECTED_RUNNER.store(u8::from(runner == "coding-fish"), Ordering::Relaxed);
+}
+
+fn selected_frames() -> &'static [&'static [u8]; 4] {
+    if SELECTED_RUNNER.load(Ordering::Relaxed) == 1 {
+        &FISH_FRAMES
+    } else {
+        &CAT_FRAMES
+    }
+}
+
 pub fn create(app: &App) -> tauri::Result<()> {
     let open = MenuItem::with_id(app, "open", "RunDev 열기", true, None::<&str>)?;
     let quit = MenuItem::with_id(app, "quit", "종료", true, None::<&str>)?;
     let menu = Menu::with_items(app, &[&open, &quit])?;
-    let icon = tauri::image::Image::from_bytes(include_bytes!("../../icons/tray/coding/01.png"))?;
+    let icon = tauri::image::Image::from_bytes(selected_frames()[0])?;
 
     TrayIconBuilder::with_id("rundev-tray")
         .icon(icon)
@@ -39,18 +67,12 @@ pub fn create(app: &App) -> tauri::Result<()> {
 }
 
 fn start_animation(app: tauri::AppHandle) {
-    let frames = [
-        include_bytes!("../../icons/tray/coding/01.png").as_slice(),
-        include_bytes!("../../icons/tray/coding/02.png").as_slice(),
-        include_bytes!("../../icons/tray/coding/03.png").as_slice(),
-        include_bytes!("../../icons/tray/coding/04.png").as_slice(),
-    ];
-
     tauri::async_runtime::spawn(async move {
         let mut frame_index = 0;
         let mut ticker = tokio::time::interval(std::time::Duration::from_millis(170));
         loop {
             ticker.tick().await;
+            let frames = selected_frames();
             frame_index = (frame_index + 1) % frames.len();
             if let (Some(tray), Ok(icon)) = (
                 app.tray_by_id("rundev-tray"),

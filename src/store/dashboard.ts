@@ -4,13 +4,17 @@ import {
   connectCodexAccount,
   disconnectClaude,
   disconnectCodexAccount,
-  getDashboard
+  getDashboard,
+  setRunnerSelection
 } from "../services/rundev";
 import type {
   AiUsageToday,
+  AiActivityStatus,
   CharacterState,
   ClaudeUsageToday,
-  DailySummary
+  DailySummary,
+  RunnerId,
+  RunnerSelection
 } from "../types/activity";
 
 type DashboardStore = {
@@ -18,6 +22,8 @@ type DashboardStore = {
   character: CharacterState | null;
   aiUsage: AiUsageToday | null;
   claudeUsage: ClaudeUsageToday | null;
+  aiActivity: AiActivityStatus | null;
+  runner: RunnerSelection | null;
   loading: boolean;
   error: string | null;
   refresh: () => Promise<void>;
@@ -25,6 +31,7 @@ type DashboardStore = {
   disconnectCodex: () => Promise<void>;
   connectClaude: () => Promise<void>;
   disconnectClaude: () => Promise<void>;
+  selectRunner: (runnerId: RunnerId) => Promise<void>;
 };
 
 export const useDashboardStore = create<DashboardStore>((set) => ({
@@ -32,6 +39,8 @@ export const useDashboardStore = create<DashboardStore>((set) => ({
   character: null,
   aiUsage: null,
   claudeUsage: null,
+  aiActivity: null,
+  runner: null,
   loading: false,
   error: null,
   refresh: async () => {
@@ -85,6 +94,12 @@ export const useDashboardStore = create<DashboardStore>((set) => ({
   disconnectClaude: async () => {
     set({ loading: true, error: null });
     await disconnectClaude();
+    const data = await getDashboard();
+    set({ ...data, loading: false });
+  },
+  selectRunner: async (runnerId) => {
+    set({ loading: true, error: null });
+    await setRunnerSelection(runnerId);
     const data = await getDashboard();
     set({ ...data, loading: false });
   }

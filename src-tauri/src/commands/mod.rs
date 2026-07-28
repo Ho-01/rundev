@@ -1,5 +1,5 @@
-use crate::{adapters, database::AppState};
-use chrono::Local;
+use crate::{adapters, database::AppState, tray};
+use chrono::{DateTime, Duration, Local, Utc};
 use serde::Serialize;
 use tauri::State;
 
@@ -62,9 +62,72 @@ pub struct ClaudeUsageToday {
     output_tokens: i64,
     cached_tokens: i64,
     cache_write_tokens: i64,
+    session_count: i64,
     last_received_at: Option<String>,
     status: String,
     error: Option<String>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AiActivityStatus {
+    active_provider_count: i64,
+    codex_active: bool,
+    claude_active: bool,
+    claude_active_sessions: i64,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RunnerSelection {
+    runner_id: String,
+}
+
+#[tauri::command]
+pub async fn get_runner_selection(state: State<'_, AppState>) -> Result<RunnerSelection, String> {
+    let runner_id =
+        sqlx::query_scalar("SELECT value FROM app_settings WHERE key = 'runner.selected'")
+            .fetch_optional(&state.pool)
+            .await
+            .map_err(|error| error.to_string())?
+            .unwrap_or_else(|| "coding-cat".to_string());
+    Ok(RunnerSelection { runner_id })
+}
+
+#[tauri::command]
+pub async fn set_runner_selection(
+    runner_id: String,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    if !is_supported_runner(&runner_id) {
+        return Err("지원하지 않는 러너입니다.".to_string());
+    }
+    sqlx::query(
+        "INSERT INTO app_settings (key, value) VALUES ('runner.selected', ?)
+         ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+    )
+    .bind(&runner_id)
+    .execute(&state.pool)
+    .await
+    .map_err(|error| error.to_string())?;
+    tray::set_runner(&runner_id);
+    Ok(())
+}
+
+fn is_supported_runner(runner_id: &str) -> bool {
+    matches!(runner_id, "coding-cat" | "coding-fish")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_supported_runner;
+
+    #[test]
+    fn accepts_only_packaged_runner_ids() {
+        assert!(is_supported_runner("coding-cat"));
+        assert!(is_supported_runner("coding-fish"));
+        assert!(!is_supported_runner("../custom"));
+    }
 }
 
 #[tauri::command]
@@ -146,7 +209,7 @@ pub async fn get_ai_usage_today(state: State<'_, AppState>) -> Result<AiUsageTod
          ORDER BY observed_at DESC
          LIMIT 1",
     )
-    .bind(date)
+    .bind(&date)
     .fetch_optional(&state.pool)
     .await
     .map_err(|error| error.to_string())?;
@@ -307,6 +370,7 @@ pub async fn get_claude_usage_today(
             output_tokens: 0,
             cached_tokens: 0,
             cache_write_tokens: 0,
+            session_count: 0,
             last_received_at: None,
             status: "disconnected".to_string(),
             error: None,
@@ -324,7 +388,7 @@ pub async fn get_claude_usage_today(
          FROM ai_usage_events
          WHERE provider = 'claude' AND date(occurred_at, 'localtime') = ?",
     )
-    .bind(date)
+    .bind(&date)
     .fetch_one(&state.pool)
     .await
     .map_err(|error| error.to_string())?;
@@ -336,6 +400,17 @@ pub async fn get_claude_usage_today(
     .await
     .map_err(|error| error.to_string())?;
     let (last_received_at, error) = adapter.unwrap_or((None, None));
+    let session_count: i64 = sqlx::query_scalar(
+        "SELECT COUNT(DISTINCT session_key)
+         FROM ai_usage_events
+         WHERE provider = 'claude'
+           AND session_key IS NOT NULL
+           AND date(occurred_at, 'localtime') = ?",
+    )
+    .bind(&date)
+    .fetch_one(&state.pool)
+    .await
+    .map_err(|error| error.to_string())?;
     let status = if error.is_some() {
         "error"
     } else if last_received_at.is_some() {
@@ -351,9 +426,68 @@ pub async fn get_claude_usage_today(
         output_tokens: totals.2,
         cached_tokens: totals.3,
         cache_write_tokens: totals.4,
+        session_count,
         last_received_at,
         status: status.to_string(),
         error,
+    })
+}
+
+#[tauri::command]
+pub async fn get_ai_activity_status(
+    state: State<'_, AppState>,
+) -> Result<AiActivityStatus, String> {
+    let cutoff = Utc::now() - Duration::minutes(15);
+    let claude_active_sessions: i64 = if adapters::claude::is_enabled(&state.pool).await? {
+        sqlx::query_scalar(
+            "SELECT COUNT(DISTINCT session_key)
+             FROM ai_usage_events
+             WHERE provider = 'claude'
+               AND session_key IS NOT NULL
+               AND datetime(occurred_at) >= datetime(?)",
+        )
+        .bind(cutoff.to_rfc3339())
+        .fetch_one(&state.pool)
+        .await
+        .map_err(|error| error.to_string())?
+    } else {
+        0
+    };
+    let claude_active = claude_active_sessions > 0;
+
+    let codex_active = if adapters::codex::is_enabled(&state.pool).await? {
+        let date = Local::now().date_naive().to_string();
+        let snapshots: Vec<(i64, String)> = sqlx::query_as(
+            "SELECT total_tokens, observed_at
+             FROM ai_usage_snapshots
+             WHERE provider = 'codex'
+               AND scope = 'account-day'
+               AND bucket_started_at = ?
+             ORDER BY observed_at DESC
+             LIMIT 2",
+        )
+        .bind(date)
+        .fetch_all(&state.pool)
+        .await
+        .map_err(|error| error.to_string())?;
+        match snapshots.as_slice() {
+            [latest, previous] => {
+                latest.0 > previous.0
+                    && DateTime::parse_from_rfc3339(&latest.1)
+                        .map(|observed| observed.with_timezone(&Utc) >= cutoff)
+                        .unwrap_or(false)
+            }
+            _ => false,
+        }
+    } else {
+        false
+    };
+
+    Ok(AiActivityStatus {
+        active_provider_count: i64::from(codex_active) + i64::from(claude_active),
+        codex_active,
+        claude_active,
+        claude_active_sessions,
     })
 }
 

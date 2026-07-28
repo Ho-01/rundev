@@ -5,6 +5,8 @@ import sharp from "sharp";
 const input = process.argv[2];
 const outputDir = process.argv[3] ?? "src-tauri/icons/tray/coding";
 const greenKey = process.argv.includes("--green-key");
+const magentaKey = process.argv.includes("--magenta-key");
+const lockLaptop = process.argv.includes("--lock-laptop");
 
 if (!input) {
   throw new Error("Usage: node scripts/build-tray-animation.mjs <sprite.png> [output-dir]");
@@ -20,11 +22,14 @@ for (let index = 0; index < data.length; index += 4) {
   const red = data[index];
   const green = data[index + 1];
   const blue = data[index + 2];
-  const alpha = greenKey
+  const keyDistance = magentaKey
+    ? Math.hypot(red - 255, green, blue - 255)
+    : Math.hypot(red, green - 255, blue);
+  const alpha = greenKey || magentaKey
     ? Math.round(
         Math.max(
           0,
-          Math.min(255, ((Math.hypot(red, green - 255, blue) - 42) / 54) * 255)
+          Math.min(255, ((keyDistance - 42) / 54) * 255)
         )
       )
     : Math.round(
@@ -37,6 +42,10 @@ for (let index = 0; index < data.length; index += 4) {
 
   if (greenKey && alpha > 0) {
     data[index + 1] = Math.min(green, Math.max(red, blue) + 12);
+  } else if (magentaKey && alpha > 0) {
+    const edgeColor = Math.max(red, blue);
+    data[index] = Math.min(red, green + Math.max(12, Math.round((edgeColor - green) * 0.15)));
+    data[index + 2] = Math.min(blue, green + Math.max(12, Math.round((edgeColor - green) * 0.15)));
   } else if (alpha < 245) {
     data[index] = Math.min(red, green + 18);
     data[index + 2] = Math.min(blue, green + 18);
@@ -46,7 +55,7 @@ for (let index = 0; index < data.length; index += 4) {
 const frameWidth = Math.floor(info.width / 4);
 let crop = { left: 0, top: 150, width: frameWidth, height: 480 };
 
-if (greenKey) {
+if (greenKey || magentaKey) {
   let minX = frameWidth;
   let minY = info.height;
   let maxX = 0;
@@ -108,7 +117,7 @@ for (let frame = 0; frame < 4; frame += 1) {
   );
 }
 
-if (greenKey) {
+if ((greenKey || magentaKey) && lockLaptop) {
   const firstFramePath = path.join(outputDir, "01.png");
   const { data: fixed, info: fixedInfo } = await sharp(firstFramePath)
     .ensureAlpha()
@@ -124,7 +133,7 @@ if (greenKey) {
 
     for (let y = 0; y < fixedInfo.height; y += 1) {
       for (let x = 0; x < fixedInfo.width; x += 1) {
-        const isLaptop = (x <= 14 && y >= 8) || (x <= 20 && y >= 20);
+        const isLaptop = (x <= 15 && y >= 8) || (x <= 20 && y >= 20);
         if (!isLaptop) continue;
         const offset = (y * fixedInfo.width + x) * 4;
         fixed.copy(current, offset, offset, offset + 4);

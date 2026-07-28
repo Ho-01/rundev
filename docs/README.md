@@ -19,6 +19,7 @@
 
 - [Codex 사용량 연동](features/codex-integration.md)
 - [Claude Code 사용량 연동](features/claude-integration.md)
+- [AI 공급자 아이콘 출처](assets/provider-icons.md)
 
 ## 릴리스
 

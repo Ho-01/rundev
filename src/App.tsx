@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import {
-  Bot,
   ChevronRight,
   CircleHelp,
   Clock3,
@@ -16,8 +15,15 @@ import codingCat1 from "../src-tauri/icons/tray/coding/01.png";
 import codingCat2 from "../src-tauri/icons/tray/coding/02.png";
 import codingCat3 from "../src-tauri/icons/tray/coding/03.png";
 import codingCat4 from "../src-tauri/icons/tray/coding/04.png";
+import codingFish1 from "../src-tauri/icons/tray/coding-fish/01.png";
+import codingFish2 from "../src-tauri/icons/tray/coding-fish/02.png";
+import codingFish3 from "../src-tauri/icons/tray/coding-fish/03.png";
+import codingFish4 from "../src-tauri/icons/tray/coding-fish/04.png";
+import openAiIcon from "./assets/providers/openai.svg";
+import claudeIcon from "./assets/providers/claude.svg";
 
 const codingCatFrames = [codingCat1, codingCat2, codingCat3, codingCat4];
+const codingFishFrames = [codingFish1, codingFish2, codingFish3, codingFish4];
 
 function formatDuration(seconds: number) {
   const hours = Math.floor(seconds / 3600);
@@ -62,19 +68,25 @@ export function App() {
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [headerFrame, setHeaderFrame] = useState(0);
+  const [runnerDialogOpen, setRunnerDialogOpen] = useState(false);
+  const freezeRunner = new URLSearchParams(window.location.search).has("freezeRunner");
   const {
     summary,
     character,
     aiUsage,
     claudeUsage,
+    aiActivity,
+    runner,
     loading,
     error,
     refresh,
     connectCodex,
     disconnectCodex,
     connectClaude,
-    disconnectClaude
+    disconnectClaude,
+    selectRunner
   } = useDashboardStore();
+  const runnerFrames = runner?.runnerId === "coding-fish" ? codingFishFrames : codingCatFrames;
 
   async function openCodexConnection() {
     setPreviewLoading(true);
@@ -121,24 +133,27 @@ export function App() {
   }, [refresh]);
 
   useEffect(() => {
+    if (freezeRunner) return;
     const timer = window.setInterval(
-      () => setHeaderFrame((frame) => (frame + 1) % codingCatFrames.length),
+      () => setHeaderFrame((frame) => (frame + 1) % runnerFrames.length),
       170
     );
     return () => window.clearInterval(timer);
-  }, []);
+  }, [freezeRunner, runnerFrames.length]);
 
   const levelProgress = character
     ? (character.xpIntoLevel / character.xpForNextLevel) * 100
     : 0;
   const activeMinutes = Math.floor((summary?.activeSeconds ?? 0) / 60);
   const focusProgress = Math.min(100, (activeMinutes / 120) * 100);
+  const hasUsageDetails =
+    aiUsage?.status !== "disconnected" || claudeUsage?.status !== "disconnected";
 
   return (
-    <main className="popover">
+    <main className={`popover${hasUsageDetails ? " dense" : ""}`}>
       <header className="runner-header">
         <div className="runner">
-          <img src={codingCatFrames[headerFrame]} alt="" aria-hidden="true" />
+          <img src={runnerFrames[headerFrame]} alt="" aria-hidden="true" />
         </div>
         <div className="runner-copy">
           <strong>RunDev</strong>
@@ -166,8 +181,25 @@ export function App() {
           </div>
           <div>
             <Code2 size={13} />
-            <span>활성 세션</span>
-            <strong>0</strong>
+            <span>활성 AI</span>
+            <strong
+              className="active-provider-icons"
+              title={`Codex ${aiActivity?.codexActive ? "활성" : "비활성"}, Claude ${
+                aiActivity?.claudeActive ? `${aiActivity.claudeActiveSessions}개 세션 활성` : "비활성"
+              }`}
+            >
+              <img
+                src={openAiIcon}
+                className={aiActivity?.codexActive ? "active" : ""}
+                alt="Codex"
+              />
+              <img
+                src={claudeIcon}
+                className={aiActivity?.claudeActive ? "active" : ""}
+                alt="Claude Code"
+              />
+              <span>{aiActivity?.activeProviderCount ?? 0}</span>
+            </strong>
           </div>
           <div>
             <Flame size={13} />
@@ -182,7 +214,9 @@ export function App() {
       <section className="info-section compact">
         <SectionTitle>AI 사용량</SectionTitle>
         <div className="provider-row">
-          <span className="provider-icon"><Bot size={15} /></span>
+          <span className="provider-icon">
+            <img className="openai-icon" src={openAiIcon} alt="" aria-hidden="true" />
+          </span>
           <div>
             <strong>Codex</strong>
             <span>
@@ -234,7 +268,9 @@ export function App() {
           </p>
         )}
         <div className="provider-row">
-          <span className="provider-icon"><Bot size={15} /></span>
+          <span className="provider-icon">
+            <img src={claudeIcon} alt="" aria-hidden="true" />
+          </span>
           <div>
             <strong>Claude Code</strong>
             <span>
@@ -267,7 +303,7 @@ export function App() {
                 ? "Claude Code 재시작 후 첫 응답 대기"
                 : "오늘 총 토큰"}
             </span>
-            <span>출처 <b>Claude OTel</b></span>
+            <span>오늘 세션 <b>{claudeUsage?.sessionCount ?? 0}개</b></span>
             <button
               className="disconnect-button"
               type="button"
@@ -303,7 +339,7 @@ export function App() {
       </section>
 
       <nav className="panel-menu">
-        <button>
+        <button type="button" onClick={() => setRunnerDialogOpen(true)}>
           <span><Sparkles size={15} /> 러너 변경</span>
           <ChevronRight size={14} />
         </button>
@@ -315,6 +351,38 @@ export function App() {
 
       {loading && <div className="loading-line" />}
       {error && <p className="error-message">{error}</p>}
+      {runnerDialogOpen && (
+        <div className="dialog-backdrop" role="presentation">
+          <section
+            className="account-dialog runner-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="runner-title"
+          >
+            <h2 id="runner-title">러너 변경</h2>
+            <p>트레이와 RunDev 화면에서 함께 달릴 러너를 선택하세요.</p>
+            <div className="runner-options">
+              {[
+                { id: "coding-cat" as const, name: "코딩 고양이", frame: codingCat1 },
+                { id: "coding-fish" as const, name: "노란 물고기", frame: codingFish1 }
+              ].map((option) => (
+                <button
+                  key={option.id}
+                  type="button"
+                  className={runner?.runnerId === option.id ? "selected" : ""}
+                  onClick={() => void selectRunner(option.id).then(() => setRunnerDialogOpen(false))}
+                >
+                  <img src={option.frame} alt="" aria-hidden="true" />
+                  <span>{option.name}</span>
+                </button>
+              ))}
+            </div>
+            <div className="dialog-actions">
+              <button type="button" onClick={() => setRunnerDialogOpen(false)}>닫기</button>
+            </div>
+          </section>
+        </div>
+      )}
       {accountPreview && (
         <div className="dialog-backdrop" role="presentation">
           <section

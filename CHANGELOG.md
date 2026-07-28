@@ -7,6 +7,9 @@ RunDev의 사용자에게 의미 있는 변경을 기록한다. 커밋 목록이
 
 ### Added
 
+- 노트북하는 노란 물고기 러너와 러너 선택·영속화
+- 주요 UI 상태 스크린샷과 지원 러너 GIF를 표시하는 README 갤러리
+- UI·러너 변경 시 README 애셋을 자동 갱신하는 GitHub Actions
 - Tauri 2 기반 Windows/macOS 트레이 애플리케이션
 - React 대시보드와 Rust command 경계
 - SQLite 로컬 저장소와 migration
@@ -16,6 +19,8 @@ RunDev의 사용자에게 의미 있는 변경을 기록한다. 커밋 목록이
 - Codex 계정 사용량 연동
 - macOS universal DMG 자동 테스트 빌드
 - 앱 버전 동기화와 검증 도구
+- 익명 세션 키 기반 Claude Code 세션 수와 활성 AI 표시
+- Codex와 Claude Code 공급자 아이콘
 
 ### Changed
 

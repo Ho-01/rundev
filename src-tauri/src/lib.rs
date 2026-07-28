@@ -26,6 +26,11 @@ pub fn run() {
             std::fs::create_dir_all(&app_data_dir)?;
             let database_url = format!("sqlite://{}", app_data_dir.join("rundev.db").display());
             let pool = tauri::async_runtime::block_on(database::connect(&database_url))?;
+            let selected_runner: Option<String> = tauri::async_runtime::block_on(
+                sqlx::query_scalar("SELECT value FROM app_settings WHERE key = 'runner.selected'")
+                    .fetch_optional(&pool),
+            )?;
+            tray::set_runner(selected_runner.as_deref().unwrap_or("coding-cat"));
             app.manage(AppState { pool: pool.clone() });
             tauri::async_runtime::spawn(adapters::claude::serve(pool.clone()));
             tauri::async_runtime::spawn(async move {
@@ -61,7 +66,10 @@ pub fn run() {
             commands::preview_claude_connection,
             commands::connect_claude,
             commands::disconnect_claude,
-            commands::get_claude_usage_today
+            commands::get_claude_usage_today,
+            commands::get_ai_activity_status,
+            commands::get_runner_selection,
+            commands::set_runner_selection
         ])
         .run(tauri::generate_context!())
         .expect("error while running RunDev");
