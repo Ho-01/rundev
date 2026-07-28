@@ -2,7 +2,6 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import type {
   AiUsageToday,
-  AiActivityStatus,
   CharacterState,
   ClaudeConnectionPreview,
   ClaudeUsageToday,
@@ -59,13 +58,6 @@ const previewClaudeUsage: ClaudeUsageToday = {
   lastReceivedAt: null,
   status: "disconnected",
   error: null
-};
-
-const previewAiActivity: AiActivityStatus = {
-  activeProviderCount: 0,
-  codexActive: false,
-  claudeActive: false,
-  claudeActiveSessions: 0
 };
 
 const previewKeyboard: KeyboardActivityToday = {
@@ -132,12 +124,6 @@ function getPreviewDashboard() {
         lastReceivedAt: "2026-07-28T16:51:00+09:00",
         status: "connected" as const
       },
-      aiActivity: {
-        activeProviderCount: 2,
-        codexActive: true,
-        claudeActive: true,
-        claudeActiveSessions: 2
-      },
       keyboard: {
         ...previewKeyboard,
         pressCount: 8_421,
@@ -162,7 +148,6 @@ function getPreviewDashboard() {
         ...previewClaudeUsage,
         status: "waiting" as const
       },
-      aiActivity: previewAiActivity,
       keyboard: previewKeyboard,
       runner: previewRunner()
     };
@@ -173,7 +158,6 @@ function getPreviewDashboard() {
     character: previewCharacter,
     aiUsage: previewAiUsage,
     claudeUsage: previewClaudeUsage,
-    aiActivity: previewAiActivity,
     keyboard: previewKeyboard,
     runner: previewRunner()
   };
@@ -258,17 +242,16 @@ export async function getDashboard() {
     return getPreviewDashboard();
   }
 
-  const [summary, focus, character, aiUsage, claudeUsage, aiActivity, keyboard, runner] =
+  const [summary, focus, character, aiUsage, claudeUsage, keyboard, runner] =
     await Promise.all([
     invoke<DailySummary>("get_daily_summary"),
     invoke<FocusActivityToday>("get_focus_activity_today"),
     invoke<CharacterState>("get_character_state"),
     invoke<AiUsageToday>("get_ai_usage_today"),
     invoke<ClaudeUsageToday>("get_claude_usage_today"),
-    invoke<AiActivityStatus>("get_ai_activity_status"),
     invoke<KeyboardActivityToday>("get_keyboard_activity_today"),
     invoke<RunnerSelection>("get_runner_selection")
   ]);
 
-  return { summary, focus, character, aiUsage, claudeUsage, aiActivity, keyboard, runner };
+  return { summary, focus, character, aiUsage, claudeUsage, keyboard, runner };
 }

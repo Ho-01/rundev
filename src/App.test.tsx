@@ -10,7 +10,6 @@ describe("App", () => {
     expect(await screen.findByText("개발 활동")).toBeInTheDocument();
     expect(await screen.findByText("개발 도구 노려본 시간")).toBeInTheDocument();
     expect(await screen.findByText("마지막으로 본 도구")).toBeInTheDocument();
-    expect(await screen.findByText("활성 AI")).toBeInTheDocument();
     expect(await screen.findByText("Claude Code")).toBeInTheDocument();
     expect(await screen.findByText("오늘 두드린 키보드")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "개발자 변경" }));

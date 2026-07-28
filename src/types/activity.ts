@@ -61,13 +61,6 @@ export type ClaudeUsageToday = {
   error: string | null;
 };
 
-export type AiActivityStatus = {
-  activeProviderCount: number;
-  codexActive: boolean;
-  claudeActive: boolean;
-  claudeActiveSessions: number;
-};
-
 export type KeyboardActivityToday = {
   localDate: string;
   pressCount: number;

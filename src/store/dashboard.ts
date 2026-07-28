@@ -9,7 +9,6 @@ import {
 } from "../services/rundev";
 import type {
   AiUsageToday,
-  AiActivityStatus,
   CharacterState,
   ClaudeUsageToday,
   DailySummary,
@@ -26,7 +25,6 @@ type DashboardStore = {
   character: CharacterState | null;
   aiUsage: AiUsageToday | null;
   claudeUsage: ClaudeUsageToday | null;
-  aiActivity: AiActivityStatus | null;
   keyboard: KeyboardActivityToday | null;
   runner: RunnerSelection | null;
   loading: boolean;
@@ -47,7 +45,6 @@ export const useDashboardStore = create<DashboardStore>((set) => ({
   character: null,
   aiUsage: null,
   claudeUsage: null,
-  aiActivity: null,
   keyboard: null,
   runner: null,
   setKeyboardActivity: (keyboard) => set({ keyboard }),

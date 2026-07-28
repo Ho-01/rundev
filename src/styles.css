@@ -142,6 +142,8 @@ button { color: inherit; font: inherit; }
 .primary-stat { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 7px; }
 .primary-stat span { color: #d0d0d2; font-size: 13px; }
 .primary-stat strong { font-size: 24px; font-weight: 500; letter-spacing: -.045em; font-variant-numeric: tabular-nums; }
+.primary-label { display: flex; align-items: center; gap: 6px; }
+.primary-label svg { flex: 0 0 auto; color: #85858b; }
 
 .meter { width: 100%; height: 5px; overflow: hidden; background: #3a3a3c; border-radius: 99px; }
 .meter span { display: block; height: 100%; min-width: 2px; background: #8bc34a; border-radius: inherit; transition: width .25s ease; }
@@ -169,16 +171,6 @@ button { color: inherit; font: inherit; }
 .keyboard-permission { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 6px; }
 .keyboard-permission span { color: #8e8e94; font-size: 9px; line-height: 1.35; }
 .keyboard-permission button { flex: 0 0 auto; padding: 4px 7px; color: #171717; background: #e8e8e8; border: 0; border-radius: 5px; font-size: 9px; font-weight: 700; }
-.detail-grid { display: grid; grid-template-columns: repeat(3, 1fr); margin-top: 10px; }
-.detail-grid > div { display: grid; grid-template-columns: 17px 1fr; align-items: center; row-gap: 3px; color: #85858a; }
-.detail-grid svg { grid-row: 1 / 3; color: #77777d; }
-.detail-grid span { font-size: 10px; }
-.detail-grid strong { color: #dedee0; font-size: 12px; font-weight: 500; font-variant-numeric: tabular-nums; }
-.detail-grid .active-provider-icons { display: flex; align-items: center; gap: 3px; }
-.active-provider-icons img { width: 12px; height: 12px; opacity: .25; object-fit: contain; }
-.active-provider-icons img:first-child { filter: invert(1); }
-.active-provider-icons img.active { opacity: 1; }
-.active-provider-icons span { margin-left: 1px; color: #dedee0; font-size: 11px; }
 
 .provider-row { display: flex; align-items: center; }
 .provider-row + .provider-row, .mini-stats + .provider-row { margin-top: 10px; }
@@ -227,7 +219,6 @@ button { color: inherit; font: inherit; }
 .popover.dense .divider { margin: 5px 0; }
 .popover.dense .section-title { margin-bottom: 6px; }
 .popover.dense .primary-stat { margin-bottom: 5px; }
-.popover.dense .detail-grid { margin-top: 7px; }
 .popover.dense .provider-row + .provider-row,
 .popover.dense .mini-stats + .provider-row { margin-top: 7px; }
 .popover.dense .mini-stats { margin-top: 5px; }

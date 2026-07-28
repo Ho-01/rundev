@@ -3,10 +3,8 @@ import {
   ChevronRight,
   CircleHelp,
   Clock3,
-  Code2,
-  Flame,
   Keyboard,
-  Sparkles
+  Settings2
 } from "lucide-react";
 import { useDashboardStore } from "./store/dashboard";
 import {
@@ -80,7 +78,6 @@ export function App() {
     character,
     aiUsage,
     claudeUsage,
-    aiActivity,
     keyboard,
     runner,
     loading,
@@ -168,8 +165,6 @@ export function App() {
   const levelProgress = character
     ? (character.xpIntoLevel / character.xpForNextLevel) * 100
     : 0;
-  const activeMinutes = Math.floor((summary?.activeSeconds ?? 0) / 60);
-  const focusProgress = Math.min(100, (activeMinutes / 120) * 100);
   const focusRewardProgress = ((summary?.activeSeconds ?? 0) % 1_800) / 18;
   const focusRewardRemaining =
     1_800 - ((summary?.activeSeconds ?? 0) % 1_800);
@@ -197,7 +192,7 @@ export function App() {
           aria-label="개발자 변경"
           onClick={() => setRunnerDialogOpen(true)}
         >
-          <Sparkles size={17} />
+          <Settings2 size={17} />
         </button>
       </header>
 
@@ -206,10 +201,12 @@ export function App() {
       <section className="info-section">
         <SectionTitle>개발 활동</SectionTitle>
         <div className="primary-stat">
-          <span>개발 도구 노려본 시간</span>
+          <div className="primary-label">
+            <Clock3 size={14} />
+            <span>개발 도구 노려본 시간</span>
+          </div>
           <strong>{formatDuration(summary?.activeSeconds ?? 0)}</strong>
         </div>
-        <Meter value={focusProgress} />
         <div className="keyboard-progress focus-reward">
           <Meter value={focusRewardProgress} />
           <span>다음 +10 XP까지 {formatRemainingMinutes(focusRewardRemaining)}</span>
@@ -266,40 +263,6 @@ export function App() {
             </span>
           </div>
         )}
-        <div className="detail-grid">
-          <div>
-            <Clock3 size={13} />
-            <span>목표</span>
-            <strong>2h</strong>
-          </div>
-          <div>
-            <Code2 size={13} />
-            <span>활성 AI</span>
-            <strong
-              className="active-provider-icons"
-              title={`Codex ${aiActivity?.codexActive ? "활성" : "비활성"}, Claude ${
-                aiActivity?.claudeActive ? `${aiActivity.claudeActiveSessions}개 세션 활성` : "비활성"
-              }`}
-            >
-              <img
-                src={openAiIcon}
-                className={aiActivity?.codexActive ? "active" : ""}
-                alt="Codex"
-              />
-              <img
-                src={claudeIcon}
-                className={aiActivity?.claudeActive ? "active" : ""}
-                alt="Claude Code"
-              />
-              <span>{aiActivity?.activeProviderCount ?? 0}</span>
-            </strong>
-          </div>
-          <div>
-            <Flame size={13} />
-            <span>오늘 XP</span>
-            <strong>{summary?.xpEarned ?? 0}</strong>
-          </div>
-        </div>
       </section>
 
       <div className="divider" />
