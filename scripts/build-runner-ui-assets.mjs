@@ -33,9 +33,16 @@ for (const runnerId of runnerIds) {
     );
     if (renderedSize > 128) {
       const inset = Math.floor((renderedSize - 128) / 2);
-      pipeline = pipeline.extract({ left: inset, top: inset, width: 128, height: 128 });
+      pipeline = pipeline.extract({
+        left: inset,
+        top: inset,
+        width: 128,
+        height: 128
+      });
     }
-    await pipeline.png({ compressionLevel: 9 }).toFile(path.join(outputDirectory, fileName));
+    await pipeline
+      .png({ compressionLevel: 9 })
+      .toFile(path.join(outputDirectory, fileName));
   }
 }
 

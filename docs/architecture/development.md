@@ -60,6 +60,17 @@ npm.cmd run tray:frames -- <sprite.png> src-tauri/icons/tray/coding
 npm.cmd run runners:ui
 ```
 
+러너 프레임을 새로 만들 때는 노트북과 상체가 프레임마다 흔들리지 않도록 마스터 및
+트레이 프레임에 안정화 단계를 적용한다. 1번 프레임을 고정 기준으로 삼고, 앞발과
+키보드가 맞닿는 작은 영역만 2–4번 프레임에서 유지한다. 버튜버의 눈 깜빡임처럼
+의도한 보조 동작은 러너별 허용 영역으로 명시한다.
+
+```powershell
+node scripts/stabilize-runner-animation.mjs coding-cat
+node scripts/stabilize-runner-animation.mjs coding-cat src-tauri/icons/tray/coding 32
+npm.cmd run runners:ui
+```
+
 React는 `src/assets/runners/ui/`만 사용하고 네이티브 트레이는
 `src-tauri/icons/tray/`의 32×32 전용 애셋만 사용한다. 화면에서 트레이 프레임을
 확대해 사용하지 않는다.

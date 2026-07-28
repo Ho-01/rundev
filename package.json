@@ -15,6 +15,7 @@
     "version:check-tag": "node scripts/version.mjs tag",
     "tray:frames": "node scripts/build-tray-animation.mjs",
     "runners:ui": "node scripts/build-runner-ui-assets.mjs",
+    "runners:stabilize": "node scripts/stabilize-runner-animation.mjs",
     "docs:assets": "node scripts/build-runner-ui-assets.mjs && node scripts/generate-readme-assets.mjs",
     "docs:assets:refresh": "npm run build && npm run docs:assets",
     "docs:assets:check": "npm run docs:assets && git diff --exit-code -- docs/assets/readme",
