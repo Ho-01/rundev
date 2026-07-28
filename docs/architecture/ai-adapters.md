@@ -1,0 +1,41 @@
+# AI 어댑터
+
+## 경계
+
+AI 어댑터는 Rust가 소유한다. React는 `src/services/rundev.ts`에 캡슐화된 Tauri
+command로 연결 상태와 집계 결과만 조회한다.
+
+```text
+AI provider or local tool
+        ↓
+Rust adapter
+        ↓
+normalized snapshot/event
+        ↓
+SQLite
+        ↓
+Tauri command
+        ↓
+Zustand / React
+```
+
+## Codex
+
+Codex 어댑터는 사용자가 승인한 로그인 환경의 계정 사용량을 주기적으로 조회해
+`ai_usage_snapshots`에 일간 스냅샷으로 저장한다. 특정 CLI 프로세스의 이벤트를
+수집하는 구조가 아니다.
+
+## Claude Code
+
+Claude 어댑터는 `127.0.0.1:43182`에서 OTLP/HTTP JSON 로그를 받는다. 연동마다
+생성한 비밀 헤더가 일치하고 `claude_code.api_request`인 이벤트만 정규화해
+`ai_usage_events`에 기록한다.
+
+`external_event_id`의 유니크 인덱스로 여러 세션이나 재전송의 중복을 막는다.
+프롬프트, 응답, 도구 내용 속성은 설정에서 비활성화하며 DB 모델에도 원문 필드를
+두지 않는다.
+
+## 공통 상태
+
+`ai_adapter_state`는 마지막 성공 시각과 오류를 저장한다. 연결 여부와 사용자 설정은
+`app_settings`에 저장한다. 공급자별 원본 형식은 UI로 직접 전달하지 않는다.

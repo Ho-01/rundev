@@ -2,8 +2,8 @@
 
 ## 요구 사항
 
-- Node.js 24 이상
-- npm 11 이상
+- Node.js 22 이상
+- npm 10 이상
 - Rust stable
 - Windows: WebView2
 - macOS 빌드: Xcode command line tools
@@ -29,12 +29,19 @@ npm.cmd run dev
 ## 검증
 
 ```powershell
+npm.cmd run version:check
 npm.cmd run build
 npm.cmd test
 cargo check --manifest-path src-tauri/Cargo.toml
 cargo test --manifest-path src-tauri/Cargo.toml --lib
 npm.cmd audit
 git diff --check
+```
+
+`v*` 릴리스 태그를 만들기 전에는 태그와 앱 버전도 검증한다.
+
+```powershell
+npm.cmd run version:check-tag -- v0.2.0
 ```
 
 ## 트레이 프레임 생성
@@ -82,3 +89,10 @@ macOS:
 - 잠금/절전 복귀
 - Accessibility 권한 없이 가능한 기본 기능
 
+## 자동 검증
+
+- `CI`: PR과 `main` 푸시에서 Windows 빌드, 프론트/Rust 테스트, 버전 일치와 npm
+  audit을 검사한다.
+- `macOS test build`: 앱 관련 `main` 변경에서 universal DMG를 만든다.
+- `Test release`: `v*` 태그에서 태그와 앱 버전을 확인하고 Windows NSIS와 macOS
+  universal DMG를 draft prerelease에 업로드한다.

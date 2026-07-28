@@ -45,3 +45,6 @@ Codex 인증은 실행 파일 위치와 별개다. 기본적으로 Codex의 기�
 `macOS test build` 워크플로가 자동 실행된다. 문서만 바뀐 푸시에는 실행하지 않는다.
 같은 브랜치에 새 푸시가 들어오면 진행 중인 이전 빌드는 취소해 runner 사용량을 줄인다.
 
+`v*` 태그는 별도의 `Test release` 워크플로를 실행한다. 태그와 앱 버전이 일치할
+때만 Windows NSIS와 macOS universal DMG를 draft prerelease에 업로드한다. 현재
+산출물은 Developer ID 서명과 notarization이 없는 테스트 배포물이다.

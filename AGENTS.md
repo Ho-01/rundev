@@ -75,6 +75,7 @@ database / OS adapter
 최소 검증:
 
 ```powershell
+npm.cmd run version:check
 npm.cmd run build
 npm.cmd test
 cargo check --manifest-path src-tauri/Cargo.toml
@@ -116,3 +117,11 @@ chore(english-scope): 한글 설명
 - 모듈 경계나 데이터 흐름 변경: architecture
 - 실행 및 검증 명령 변경: README와 이 문서
 
+앱 버전은 개별 파일을 직접 수정하지 않고 다음 명령으로 변경한다.
+
+```powershell
+npm.cmd run version:set -- X.Y.Z
+```
+
+버전 정책, CHANGELOG 형식 또는 릴리스 절차 변경은
+`docs/releases/versioning.md`와 `CHANGELOG.md`를 함께 확인한다.

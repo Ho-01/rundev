@@ -1,12 +1,29 @@
 # RunDev 문서
 
+## 제품
+
+- [제품 비전](product/vision.md)
+- [로드맵](product/roadmap.md)
+- [개인정보 원칙](product/privacy.md)
+
 ## 아키텍처
 
 - [시스템 개요](architecture/overview.md)
 - [네이티브 백엔드](architecture/native-backend.md)
 - [프론트엔드](architecture/frontend.md)
+- [AI 어댑터](architecture/ai-adapters.md)
 - [개발 및 검증](architecture/development.md)
 - [macOS 테스트 배포](architecture/macos-test-distribution.md)
+
+## 기능
+
+- [Codex 사용량 연동](features/codex-integration.md)
+- [Claude Code 사용량 연동](features/claude-integration.md)
+
+## 릴리스
+
+- [버전과 릴리스 관리](releases/versioning.md)
+- [변경 기록](../CHANGELOG.md)
 
 ## Architecture Decision Records
 
@@ -17,3 +34,5 @@
 - [0004 이벤트 원장 기반 XP](decisions/0004-event-ledger-xp.md)
 - [0005 개인정보 최소 수집](decisions/0005-privacy-minimal-collection.md)
 - [0006 PNG 프레임 트레이 애니메이션](decisions/0006-png-frame-tray-animation.md)
+- [0007 AI 사용량 관찰 모델](decisions/0007-ai-usage-observation-model.md)
+- [0008 Claude Code OpenTelemetry 수집](decisions/0008-claude-opentelemetry-usage.md)
