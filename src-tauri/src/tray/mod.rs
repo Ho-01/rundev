@@ -25,11 +25,11 @@ const ORANGE_CAT_FRAMES: [&[u8]; 4] = [
     include_bytes!("../../icons/tray/coding-orange-cat/03.png").as_slice(),
     include_bytes!("../../icons/tray/coding-orange-cat/04.png").as_slice(),
 ];
-const WHITE_CAT_FRAMES: [&[u8]; 4] = [
-    include_bytes!("../../icons/tray/coding-white-cat/01.png").as_slice(),
-    include_bytes!("../../icons/tray/coding-white-cat/02.png").as_slice(),
-    include_bytes!("../../icons/tray/coding-white-cat/03.png").as_slice(),
-    include_bytes!("../../icons/tray/coding-white-cat/04.png").as_slice(),
+const SHRIMP_FRAMES: [&[u8]; 4] = [
+    include_bytes!("../../icons/tray/coding-shrimp/01.png").as_slice(),
+    include_bytes!("../../icons/tray/coding-shrimp/02.png").as_slice(),
+    include_bytes!("../../icons/tray/coding-shrimp/03.png").as_slice(),
+    include_bytes!("../../icons/tray/coding-shrimp/04.png").as_slice(),
 ];
 const VTUBER_FRAMES: [&[u8]; 4] = [
     include_bytes!("../../icons/tray/coding-vtuber/01.png").as_slice(),
@@ -42,7 +42,7 @@ pub fn set_runner(runner: &str) {
     let runner_index = match runner {
         "coding-fish" => 1,
         "coding-orange-cat" => 2,
-        "coding-white-cat" => 3,
+        "coding-shrimp" | "coding-white-cat" => 3,
         "coding-vtuber" => 4,
         _ => 0,
     };
@@ -53,7 +53,7 @@ fn selected_frames() -> &'static [&'static [u8]; 4] {
     match SELECTED_RUNNER.load(Ordering::Relaxed) {
         1 => &FISH_FRAMES,
         2 => &ORANGE_CAT_FRAMES,
-        3 => &WHITE_CAT_FRAMES,
+        3 => &SHRIMP_FRAMES,
         4 => &VTUBER_FRAMES,
         _ => &CAT_FRAMES,
     }

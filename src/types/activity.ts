@@ -58,11 +58,21 @@ export type AiActivityStatus = {
   claudeActiveSessions: number;
 };
 
+export type KeyboardActivityToday = {
+  localDate: string;
+  pressCount: number;
+  rewardedMilestones: number;
+  xpEarned: number;
+  nextRewardAt: number;
+  status: "starting" | "active" | "permission-required" | "error" | "unavailable";
+  permissionRequired: boolean;
+};
+
 export type RunnerId =
   | "coding-cat"
   | "coding-fish"
   | "coding-orange-cat"
-  | "coding-white-cat"
+  | "coding-shrimp"
   | "coding-vtuber";
 
 export type RunnerSelection = {

@@ -7,6 +7,7 @@ import type {
   ClaudeUsageToday,
   CodexAccountPreview,
   DailySummary,
+  KeyboardActivityToday,
   RunnerId,
   RunnerSelection
 } from "../types/activity";
@@ -59,13 +60,23 @@ const previewAiActivity: AiActivityStatus = {
   claudeActiveSessions: 0
 };
 
+const previewKeyboard: KeyboardActivityToday = {
+  localDate: new Date().toISOString().slice(0, 10),
+  pressCount: 0,
+  rewardedMilestones: 0,
+  xpEarned: 0,
+  nextRewardAt: 2_000,
+  status: "active",
+  permissionRequired: false
+};
+
 function previewRunner(): RunnerSelection {
   const requested = new URLSearchParams(window.location.search).get("runner");
   const supported: RunnerId[] = [
     "coding-cat",
     "coding-fish",
     "coding-orange-cat",
-    "coding-white-cat",
+    "coding-shrimp",
     "coding-vtuber"
   ];
   return {
@@ -111,6 +122,13 @@ function getPreviewDashboard() {
         claudeActive: true,
         claudeActiveSessions: 2
       },
+      keyboard: {
+        ...previewKeyboard,
+        pressCount: 8_421,
+        rewardedMilestones: 4,
+        xpEarned: 40,
+        nextRewardAt: 10_000
+      },
       runner: previewRunner()
     };
   }
@@ -128,6 +146,7 @@ function getPreviewDashboard() {
         status: "waiting" as const
       },
       aiActivity: previewAiActivity,
+      keyboard: previewKeyboard,
       runner: previewRunner()
     };
   }
@@ -137,6 +156,7 @@ function getPreviewDashboard() {
     aiUsage: previewAiUsage,
     claudeUsage: previewClaudeUsage,
     aiActivity: previewAiActivity,
+    keyboard: previewKeyboard,
     runner: previewRunner()
   };
 }
@@ -144,6 +164,11 @@ function getPreviewDashboard() {
 export async function setRunnerSelection(runnerId: RunnerId) {
   if (!isTauri()) return;
   await invoke("set_runner_selection", { runnerId });
+}
+
+export async function openKeyboardPermissionSettings() {
+  if (!isTauri()) return;
+  await invoke("open_keyboard_permission_settings");
 }
 
 export async function previewCodexAccount() {
@@ -197,14 +222,16 @@ export async function getDashboard() {
     return getPreviewDashboard();
   }
 
-  const [summary, character, aiUsage, claudeUsage, aiActivity, runner] = await Promise.all([
+  const [summary, character, aiUsage, claudeUsage, aiActivity, keyboard, runner] =
+    await Promise.all([
     invoke<DailySummary>("get_daily_summary"),
     invoke<CharacterState>("get_character_state"),
     invoke<AiUsageToday>("get_ai_usage_today"),
     invoke<ClaudeUsageToday>("get_claude_usage_today"),
     invoke<AiActivityStatus>("get_ai_activity_status"),
+    invoke<KeyboardActivityToday>("get_keyboard_activity_today"),
     invoke<RunnerSelection>("get_runner_selection")
   ]);
 
-  return { summary, character, aiUsage, claudeUsage, aiActivity, runner };
+  return { summary, character, aiUsage, claudeUsage, aiActivity, keyboard, runner };
 }

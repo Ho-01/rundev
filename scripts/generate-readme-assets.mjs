@@ -13,7 +13,7 @@ const outputDir = path.join(root, "docs", "assets", "readme");
 const runners = [
   { id: "coding-cat" },
   { id: "coding-orange-cat" },
-  { id: "coding-white-cat" },
+  { id: "coding-shrimp" },
   { id: "coding-fish" },
   { id: "coding-vtuber" }
 ];
@@ -73,7 +73,7 @@ try {
     {
       name: "runner-picker",
       query: "?preview=disconnected&runner=coding-fish&freezeRunner=1",
-      action: async () => page.getByRole("button", { name: "러너 변경" }).click()
+      action: async () => page.getByRole("button", { name: "개발자 변경" }).click()
     }
   ]) {
     await page.goto(`http://127.0.0.1:${address.port}/${scenario.query}`, {

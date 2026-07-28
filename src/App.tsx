@@ -5,11 +5,16 @@ import {
   Clock3,
   Code2,
   Flame,
+  Keyboard,
   Settings2,
   Sparkles
 } from "lucide-react";
 import { useDashboardStore } from "./store/dashboard";
-import { previewClaudeConnection, previewCodexAccount } from "./services/rundev";
+import {
+  openKeyboardPermissionSettings,
+  previewClaudeConnection,
+  previewCodexAccount
+} from "./services/rundev";
 import type {
   ClaudeConnectionPreview,
   CodexAccountPreview
@@ -69,6 +74,7 @@ export function App() {
     aiUsage,
     claudeUsage,
     aiActivity,
+    keyboard,
     runner,
     loading,
     error,
@@ -121,7 +127,7 @@ export function App() {
 
   useEffect(() => {
     void refresh();
-    const timer = window.setInterval(() => void refresh(), 30_000);
+    const timer = window.setInterval(() => void refresh(), 5_000);
     return () => window.clearInterval(timer);
   }, [refresh]);
 
@@ -139,6 +145,11 @@ export function App() {
     : 0;
   const activeMinutes = Math.floor((summary?.activeSeconds ?? 0) / 60);
   const focusProgress = Math.min(100, (activeMinutes / 120) * 100);
+  const keyboardProgress = ((keyboard?.pressCount ?? 0) % 2_000) / 20;
+  const keyboardRemaining = Math.max(
+    0,
+    (keyboard?.nextRewardAt ?? 2_000) - (keyboard?.pressCount ?? 0)
+  );
   const hasUsageDetails =
     aiUsage?.status !== "disconnected" || claudeUsage?.status !== "disconnected";
 
@@ -166,6 +177,39 @@ export function App() {
           <strong>{formatDuration(summary?.activeSeconds ?? 0)}</strong>
         </div>
         <Meter value={focusProgress} />
+        <div className="keyboard-stat">
+          <div>
+            <Keyboard size={14} />
+            <span>오늘 두드린 키보드</span>
+          </div>
+          <strong>{formatTokens(keyboard?.pressCount ?? 0)}회</strong>
+        </div>
+        {keyboard?.permissionRequired ? (
+          <div className="keyboard-permission">
+            <span>입력 내용은 저장하지 않고 횟수만 집계합니다.</span>
+            <button
+              type="button"
+              onClick={() => void openKeyboardPermissionSettings()}
+            >
+              설정 열기
+            </button>
+          </div>
+        ) : keyboard?.status === "error" || keyboard?.status === "unavailable" ? (
+          <div className="keyboard-permission">
+            <span>이 환경에서는 키보드 횟수를 측정할 수 없습니다.</span>
+          </div>
+        ) : keyboard?.status === "starting" ? (
+          <div className="keyboard-permission">
+            <span>키보드 측정을 준비하고 있습니다.</span>
+          </div>
+        ) : (
+          <div className="keyboard-progress">
+            <Meter value={keyboardProgress} />
+            <span>
+              다음 +10 XP까지 {formatTokens(keyboardRemaining)}회
+            </span>
+          </div>
+        )}
         <div className="detail-grid">
           <div>
             <Clock3 size={13} />
@@ -318,7 +362,7 @@ export function App() {
       <div className="divider" />
 
       <section className="info-section compact">
-        <SectionTitle>러너 상태</SectionTitle>
+        <SectionTitle>개발자 상태</SectionTitle>
         <div className="level-row">
           <div className="level-badge">{character?.level ?? 1}</div>
           <div className="level-copy">
@@ -333,7 +377,7 @@ export function App() {
 
       <nav className="panel-menu">
         <button type="button" onClick={() => setRunnerDialogOpen(true)}>
-          <span><Sparkles size={15} /> 러너 변경</span>
+          <span><Sparkles size={15} /> 개발자 변경</span>
           <ChevronRight size={14} />
         </button>
         <button>
@@ -352,8 +396,8 @@ export function App() {
             aria-modal="true"
             aria-labelledby="runner-title"
           >
-            <h2 id="runner-title">러너 변경</h2>
-            <p>트레이와 RunDev 화면에서 함께 달릴 러너를 선택하세요.</p>
+            <h2 id="runner-title">개발자 변경</h2>
+            <p>트레이와 RunDev 화면에 표시할 개발자 캐릭터를 선택하세요.</p>
             <div className="runner-options">
               {runnerOptions.map((option) => (
                 <button

@@ -7,7 +7,7 @@
 3. 앱 데이터 디렉터리를 생성한다.
 4. SQLite pool을 열고 migration을 실행한다.
 5. pool을 Tauri managed state로 등록한다.
-6. Claude Code 로컬 OpenTelemetry 수집기를 시작한다.
+6. 키보드 횟수 수집기와 Claude Code 로컬 OpenTelemetry 수집기를 시작한다.
 7. 트레이 메뉴와 애니메이션을 시작한다.
 8. command handler를 노출한다.
 
@@ -29,6 +29,14 @@ Updater 의존성은 포함되어 있지만 서명키와 endpoint가 없으므�
   - `get_character_state`
 - 내부 오류를 현재는 문자열로 변환한다. 오류 종류가 늘어나면 안정적인 command
   error enum을 도입한다.
+
+### `keyboard`
+
+- Windows 저수준 키보드 훅과 macOS listen-only event tap 관리
+- 자동 반복, 주입 입력, 단독 보조키 제외
+- 키 값이나 입력 순서를 보존하지 않고 횟수 신호만 일별로 저장
+- 2,000회 단위 XP 원장 기록과 `daily_activity_metrics` 갱신
+- macOS Input Monitoring 권한 상태 및 설정 화면 연결
 
 ### `tray`
 
@@ -76,6 +84,19 @@ erDiagram
     APP_SETTINGS {
         text key PK
         text value
+    }
+    KEYBOARD_DAILY_STATS {
+        text local_date PK
+        integer press_count
+        integer rewarded_milestones
+        text updated_at
+    }
+    DAILY_ACTIVITY_METRICS {
+        text local_date PK
+        text metric_type PK
+        text source PK
+        integer value
+        text updated_at
     }
 ```
 

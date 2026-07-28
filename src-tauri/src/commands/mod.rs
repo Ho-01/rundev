@@ -1,4 +1,4 @@
-use crate::{adapters, database::AppState, tray};
+use crate::{adapters, database::AppState, keyboard, tray};
 use chrono::{DateTime, Duration, Local, Utc};
 use serde::Serialize;
 use tauri::State;
@@ -84,6 +84,20 @@ pub struct RunnerSelection {
 }
 
 #[tauri::command]
+pub async fn get_keyboard_activity_today(
+    state: State<'_, AppState>,
+) -> Result<keyboard::KeyboardActivityToday, String> {
+    keyboard::today(&state.pool)
+        .await
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub fn open_keyboard_permission_settings() -> Result<(), String> {
+    keyboard::open_permission_settings()
+}
+
+#[tauri::command]
 pub async fn get_runner_selection(state: State<'_, AppState>) -> Result<RunnerSelection, String> {
     let runner_id =
         sqlx::query_scalar("SELECT value FROM app_settings WHERE key = 'runner.selected'")
@@ -91,6 +105,11 @@ pub async fn get_runner_selection(state: State<'_, AppState>) -> Result<RunnerSe
             .await
             .map_err(|error| error.to_string())?
             .unwrap_or_else(|| "coding-cat".to_string());
+    let runner_id = if runner_id == "coding-white-cat" {
+        "coding-shrimp".to_string()
+    } else {
+        runner_id
+    };
     Ok(RunnerSelection { runner_id })
 }
 
@@ -100,7 +119,7 @@ pub async fn set_runner_selection(
     state: State<'_, AppState>,
 ) -> Result<(), String> {
     if !is_supported_runner(&runner_id) {
-        return Err("지원하지 않는 러너입니다.".to_string());
+        return Err("지원하지 않는 개발자 캐릭터입니다.".to_string());
     }
     sqlx::query(
         "INSERT INTO app_settings (key, value) VALUES ('runner.selected', ?)
@@ -117,7 +136,7 @@ pub async fn set_runner_selection(
 fn is_supported_runner(runner_id: &str) -> bool {
     matches!(
         runner_id,
-        "coding-cat" | "coding-fish" | "coding-orange-cat" | "coding-white-cat" | "coding-vtuber"
+        "coding-cat" | "coding-fish" | "coding-orange-cat" | "coding-shrimp" | "coding-vtuber"
     )
 }
 
@@ -130,7 +149,7 @@ mod tests {
         assert!(is_supported_runner("coding-cat"));
         assert!(is_supported_runner("coding-fish"));
         assert!(is_supported_runner("coding-orange-cat"));
-        assert!(is_supported_runner("coding-white-cat"));
+        assert!(is_supported_runner("coding-shrimp"));
         assert!(is_supported_runner("coding-vtuber"));
         assert!(!is_supported_runner("../custom"));
     }
@@ -150,7 +169,9 @@ pub async fn get_daily_summary(state: State<'_, AppState>) -> Result<DailySummar
     .map_err(|error| error.to_string())?;
 
     let xp_earned: i64 = sqlx::query_scalar(
-        "SELECT COALESCE(SUM(amount), 0) FROM xp_events WHERE date(occurred_at) = ?",
+        "SELECT COALESCE(SUM(amount), 0)
+         FROM xp_events
+         WHERE date(occurred_at, 'localtime') = ?",
     )
     .bind(&date_text)
     .fetch_one(&state.pool)

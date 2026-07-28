@@ -4,27 +4,27 @@
 Windows/macOS 트레이 앱입니다.
 
 RunDev는 개발 활동과 사용자가 연결한 AI 도구의 집계 사용량을 로컬에서 기록하고,
-XP와 작은 러너 캐릭터로 보여줍니다. 키 입력, 프롬프트, 응답, 소스 코드 내용은
-수집하지 않습니다.
+XP와 작은 개발자 캐릭터로 보여줍니다. 키 입력 내용은 읽거나 저장하지 않고 누른
+횟수만 집계하며, 프롬프트·응답·소스 코드 내용은 수집하지 않습니다.
 
 ## 주요 화면
 
 | 연동 전 | AI 활동 중 |
 | --- | --- |
 | <img src="docs/assets/readme/dashboard-disconnected.png" width="280" alt="AI 도구 연동 전 RunDev 화면"> | <img src="docs/assets/readme/dashboard-active.png" width="280" alt="Codex와 Claude Code 활동이 집계된 RunDev 화면"> |
-| **연동 후 데이터 대기** | **러너 변경** |
-| <img src="docs/assets/readme/dashboard-connected.png" width="280" alt="AI 도구 연동 후 데이터를 기다리는 RunDev 화면"> | <img src="docs/assets/readme/runner-picker.png" width="280" alt="RunDev 러너 선택 화면"> |
+| **연동 후 데이터 대기** | **개발자 변경** |
+| <img src="docs/assets/readme/dashboard-connected.png" width="280" alt="AI 도구 연동 후 데이터를 기다리는 RunDev 화면"> | <img src="docs/assets/readme/runner-picker.png" width="280" alt="RunDev 개발자 캐릭터 선택 화면"> |
 
 화면 이미지는 320×480 팝오버 크기의 고정된 미리보기 데이터로 생성됩니다. 실제
 SQLite 데이터나 계정 정보는 문서 이미지 생성에 사용하지 않습니다.
 
-## 지원 러너
+## 지원 개발자 캐릭터
 
-| 코딩 고양이 | 주황 고양이 | 하양 고양이 | 노란 물고기 | 핑크 버튜버 |
+| 코딩 고양이 | 주황 고양이 | 주황 새우 | 노란 물고기 | 핑크 버튜버 |
 | --- | --- | --- | --- | --- |
-| <img src="docs/assets/readme/coding-cat.gif" width="96" height="96" alt="노트북하는 코딩 고양이 애니메이션"> | <img src="docs/assets/readme/coding-orange-cat.gif" width="96" height="96" alt="노트북하는 주황 고양이 애니메이션"> | <img src="docs/assets/readme/coding-white-cat.gif" width="96" height="96" alt="노트북하는 하양 고양이 애니메이션"> | <img src="docs/assets/readme/coding-fish.gif" width="96" height="96" alt="노트북하는 노란 물고기 애니메이션"> | <img src="docs/assets/readme/coding-vtuber.gif" width="96" height="96" alt="노트북하는 분홍머리 버튜버 애니메이션"> |
+| <img src="docs/assets/readme/coding-cat.gif" width="96" height="96" alt="노트북하는 코딩 고양이 애니메이션"> | <img src="docs/assets/readme/coding-orange-cat.gif" width="96" height="96" alt="노트북하는 주황 고양이 애니메이션"> | <img src="docs/assets/readme/coding-shrimp.gif" width="96" height="96" alt="노트북하는 주황 새우 애니메이션"> | <img src="docs/assets/readme/coding-fish.gif" width="96" height="96" alt="노트북하는 노란 물고기 애니메이션"> | <img src="docs/assets/readme/coding-vtuber.gif" width="96" height="96" alt="노트북하는 분홍머리 버튜버 애니메이션"> |
 
-러너는 앱의 **러너 변경** 메뉴에서 선택하며, 헤더와 네이티브 트레이 애니메이션에
+개발자 캐릭터는 앱의 **개발자 변경** 메뉴에서 선택하며, 헤더와 네이티브 트레이 애니메이션에
 동시에 적용됩니다.
 
 ## 개발
@@ -35,7 +35,7 @@ npm.cmd run tauri dev
 ```
 
 브라우저에서 UI만 확인하려면 `npm.cmd run dev`를 사용합니다. README용 주요 화면과
-러너 GIF를 로컬에서 다시 만들려면 다음 명령을 실행합니다.
+개발자 캐릭터 GIF를 로컬에서 다시 만들려면 다음 명령을 실행합니다.
 
 ```powershell
 npx.cmd playwright install chromium
@@ -43,7 +43,7 @@ npm.cmd run build
 npm.cmd run docs:assets
 ```
 
-`main`에 UI 또는 러너 애셋 변경이 푸시되면 GitHub Actions가 이미지를 다시 만들고,
+`main`에 UI 또는 개발자 캐릭터 애셋 변경이 푸시되면 GitHub Actions가 이미지를 다시 만들고,
 변경된 결과만 자동 커밋합니다.
 
 ## 버전
@@ -64,10 +64,11 @@ npm.cmd run version:set -- 0.2.0
 - 창을 닫아도 백그라운드 유지
 - 단일 인스턴스와 우클릭 종료 메뉴
 - 32×32 PNG 프레임 트레이 애니메이션
-- 256×256 마스터에서 생성하는 128×128 고해상도 화면 러너
-- 고양이 3종, 노란 물고기, 핑크 버튜버 러너 선택
+- 256×256 마스터에서 생성하는 128×128 고해상도 화면 개발자 캐릭터
+- 고양이 2종, 주황 새우, 노란 물고기, 핑크 버튜버 선택
 - SQLite 자동 생성과 초기 마이그레이션
 - Codex 계정 사용량과 Claude Code OpenTelemetry 집계
+- 오늘 누른 키보드 횟수 집계와 2,000회당 10 XP 지급
 - Rust command를 통한 요약·캐릭터·AI 상태 조회
 - React + Zustand 대시보드
 

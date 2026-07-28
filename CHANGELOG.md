@@ -7,10 +7,10 @@ RunDev의 사용자에게 의미 있는 변경을 기록한다. 커밋 목록이
 
 ### Added
 
-- 주황 고양이, 하양 고양이, 핑크 버튜버 러너
+- 주황 고양이, 주황 새우, 핑크 버튜버 개발자 캐릭터
 - 노트북하는 노란 물고기 러너와 러너 선택·영속화
-- 주요 UI 상태 스크린샷과 지원 러너 GIF를 표시하는 README 갤러리
-- UI·러너 변경 시 README 애셋을 자동 갱신하는 GitHub Actions
+- 주요 UI 상태 스크린샷과 지원 개발자 캐릭터 GIF를 표시하는 README 갤러리
+- UI·개발자 캐릭터 변경 시 README 애셋을 자동 갱신하는 GitHub Actions
 - Tauri 2 기반 Windows/macOS 트레이 애플리케이션
 - React 대시보드와 Rust command 경계
 - SQLite 로컬 저장소와 migration
@@ -22,6 +22,8 @@ RunDev의 사용자에게 의미 있는 변경을 기록한다. 커밋 목록이
 - 앱 버전 동기화와 검증 도구
 - 익명 세션 키 기반 Claude Code 세션 수와 활성 AI 표시
 - Codex와 Claude Code 공급자 아이콘
+- 입력 내용을 저장하지 않는 일별 키보드 횟수 집계와 2,000회당 10 XP 보상
+- macOS 입력 모니터링 권한 확인과 시스템 설정 연결
 
 ### Changed
 

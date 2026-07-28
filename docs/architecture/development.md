@@ -52,7 +52,7 @@ ImageGen에서 만든 마젠타 chroma-key 4열 스프라이트를 입력으로 
 npm.cmd run tray:frames -- <sprite.png> src-tauri/icons/tray/coding
 ```
 
-러너는 `src/assets/runners/master/`의 256×256 프레임을 화면 표시의 원본으로
+개발자 캐릭터는 `src/assets/runners/master/`의 256×256 프레임을 화면 표시의 원본으로
 사용한다. UI용 128×128 프레임은 다음 명령으로 생성하며 `npm.cmd run build`
 실행 전에도 자동으로 갱신된다.
 
@@ -60,7 +60,7 @@ npm.cmd run tray:frames -- <sprite.png> src-tauri/icons/tray/coding
 npm.cmd run runners:ui
 ```
 
-러너 애니메이션은 노트북의 위치·크기·각도를 모든 프레임에서 유지한다. 얼굴과
+개발자 캐릭터 애니메이션은 노트북의 위치·크기·각도를 모든 프레임에서 유지한다. 얼굴과
 몸통은 1–2픽셀 범위에서 자연스럽게 움직이고, 손이나 지느러미가 좌우 교대로
 키보드를 누르는 완전한 프레임으로 제작한다. 프레임 일부를 사각형으로 잘라 붙이지
 않으며 기본 루프는 `누름 → 중립 → 반대쪽 누름 → 중립` 순서를 사용한다.
@@ -71,7 +71,7 @@ React는 `src/assets/runners/ui/`만 사용하고 네이티브 트레이는
 `src-tauri/icons/tray/`의 32×32 전용 애셋만 사용한다. 화면에서 트레이 프레임을
 확대해 사용하지 않는다.
 
-README에 들어가는 상태별 화면과 러너 GIF는 실제 사용자 데이터 대신 URL의 고정
+README에 들어가는 상태별 화면과 개발자 캐릭터 GIF는 실제 사용자 데이터 대신 URL의 고정
 미리보기 시나리오를 사용한다.
 
 ```powershell
@@ -79,7 +79,7 @@ npm.cmd run build
 npm.cmd run docs:assets
 ```
 
-생성 결과는 `docs/assets/readme/`에 저장한다. UI나 트레이 러너 변경이 `main`에
+생성 결과는 `docs/assets/readme/`에 저장한다. UI나 트레이 개발자 캐릭터 변경이 `main`에
 푸시되면 `readme-assets.yml`이 같은 명령을 실행하고, 결과가 달라졌을 때만
 `github-actions[bot]` 커밋을 만든다.
 

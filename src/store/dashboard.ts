@@ -13,6 +13,7 @@ import type {
   CharacterState,
   ClaudeUsageToday,
   DailySummary,
+  KeyboardActivityToday,
   RunnerId,
   RunnerSelection
 } from "../types/activity";
@@ -23,6 +24,7 @@ type DashboardStore = {
   aiUsage: AiUsageToday | null;
   claudeUsage: ClaudeUsageToday | null;
   aiActivity: AiActivityStatus | null;
+  keyboard: KeyboardActivityToday | null;
   runner: RunnerSelection | null;
   loading: boolean;
   error: string | null;
@@ -40,6 +42,7 @@ export const useDashboardStore = create<DashboardStore>((set) => ({
   aiUsage: null,
   claudeUsage: null,
   aiActivity: null,
+  keyboard: null,
   runner: null,
   loading: false,
   error: null,

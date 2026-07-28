@@ -1,6 +1,7 @@
 mod adapters;
 mod commands;
 mod database;
+mod keyboard;
 mod tray;
 
 use database::AppState;
@@ -32,6 +33,7 @@ pub fn run() {
             )?;
             tray::set_runner(selected_runner.as_deref().unwrap_or("coding-cat"));
             app.manage(AppState { pool: pool.clone() });
+            keyboard::start(pool.clone());
             tauri::async_runtime::spawn(adapters::claude::serve(pool.clone()));
             tauri::async_runtime::spawn(async move {
                 loop {
@@ -68,6 +70,8 @@ pub fn run() {
             commands::disconnect_claude,
             commands::get_claude_usage_today,
             commands::get_ai_activity_status,
+            commands::get_keyboard_activity_today,
+            commands::open_keyboard_permission_settings,
             commands::get_runner_selection,
             commands::set_runner_selection
         ])

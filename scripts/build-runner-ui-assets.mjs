@@ -8,7 +8,7 @@ const uiRoot = path.join(root, "src", "assets", "runners", "ui");
 const runnerIds = [
   "coding-cat",
   "coding-orange-cat",
-  "coding-white-cat",
+  "coding-shrimp",
   "coding-fish",
   "coding-vtuber"
 ];
@@ -46,4 +46,4 @@ for (const runnerId of runnerIds) {
   }
 }
 
-console.log(`Generated 128×128 UI runner frames in ${path.relative(root, uiRoot)}`);
+console.log(`Generated 128×128 developer frames in ${path.relative(root, uiRoot)}`);
