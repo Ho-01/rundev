@@ -6,11 +6,8 @@ const input = process.argv[2];
 const outputDir = process.argv[3] ?? "src-tauri/icons/tray/coding";
 const greenKey = process.argv.includes("--green-key");
 const magentaKey = process.argv.includes("--magenta-key");
-const lockLaptop = process.argv.includes("--lock-laptop");
-const liftDarkLaptop = process.argv.includes("--lift-dark-laptop");
 const flipHorizontal = process.argv.includes("--flip-horizontal");
 const normalizeReference = process.argv.includes("--normalize-reference");
-const animateHead = process.argv.includes("--animate-head");
 
 if (!input) {
   throw new Error("Usage: node scripts/build-tray-animation.mjs <sprite.png> [output-dir]");
@@ -121,75 +118,6 @@ for (let frame = 0; frame < 4; frame += 1) {
   );
 }
 
-if ((greenKey || magentaKey) && lockLaptop) {
-  const firstFramePath = path.join(outputDir, "01.png");
-  const { data: fixed, info: fixedInfo } = await sharp(firstFramePath)
-    .ensureAlpha()
-    .raw()
-    .toBuffer({ resolveWithObject: true });
-
-  for (let frame = 2; frame <= 4; frame += 1) {
-    const framePath = path.join(outputDir, `${String(frame).padStart(2, "0")}.png`);
-    const { data: current } = await sharp(framePath)
-      .ensureAlpha()
-      .raw()
-      .toBuffer({ resolveWithObject: true });
-
-    for (let y = 0; y < fixedInfo.height; y += 1) {
-      for (let x = 0; x < fixedInfo.width; x += 1) {
-        const isLaptop = (x <= 15 && y >= 8) || (x <= 20 && y >= 20);
-        if (!isLaptop) continue;
-        const offset = (y * fixedInfo.width + x) * 4;
-        fixed.copy(current, offset, offset, offset + 4);
-      }
-    }
-
-    await sharp(current, {
-      raw: {
-        width: fixedInfo.width,
-        height: fixedInfo.height,
-        channels: 4
-      }
-    })
-      .png()
-      .toFile(framePath);
-  }
-}
-
-if (liftDarkLaptop) {
-  for (let frame = 1; frame <= 4; frame += 1) {
-    const framePath = path.join(outputDir, `${String(frame).padStart(2, "0")}.png`);
-    const { data: current, info: currentInfo } = await sharp(framePath)
-      .ensureAlpha()
-      .raw()
-      .toBuffer({ resolveWithObject: true });
-    for (let y = 8; y < currentInfo.height; y += 1) {
-      for (let x = 0; x <= 20; x += 1) {
-        const offset = (y * currentInfo.width + x) * 4;
-        if (current[offset + 3] === 0) continue;
-        const luminance =
-          current[offset] * 0.2126 +
-          current[offset + 1] * 0.7152 +
-          current[offset + 2] * 0.0722;
-        if (luminance >= 72) continue;
-        const lift = Math.round(72 - luminance);
-        current[offset] = Math.min(255, current[offset] + lift);
-        current[offset + 1] = Math.min(255, current[offset + 1] + lift);
-        current[offset + 2] = Math.min(255, current[offset + 2] + lift);
-      }
-    }
-    await sharp(current, {
-      raw: {
-        width: currentInfo.width,
-        height: currentInfo.height,
-        channels: 4
-      }
-    })
-      .png()
-      .toFile(framePath);
-  }
-}
-
 if (normalizeReference) {
   const frameData = [];
   let minX = 32;
@@ -238,49 +166,6 @@ if (normalizeReference) {
         right: 1,
         background: { r: 0, g: 0, b: 0, alpha: 0 }
       })
-      .png()
-      .toFile(framePath);
-  }
-}
-
-if (animateHead) {
-  const shifts = [
-    { x: 0, y: 0 },
-    { x: 1, y: 0 },
-    { x: 0, y: 1 },
-    { x: -1, y: 0 }
-  ];
-  for (let frame = 2; frame <= 4; frame += 1) {
-    const framePath = path.join(outputDir, `${String(frame).padStart(2, "0")}.png`);
-    const { data: current, info: currentInfo } = await sharp(framePath)
-      .ensureAlpha()
-      .raw()
-      .toBuffer({ resolveWithObject: true });
-    const shifted = Buffer.from(current);
-    for (let y = 4; y <= 17; y += 1) {
-      for (let x = 0; x < currentInfo.width; x += 1) {
-        const offset = (y * currentInfo.width + x) * 4;
-        shifted.fill(0, offset, offset + 4);
-      }
-    }
-    const shift = shifts[frame - 1];
-    for (let y = 4; y <= 17; y += 1) {
-      for (let x = 0; x < currentInfo.width; x += 1) {
-        const targetX = x + shift.x;
-        const targetY = y + shift.y;
-        if (targetX < 0 || targetX >= currentInfo.width || targetY > 17) continue;
-        const sourceOffset = (y * currentInfo.width + x) * 4;
-        const targetOffset = (targetY * currentInfo.width + targetX) * 4;
-        current.copy(shifted, targetOffset, sourceOffset, sourceOffset + 4);
-      }
-    }
-    await sharp(shifted, {
-      raw: {
-        width: currentInfo.width,
-        height: currentInfo.height,
-        channels: 4
-      }
-    })
       .png()
       .toFile(framePath);
   }
