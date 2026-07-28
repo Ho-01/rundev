@@ -9,6 +9,9 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
+    "version:set": "node scripts/version.mjs set",
+    "version:check": "node scripts/version.mjs check",
+    "version:check-tag": "node scripts/version.mjs tag",
     "tray:frames": "node scripts/build-tray-animation.mjs",
     "tauri": "tauri"
   },
