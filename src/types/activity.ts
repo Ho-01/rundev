@@ -32,3 +32,20 @@ export type CodexAccountPreview = {
   planType: string | null;
   environment: string;
 };
+
+export type ClaudeConnectionPreview = {
+  settingsPath: string;
+  hasConflicts: boolean;
+};
+
+export type ClaudeUsageToday = {
+  provider: string;
+  totalTokens: number;
+  inputTokens: number;
+  outputTokens: number;
+  cachedTokens: number;
+  cacheWriteTokens: number;
+  lastReceivedAt: string | null;
+  status: "disconnected" | "waiting" | "connected" | "error";
+  error: string | null;
+};

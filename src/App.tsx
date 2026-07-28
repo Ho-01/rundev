@@ -10,8 +10,8 @@ import {
   Sparkles
 } from "lucide-react";
 import { useDashboardStore } from "./store/dashboard";
-import { previewCodexAccount } from "./services/rundev";
-import type { CodexAccountPreview } from "./types/activity";
+import { previewClaudeConnection, previewCodexAccount } from "./services/rundev";
+import type { ClaudeConnectionPreview, CodexAccountPreview } from "./types/activity";
 import codingCat1 from "../src-tauri/icons/tray/coding/01.png";
 import codingCat2 from "../src-tauri/icons/tray/coding/02.png";
 import codingCat3 from "../src-tauri/icons/tray/coding/03.png";
@@ -58,6 +58,7 @@ function Meter({ value }: { value: number }) {
 
 export function App() {
   const [accountPreview, setAccountPreview] = useState<CodexAccountPreview | null>(null);
+  const [claudePreview, setClaudePreview] = useState<ClaudeConnectionPreview | null>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [headerFrame, setHeaderFrame] = useState(0);
@@ -65,11 +66,14 @@ export function App() {
     summary,
     character,
     aiUsage,
+    claudeUsage,
     loading,
     error,
     refresh,
     connectCodex,
-    disconnectCodex
+    disconnectCodex,
+    connectClaude,
+    disconnectClaude
   } = useDashboardStore();
 
   async function openCodexConnection() {
@@ -89,6 +93,25 @@ export function App() {
   async function confirmCodexConnection() {
     await connectCodex();
     setAccountPreview(null);
+  }
+
+  async function openClaudeConnection() {
+    setPreviewLoading(true);
+    setPreviewError(null);
+    try {
+      setClaudePreview(await previewClaudeConnection());
+    } catch (connectionError) {
+      setPreviewError(
+        connectionError instanceof Error ? connectionError.message : String(connectionError)
+      );
+    } finally {
+      setPreviewLoading(false);
+    }
+  }
+
+  async function confirmClaudeConnection() {
+    await connectClaude();
+    setClaudePreview(null);
   }
 
   useEffect(() => {
@@ -210,6 +233,56 @@ export function App() {
             Codex 로그인 또는 설치 상태를 확인해 주세요.
           </p>
         )}
+        <div className="provider-row">
+          <span className="provider-icon"><Bot size={15} /></span>
+          <div>
+            <strong>Claude Code</strong>
+            <span>
+              {claudeUsage?.status === "disconnected"
+                ? "연동되지 않음"
+                : claudeUsage?.status === "waiting"
+                ? "첫 사용량 대기 중"
+                : claudeUsage?.status === "error"
+                ? "로컬 수집기 확인 필요"
+                : `로컬 텔레메트리 · ${formatSyncTime(claudeUsage?.lastReceivedAt)}`}
+            </span>
+          </div>
+          {claudeUsage?.status === "disconnected" ? (
+            <button
+              className="connect-button"
+              type="button"
+              onClick={() => void openClaudeConnection()}
+              disabled={loading || previewLoading}
+            >
+              {previewLoading ? "확인 중" : "연동"}
+            </button>
+          ) : (
+            <b>{formatTokens(claudeUsage?.totalTokens ?? 0)}</b>
+          )}
+        </div>
+        {claudeUsage?.status !== "disconnected" && (
+          <div className="mini-stats">
+            <span>
+              {claudeUsage?.status === "waiting"
+                ? "Claude Code 재시작 후 첫 응답 대기"
+                : "오늘 총 토큰"}
+            </span>
+            <span>출처 <b>Claude OTel</b></span>
+            <button
+              className="disconnect-button"
+              type="button"
+              onClick={() => void disconnectClaude()}
+              disabled={loading}
+            >
+              연동 해제
+            </button>
+          </div>
+        )}
+        {claudeUsage?.error && (
+          <p className="adapter-error" title={claudeUsage.error}>
+            RunDev를 재시작하거나 로컬 포트 상태를 확인해 주세요.
+          </p>
+        )}
         {previewError && <p className="adapter-error">{previewError}</p>}
       </section>
 
@@ -267,6 +340,42 @@ export function App() {
                 onClick={() => void confirmCodexConnection()}
               >
                 {loading ? "연동 중" : "이 계정 연동"}
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
+      {claudePreview && (
+        <div className="dialog-backdrop" role="presentation">
+          <section
+            className="account-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="claude-title"
+          >
+            <h2 id="claude-title">Claude Code 사용량을 연동할까요?</h2>
+            <dl>
+              <div><dt>설정 파일</dt><dd>{claudePreview.settingsPath}</dd></div>
+              <div><dt>수집 방식</dt><dd>로컬 OpenTelemetry</dd></div>
+            </dl>
+            <p>
+              RunDev는 토큰 합계만 로컬에 저장합니다. 프롬프트, 응답, 도구 내용 수집은
+              명시적으로 끕니다. 연동 후 실행 중인 Claude Code를 재시작해야 합니다.
+            </p>
+            {claudePreview.hasConflicts && (
+              <p className="adapter-error">
+                기존 OpenTelemetry 설정을 연동 중에 대체하며, 해제할 때 안전하게 복원합니다.
+              </p>
+            )}
+            <div className="dialog-actions">
+              <button type="button" onClick={() => setClaudePreview(null)}>취소</button>
+              <button
+                type="button"
+                className="confirm-button"
+                disabled={loading}
+                onClick={() => void confirmClaudeConnection()}
+              >
+                {loading ? "연동 중" : "Claude 연동"}
               </button>
             </div>
           </section>

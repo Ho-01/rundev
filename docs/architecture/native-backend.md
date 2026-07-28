@@ -7,8 +7,9 @@
 3. 앱 데이터 디렉터리를 생성한다.
 4. SQLite pool을 열고 migration을 실행한다.
 5. pool을 Tauri managed state로 등록한다.
-6. 트레이 메뉴와 애니메이션을 시작한다.
-7. command handler를 노출한다.
+6. Claude Code 로컬 OpenTelemetry 수집기를 시작한다.
+7. 트레이 메뉴와 애니메이션을 시작한다.
+8. command handler를 노출한다.
 
 Updater 의존성은 포함되어 있지만 서명키와 endpoint가 없으므로 초기화하지 않는다.
 
@@ -114,3 +115,12 @@ macOS:
 일별 총 토큰은 해당 날짜의 최신 공식 스냅샷을 사용한다. 향후 요청별
 OpenTelemetry 이벤트를 추가하더라도 스냅샷과 이벤트 합계를 서로 더하지 않는다.
 어댑터는 Codex 인증정보, 프롬프트, 응답, 원본 JSON을 저장하지 않는다.
+## Claude Code 사용량 수집
+
+`adapters/claude.rs`는 루프백 주소의 OTLP/HTTP JSON 수집기를 실행한다. 사용자가
+연동한 경우에만 비밀 헤더가 일치하는 `claude_code.api_request` 로그를 받아
+`ai_usage_events`에 저장한다. 프론트엔드는 SQLite나 수집기에 직접 접근하지 않고
+Tauri command로 오늘 합계와 연결 상태만 조회한다.
+
+연동과 해제는 Claude 설정의 기존 값을 보존하며, RunDev가 기록한 값이 사용자가
+따로 변경되지 않았을 때에만 원래 값으로 되돌린다.

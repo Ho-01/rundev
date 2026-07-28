@@ -2,6 +2,8 @@ import { invoke } from "@tauri-apps/api/core";
 import type {
   AiUsageToday,
   CharacterState,
+  ClaudeConnectionPreview,
+  ClaudeUsageToday,
   CodexAccountPreview,
   DailySummary
 } from "../types/activity";
@@ -34,6 +36,18 @@ const previewAiUsage: AiUsageToday = {
   latestAvailableTokens: null
 };
 
+const previewClaudeUsage: ClaudeUsageToday = {
+  provider: "claude",
+  totalTokens: 0,
+  inputTokens: 0,
+  outputTokens: 0,
+  cachedTokens: 0,
+  cacheWriteTokens: 0,
+  lastReceivedAt: null,
+  status: "disconnected",
+  error: null
+};
+
 export async function previewCodexAccount() {
   if (!isTauri()) {
     return {
@@ -56,20 +70,46 @@ export async function disconnectCodexAccount() {
   await invoke("set_codex_usage_enabled", { enabled: false });
 }
 
+export async function previewClaudeConnection() {
+  if (!isTauri()) {
+    return {
+      settingsPath: "~/.claude/settings.json",
+      hasConflicts: false
+    } satisfies ClaudeConnectionPreview;
+  }
+  return invoke<ClaudeConnectionPreview>("preview_claude_connection");
+}
+
+export async function connectClaude() {
+  if (!isTauri()) return;
+  await invoke("connect_claude");
+}
+
+export async function disconnectClaude() {
+  if (!isTauri()) return;
+  await invoke("disconnect_claude");
+}
+
 function isTauri() {
   return "__TAURI_INTERNALS__" in window;
 }
 
 export async function getDashboard() {
   if (!isTauri()) {
-    return { summary: previewSummary, character: previewCharacter, aiUsage: previewAiUsage };
+    return {
+      summary: previewSummary,
+      character: previewCharacter,
+      aiUsage: previewAiUsage,
+      claudeUsage: previewClaudeUsage
+    };
   }
 
-  const [summary, character, aiUsage] = await Promise.all([
+  const [summary, character, aiUsage, claudeUsage] = await Promise.all([
     invoke<DailySummary>("get_daily_summary"),
     invoke<CharacterState>("get_character_state"),
-    invoke<AiUsageToday>("get_ai_usage_today")
+    invoke<AiUsageToday>("get_ai_usage_today"),
+    invoke<ClaudeUsageToday>("get_claude_usage_today")
   ]);
 
-  return { summary, character, aiUsage };
+  return { summary, character, aiUsage, claudeUsage };
 }

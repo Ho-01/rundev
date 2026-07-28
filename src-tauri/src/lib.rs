@@ -27,6 +27,7 @@ pub fn run() {
             let database_url = format!("sqlite://{}", app_data_dir.join("rundev.db").display());
             let pool = tauri::async_runtime::block_on(database::connect(&database_url))?;
             app.manage(AppState { pool: pool.clone() });
+            tauri::async_runtime::spawn(adapters::claude::serve(pool.clone()));
             tauri::async_runtime::spawn(async move {
                 loop {
                     if adapters::codex::is_enabled(&pool).await.unwrap_or(false) {
@@ -56,7 +57,11 @@ pub fn run() {
             commands::get_ai_usage_today,
             commands::set_codex_usage_enabled,
             commands::preview_codex_account,
-            commands::connect_codex_account
+            commands::connect_codex_account,
+            commands::preview_claude_connection,
+            commands::connect_claude,
+            commands::disconnect_claude,
+            commands::get_claude_usage_today
         ])
         .run(tauri::generate_context!())
         .expect("error while running RunDev");

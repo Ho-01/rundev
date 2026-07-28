@@ -1,10 +1,24 @@
 name: macOS test build
 
 on:
+  push:
+    branches:
+      - main
+    paths:
+      - "src/**"
+      - "src-tauri/**"
+      - "package.json"
+      - "package-lock.json"
+      - "vite.config.ts"
+      - ".github/workflows/macos-test-build.yml"
   workflow_dispatch:
 
 permissions:
   contents: read
+
+concurrency:
+  group: macos-test-build
+  cancel-in-progress: true
 
 jobs:
   build-universal-dmg:
@@ -44,4 +58,3 @@ jobs:
           args: --target universal-apple-darwin --bundles dmg
           uploadWorkflowArtifacts: true
           workflowArtifactNamePattern: RunDev-macOS-universal-[version]
-

@@ -110,7 +110,7 @@ button { color: inherit; font: inherit; }
 .plain-button { display: grid; place-items: center; width: 30px; height: 30px; padding: 0; color: #9a9a9f; background: transparent; border: 0; border-radius: 6px; }
 .plain-button:hover { color: #fff; background: rgba(255,255,255,.07); }
 
-.divider { height: 1px; margin: 10px 0; background: rgba(255,255,255,.09); }
+.divider { height: 1px; margin: 8px 0; background: rgba(255,255,255,.09); }
 .info-section { padding: 0 2px; }
 .info-section.compact { padding-bottom: 1px; }
 .section-title { margin: 0 0 8px; color: #96969c; font-size: 11px; font-weight: 600; letter-spacing: .015em; }
@@ -127,6 +127,7 @@ button { color: inherit; font: inherit; }
 .detail-grid strong { color: #dedee0; font-size: 12px; font-weight: 500; font-variant-numeric: tabular-nums; }
 
 .provider-row { display: flex; align-items: center; }
+.provider-row + .provider-row, .mini-stats + .provider-row { margin-top: 10px; }
 .provider-icon { display: grid; flex: 0 0 auto; place-items: center; width: 30px; height: 30px; margin-right: 10px; color: #c9c9cc; background: #303033; border-radius: 7px; }
 .provider-row > div { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 2px; }
 .provider-row strong { font-size: 12px; font-weight: 500; }
@@ -159,7 +160,7 @@ button { color: inherit; font: inherit; }
 .level-copy strong { font-size: 12px; font-weight: 500; }
 .level-copy span { color: #89898f; font-size: 10px; font-variant-numeric: tabular-nums; }
 
-.panel-menu { margin: 12px -14px -10px; border-top: 1px solid rgba(255,255,255,.09); }
+.panel-menu { margin: 10px -14px -10px; border-top: 1px solid rgba(255,255,255,.09); }
 .panel-menu button { display: flex; width: 100%; height: 36px; padding: 0 14px; align-items: center; justify-content: space-between; color: #d7d7da; background: transparent; border: 0; border-bottom: 1px solid rgba(255,255,255,.055); font-size: 11px; }
 .panel-menu button:hover { background: rgba(255,255,255,.055); }
 .panel-menu button span { display: flex; align-items: center; gap: 9px; }

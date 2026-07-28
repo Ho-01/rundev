@@ -46,6 +46,27 @@ pub struct CodexAccountPreview {
     environment: String,
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ClaudeConnectionPreview {
+    settings_path: String,
+    has_conflicts: bool,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ClaudeUsageToday {
+    provider: String,
+    total_tokens: i64,
+    input_tokens: i64,
+    output_tokens: i64,
+    cached_tokens: i64,
+    cache_write_tokens: i64,
+    last_received_at: Option<String>,
+    status: String,
+    error: Option<String>,
+}
+
 #[tauri::command]
 pub async fn get_daily_summary(state: State<'_, AppState>) -> Result<DailySummary, String> {
     let date = Local::now().date_naive();
@@ -253,6 +274,87 @@ pub async fn connect_codex_account(state: State<'_, AppState>) -> Result<(), Str
         return Err(error);
     }
     Ok(())
+}
+
+#[tauri::command]
+pub async fn preview_claude_connection() -> Result<ClaudeConnectionPreview, String> {
+    let preview = adapters::claude::preview()?;
+    Ok(ClaudeConnectionPreview {
+        settings_path: preview.settings_path,
+        has_conflicts: preview.has_conflicts,
+    })
+}
+
+#[tauri::command]
+pub async fn connect_claude(state: State<'_, AppState>) -> Result<(), String> {
+    adapters::claude::connect(&state.pool).await
+}
+
+#[tauri::command]
+pub async fn disconnect_claude(state: State<'_, AppState>) -> Result<(), String> {
+    adapters::claude::disconnect(&state.pool).await
+}
+
+#[tauri::command]
+pub async fn get_claude_usage_today(
+    state: State<'_, AppState>,
+) -> Result<ClaudeUsageToday, String> {
+    if !adapters::claude::is_enabled(&state.pool).await? {
+        return Ok(ClaudeUsageToday {
+            provider: "claude".to_string(),
+            total_tokens: 0,
+            input_tokens: 0,
+            output_tokens: 0,
+            cached_tokens: 0,
+            cache_write_tokens: 0,
+            last_received_at: None,
+            status: "disconnected".to_string(),
+            error: None,
+        });
+    }
+
+    let date = Local::now().date_naive().to_string();
+    let totals: (i64, i64, i64, i64, i64) = sqlx::query_as(
+        "SELECT
+            COALESCE(SUM(total_tokens), 0),
+            COALESCE(SUM(input_tokens), 0),
+            COALESCE(SUM(output_tokens), 0),
+            COALESCE(SUM(cached_tokens), 0),
+            COALESCE(SUM(cache_write_input_tokens), 0)
+         FROM ai_usage_events
+         WHERE provider = 'claude' AND date(occurred_at, 'localtime') = ?",
+    )
+    .bind(date)
+    .fetch_one(&state.pool)
+    .await
+    .map_err(|error| error.to_string())?;
+    let adapter: Option<(Option<String>, Option<String>)> = sqlx::query_as(
+        "SELECT last_success_at, last_error
+         FROM ai_adapter_state WHERE adapter_id = 'claude-otel'",
+    )
+    .fetch_optional(&state.pool)
+    .await
+    .map_err(|error| error.to_string())?;
+    let (last_received_at, error) = adapter.unwrap_or((None, None));
+    let status = if error.is_some() {
+        "error"
+    } else if last_received_at.is_some() {
+        "connected"
+    } else {
+        "waiting"
+    };
+
+    Ok(ClaudeUsageToday {
+        provider: "claude".to_string(),
+        total_tokens: totals.0,
+        input_tokens: totals.1,
+        output_tokens: totals.2,
+        cached_tokens: totals.3,
+        cache_write_tokens: totals.4,
+        last_received_at,
+        status: status.to_string(),
+        error,
+    })
 }
 
 fn codex_environment() -> String {

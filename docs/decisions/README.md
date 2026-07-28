@@ -21,6 +21,7 @@ ADR은 이미 내려진 중요한 기술 결정을 기록한다. 결정이 바�
 | [0005](0005-privacy-minimal-collection.md) | 개인정보 최소 수집 | Accepted |
 | [0006](0006-png-frame-tray-animation.md) | PNG 프레임 트레이 애니메이션 | Accepted |
 | [0007](0007-ai-usage-observation-model.md) | AI 사용량 이벤트와 스냅샷 분리 | Accepted |
+| [0008](0008-claude-opentelemetry-usage.md) | Claude Code 로컬 OpenTelemetry 사용량 수집 | Accepted |
 
 ## 새 ADR 작성 형식
 
