@@ -8,6 +8,9 @@ const greenKey = process.argv.includes("--green-key");
 const magentaKey = process.argv.includes("--magenta-key");
 const lockLaptop = process.argv.includes("--lock-laptop");
 const liftDarkLaptop = process.argv.includes("--lift-dark-laptop");
+const flipHorizontal = process.argv.includes("--flip-horizontal");
+const normalizeReference = process.argv.includes("--normalize-reference");
+const animateHead = process.argv.includes("--animate-head");
 
 if (!input) {
   throw new Error("Usage: node scripts/build-tray-animation.mjs <sprite.png> [output-dir]");
@@ -86,7 +89,7 @@ if (greenKey || magentaKey) {
 }
 
 for (let frame = 0; frame < 4; frame += 1) {
-  const frameBuffer = await sharp(data, {
+  let framePipeline = sharp(data, {
     raw: { width: info.width, height: info.height, channels: 4 }
   })
     .extract({
@@ -108,9 +111,9 @@ for (let frame = 0; frame < 4; frame += 1) {
       left: 1,
       right: 1,
       background: { r: 0, g: 0, b: 0, alpha: 0 }
-    })
-    .png()
-    .toBuffer();
+    });
+  if (flipHorizontal) framePipeline = framePipeline.flop();
+  const frameBuffer = await framePipeline.png().toBuffer();
 
   await fs.writeFile(
     path.join(outputDir, `${String(frame + 1).padStart(2, "0")}.png`),
@@ -176,6 +179,102 @@ if (liftDarkLaptop) {
       }
     }
     await sharp(current, {
+      raw: {
+        width: currentInfo.width,
+        height: currentInfo.height,
+        channels: 4
+      }
+    })
+      .png()
+      .toFile(framePath);
+  }
+}
+
+if (normalizeReference) {
+  const frameData = [];
+  let minX = 32;
+  let minY = 32;
+  let maxX = 0;
+  let maxY = 0;
+  for (let frame = 1; frame <= 4; frame += 1) {
+    const framePath = path.join(outputDir, `${String(frame).padStart(2, "0")}.png`);
+    const { data: current, info: currentInfo } = await sharp(framePath)
+      .ensureAlpha()
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+    frameData.push({ framePath, current, currentInfo });
+    for (let y = 0; y < currentInfo.height; y += 1) {
+      for (let x = 0; x < currentInfo.width; x += 1) {
+        if (current[(y * currentInfo.width + x) * 4 + 3] <= 20) continue;
+        minX = Math.min(minX, x);
+        minY = Math.min(minY, y);
+        maxX = Math.max(maxX, x);
+        maxY = Math.max(maxY, y);
+      }
+    }
+  }
+  const width = maxX - minX + 1;
+  const height = maxY - minY + 1;
+  for (const { framePath, current, currentInfo } of frameData) {
+    await sharp(current, {
+      raw: {
+        width: currentInfo.width,
+        height: currentInfo.height,
+        channels: 4
+      }
+    })
+      .extract({ left: minX, top: minY, width, height })
+      .resize({
+        width: 28,
+        height: 22,
+        fit: "contain",
+        background: { r: 0, g: 0, b: 0, alpha: 0 },
+        kernel: sharp.kernel.nearest
+      })
+      .extend({
+        top: 5,
+        bottom: 5,
+        left: 3,
+        right: 1,
+        background: { r: 0, g: 0, b: 0, alpha: 0 }
+      })
+      .png()
+      .toFile(framePath);
+  }
+}
+
+if (animateHead) {
+  const shifts = [
+    { x: 0, y: 0 },
+    { x: 1, y: 0 },
+    { x: 0, y: 1 },
+    { x: -1, y: 0 }
+  ];
+  for (let frame = 2; frame <= 4; frame += 1) {
+    const framePath = path.join(outputDir, `${String(frame).padStart(2, "0")}.png`);
+    const { data: current, info: currentInfo } = await sharp(framePath)
+      .ensureAlpha()
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+    const shifted = Buffer.from(current);
+    for (let y = 4; y <= 17; y += 1) {
+      for (let x = 0; x < currentInfo.width; x += 1) {
+        const offset = (y * currentInfo.width + x) * 4;
+        shifted.fill(0, offset, offset + 4);
+      }
+    }
+    const shift = shifts[frame - 1];
+    for (let y = 4; y <= 17; y += 1) {
+      for (let x = 0; x < currentInfo.width; x += 1) {
+        const targetX = x + shift.x;
+        const targetY = y + shift.y;
+        if (targetX < 0 || targetX >= currentInfo.width || targetY > 17) continue;
+        const sourceOffset = (y * currentInfo.width + x) * 4;
+        const targetOffset = (targetY * currentInfo.width + targetX) * 4;
+        current.copy(shifted, targetOffset, sourceOffset, sourceOffset + 4);
+      }
+    }
+    await sharp(shifted, {
       raw: {
         width: currentInfo.width,
         height: currentInfo.height,
