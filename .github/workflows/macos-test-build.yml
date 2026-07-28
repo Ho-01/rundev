@@ -50,6 +50,9 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
+      - name: Check synchronized version
+        run: npm run version:check
+
       - name: Build ad-hoc signed universal DMG
         uses: tauri-apps/tauri-action@v1
         env:
