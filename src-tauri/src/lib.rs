@@ -1,3 +1,4 @@
+mod activity;
 mod adapters;
 mod commands;
 mod database;
@@ -33,7 +34,8 @@ pub fn run() {
             )?;
             tray::set_runner(selected_runner.as_deref().unwrap_or("coding-cat"));
             app.manage(AppState { pool: pool.clone() });
-            keyboard::start(pool.clone());
+            activity::start(pool.clone(), app.handle().clone());
+            keyboard::start(pool.clone(), app.handle().clone());
             tauri::async_runtime::spawn(adapters::claude::serve(pool.clone()));
             tauri::async_runtime::spawn(async move {
                 loop {
@@ -60,6 +62,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             commands::get_daily_summary,
+            commands::get_focus_activity_today,
             commands::get_character_state,
             commands::get_ai_usage_today,
             commands::set_codex_usage_enabled,

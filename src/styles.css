@@ -145,6 +145,18 @@ button { color: inherit; font: inherit; }
 
 .meter { width: 100%; height: 5px; overflow: hidden; background: #3a3a3c; border-radius: 99px; }
 .meter span { display: block; height: 100%; min-width: 2px; background: #8bc34a; border-radius: inherit; transition: width .25s ease; }
+.focus-apps { position: relative; margin-top: 8px; color: #8e8e94; font-size: 10px; }
+.focus-apps summary { display: flex; align-items: center; justify-content: space-between; cursor: pointer; list-style: none; }
+.focus-apps summary::-webkit-details-marker { display: none; }
+.focus-apps summary::before { content: "›"; margin-right: 5px; color: #6f6f74; transition: transform .15s ease; }
+.focus-apps[open] summary::before { transform: rotate(90deg); }
+.focus-apps summary span { flex: 1; }
+.focus-apps summary strong { max-width: 150px; overflow: hidden; color: #d6d6d8; font-size: 11px; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
+.focus-app-list { position: absolute; z-index: 8; top: calc(100% + 6px); right: 0; left: 8px; max-height: 120px; padding: 7px 8px; overflow-y: auto; background: #29292c; border: 1px solid rgba(255,255,255,.11); border-radius: 7px; box-shadow: 0 8px 22px rgba(0,0,0,.35); }
+.focus-app-list-title { margin: 1px 0 2px 9px; color: #6f6f74; font-size: 9px; }
+.focus-app-list div { display: flex; justify-content: space-between; padding: 3px 0 3px 9px; }
+.focus-app-list strong { color: #c9c9cc; font-weight: 500; font-variant-numeric: tabular-nums; }
+.focus-app-empty { margin: 3px 0 3px 9px; color: #77777d; }
 .keyboard-stat { display: flex; align-items: center; justify-content: space-between; margin-top: 9px; }
 .keyboard-stat > div { display: flex; align-items: center; gap: 6px; color: #a4a4a9; }
 .keyboard-stat svg { color: #85858b; }
@@ -153,6 +165,7 @@ button { color: inherit; font: inherit; }
 .keyboard-progress { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 8px; margin-top: 6px; }
 .keyboard-progress .meter { height: 3px; }
 .keyboard-progress > span { color: #77777d; font-size: 9px; white-space: nowrap; }
+.focus-reward { margin-top: 6px; }
 .keyboard-permission { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 6px; }
 .keyboard-permission span { color: #8e8e94; font-size: 9px; line-height: 1.35; }
 .keyboard-permission button { flex: 0 0 auto; padding: 4px 7px; color: #171717; background: #e8e8e8; border: 0; border-radius: 5px; font-size: 9px; font-weight: 700; }

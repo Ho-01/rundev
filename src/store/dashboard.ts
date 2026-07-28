@@ -13,6 +13,8 @@ import type {
   CharacterState,
   ClaudeUsageToday,
   DailySummary,
+  FocusActivityToday,
+  FocusActivityUpdate,
   KeyboardActivityToday,
   RunnerId,
   RunnerSelection
@@ -20,6 +22,7 @@ import type {
 
 type DashboardStore = {
   summary: DailySummary | null;
+  focus: FocusActivityToday | null;
   character: CharacterState | null;
   aiUsage: AiUsageToday | null;
   claudeUsage: ClaudeUsageToday | null;
@@ -34,16 +37,26 @@ type DashboardStore = {
   connectClaude: () => Promise<void>;
   disconnectClaude: () => Promise<void>;
   selectRunner: (runnerId: RunnerId) => Promise<void>;
+  setKeyboardActivity: (keyboard: KeyboardActivityToday) => void;
+  setFocusActivity: (activity: FocusActivityUpdate) => void;
 };
 
 export const useDashboardStore = create<DashboardStore>((set) => ({
   summary: null,
+  focus: null,
   character: null,
   aiUsage: null,
   claudeUsage: null,
   aiActivity: null,
   keyboard: null,
   runner: null,
+  setKeyboardActivity: (keyboard) => set({ keyboard }),
+  setFocusActivity: (activity) =>
+    set((state) => ({
+      summary: state.summary
+        ? { ...state.summary, activeSeconds: activity.activeSeconds }
+        : state.summary
+    })),
   loading: false,
   error: null,
   refresh: async () => {

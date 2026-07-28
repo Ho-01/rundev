@@ -1,6 +1,7 @@
-use crate::{adapters, database::AppState, keyboard, tray};
+use crate::{activity, adapters, database::AppState, keyboard, tray};
 use chrono::{DateTime, Duration, Local, Utc};
 use serde::Serialize;
+use std::collections::HashMap;
 use tauri::State;
 
 #[derive(Serialize)]
@@ -10,6 +11,20 @@ pub struct DailySummary {
     active_seconds: i64,
     xp_earned: i64,
     ai_events: i64,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FocusAppUsage {
+    app_name: String,
+    active_seconds: i64,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FocusActivityToday {
+    last_app_name: Option<String>,
+    apps: Vec<FocusAppUsage>,
 }
 
 #[derive(Serialize)]
@@ -161,7 +176,9 @@ pub async fn get_daily_summary(state: State<'_, AppState>) -> Result<DailySummar
     let date_text = date.to_string();
 
     let active_seconds: i64 = sqlx::query_scalar(
-        "SELECT COALESCE(SUM(active_seconds), 0) FROM activity_sessions WHERE date(started_at) = ?",
+        "SELECT COALESCE(SUM(active_seconds), 0)
+         FROM activity_sessions
+         WHERE date(started_at, 'localtime') = ?",
     )
     .bind(&date_text)
     .fetch_one(&state.pool)
@@ -191,6 +208,68 @@ pub async fn get_daily_summary(state: State<'_, AppState>) -> Result<DailySummar
         xp_earned,
         ai_events,
     })
+}
+
+#[tauri::command]
+pub async fn get_focus_activity_today(
+    state: State<'_, AppState>,
+) -> Result<FocusActivityToday, String> {
+    let date = Local::now().date_naive().to_string();
+    let rows: Vec<(String, i64)> = sqlx::query_as(
+        "SELECT source, COALESCE(SUM(active_seconds), 0)
+         FROM activity_sessions
+         WHERE activity_type = 'development'
+           AND date(started_at, 'localtime') = ?
+         GROUP BY source
+         ORDER BY SUM(active_seconds) DESC, MAX(started_at) DESC",
+    )
+    .bind(&date)
+    .fetch_all(&state.pool)
+    .await
+    .map_err(|error| error.to_string())?;
+    let last_source: Option<String> = sqlx::query_scalar(
+        "SELECT source
+         FROM activity_sessions
+         WHERE activity_type = 'development'
+           AND date(started_at, 'localtime') = ?
+         ORDER BY started_at DESC
+         LIMIT 1",
+    )
+    .bind(&date)
+    .fetch_optional(&state.pool)
+    .await
+    .map_err(|error| error.to_string())?;
+
+    let mut totals = HashMap::<String, i64>::new();
+    for (source, active_seconds) in rows {
+        let app_name = activity::catalog::display_name(source_identifier(&source));
+        *totals.entry(app_name).or_default() += active_seconds;
+    }
+    let mut apps: Vec<_> = totals
+        .into_iter()
+        .map(|(app_name, active_seconds)| FocusAppUsage {
+            app_name,
+            active_seconds,
+        })
+        .collect();
+    apps.sort_by(|left, right| {
+        right
+            .active_seconds
+            .cmp(&left.active_seconds)
+            .then_with(|| left.app_name.cmp(&right.app_name))
+    });
+
+    Ok(FocusActivityToday {
+        last_app_name: last_source
+            .as_deref()
+            .map(source_identifier)
+            .map(activity::catalog::display_name),
+        apps,
+    })
+}
+
+fn source_identifier(source: &str) -> &str {
+    source.strip_prefix("foreground:").unwrap_or(source)
 }
 
 #[tauri::command]

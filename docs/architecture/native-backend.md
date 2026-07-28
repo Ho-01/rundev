@@ -7,9 +7,10 @@
 3. 앱 데이터 디렉터리를 생성한다.
 4. SQLite pool을 열고 migration을 실행한다.
 5. pool을 Tauri managed state로 등록한다.
-6. 키보드 횟수 수집기와 Claude Code 로컬 OpenTelemetry 수집기를 시작한다.
-7. 트레이 메뉴와 애니메이션을 시작한다.
-8. command handler를 노출한다.
+6. 집중시간, 키보드 횟수, Claude Code 로컬 OpenTelemetry 수집기를 시작한다.
+7. Codex 사용량 동기화 worker를 시작한다.
+8. 트레이 메뉴와 애니메이션을 시작한다.
+9. command handler를 노출한다.
 
 Updater 의존성은 포함되어 있지만 서명키와 endpoint가 없으므로 초기화하지 않는다.
 
@@ -32,11 +33,23 @@ Updater 의존성은 포함되어 있지만 서명키와 endpoint가 없으므�
 
 ### `keyboard`
 
-- Windows 저수준 키보드 훅과 macOS listen-only event tap 관리
-- 자동 반복, 주입 입력, 단독 보조키 제외
+- Windows Raw Input 메시지 창과 macOS listen-only event tap 관리
+- 자동 반복과 단독 보조키 제외
 - 키 값이나 입력 순서를 보존하지 않고 횟수 신호만 일별로 저장
 - 2,000회 단위 XP 원장 기록과 `daily_activity_metrics` 갱신
+- 250ms 단위 `keyboard-activity-updated` 이벤트와 5초 단위 SQLite 합계 저장
 - macOS Input Monitoring 권한 상태 및 설정 화면 연결
+
+### `activity`
+
+- Windows 실행 파일명과 macOS bundle identifier를 내장 개발 앱 카탈로그로 분류
+- 1초 단위 활성 앱·idle 상태 확인과 5분 idle 중단
+- 비개발 앱 전환, 화면 잠금, 날짜 변경 시 현재 세션 종료
+- 실행된 tick만 누적하여 절전 중 경과 시간을 제외
+- 매초 `focus-activity-updated` 이벤트와 10초 단위 SQLite 세션 갱신
+- `get_focus_activity_today` command로 마지막 개발 도구와 오늘의 앱별 합계 조회
+- 30분 단위 10 XP를 `focus_milestone` 원장 이벤트로 멱등 지급
+- 앱 식별자 외 창 제목, 파일 경로, URL은 수집하지 않음
 
 ### `tray`
 
@@ -105,21 +118,24 @@ erDiagram
 
 ## 플랫폼 경계
 
-Windows:
+Windows 집중시간:
 
 - `GetForegroundWindow`
 - `GetWindowThreadProcessId`
 - `GetLastInputInfo`
-- 잠금 및 절전 이벤트
+- `GetTickCount`
+- `LockApp.exe`와 `LogonUI.exe` 잠금 화면 판별
 
-macOS:
+macOS 집중시간:
 
 - `NSWorkspace`
 - `CGEventSource`
-- 잠금 및 절전 notification
-- 필요한 경우에만 Accessibility 권한
+- `loginwindow` 잠금 화면 판별
+- 활성 앱 분류와 idle 조회에는 Accessibility 권한이 필요하지 않음
 
-플랫폼 이벤트는 공통 도메인 타입으로 정규화한 이후 DB와 XP 엔진에 전달한다.
+현재 두 플랫폼 모두 1초 polling 결과를 공통 도메인 타입으로 정규화한다. Tokio의
+`MissedTickBehavior::Skip`을 사용하므로 절전 중 누락된 tick을 깨어난 뒤 몰아서
+집계하지 않는다.
 
 ## AI 사용량 수집
 

@@ -31,8 +31,9 @@ RunDev process
 │  └─ hidden/visible WebView lifecycle
 ├─ Tokio runtime
 │  ├─ tray animation timer
-│  ├─ future activity collector
-│  └─ future adapter workers
+│  ├─ foreground development activity collector
+│  ├─ keyboard count collector
+│  └─ AI adapter workers
 ├─ sqlx SQLite pool
 └─ React WebView (visible only while popover is open)
 ```
@@ -43,16 +44,18 @@ RunDev process
 - 트레이 좌클릭 팝오버와 우클릭 메뉴
 - 4프레임 coding 애니메이션
 - SQLite 생성 및 migration
+- 활성 개발 앱과 5분 idle 기준의 집중시간 세션 수집
+- 키보드 입력 횟수 수집
+- Codex 및 Claude Code 사용량 연동
 - 오늘 요약과 캐릭터 상태 command
 - Zustand 기반 React 대시보드
 
-## 계획된 모듈
+## 주요 모듈
 
 ```text
 src-tauri/src/
 ├─ activity/
-│  ├─ detector.rs
-│  ├─ idle.rs
+│  ├─ catalog.rs
 │  ├─ windows.rs
 │  └─ macos.rs
 ├─ adapters/
@@ -68,8 +71,8 @@ src-tauri/src/
 └─ commands/
 ```
 
-계획된 폴더는 구현할 기능이 생길 때 추가한다. 빈 추상화나 빈 모듈을 미리 만들지
-않는다.
+`activity`는 OS 상태를 공통 집중 세션으로 정규화한다. `xp`와 아직 구현하지 않은
+어댑터 폴더는 실제 기능을 추가할 때만 만든다.
 
 ## 핵심 데이터 흐름
 
@@ -92,4 +95,3 @@ sequenceDiagram
 ```
 
 React가 DB에 직접 연결되는 화살표는 허용하지 않는다.
-

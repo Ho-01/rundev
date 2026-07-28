@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import type {
   AiUsageToday,
   AiActivityStatus,
@@ -7,6 +8,8 @@ import type {
   ClaudeUsageToday,
   CodexAccountPreview,
   DailySummary,
+  FocusActivityToday,
+  FocusActivityUpdate,
   KeyboardActivityToday,
   RunnerId,
   RunnerSelection
@@ -17,6 +20,11 @@ const previewSummary: DailySummary = {
   activeSeconds: 0,
   xpEarned: 0,
   aiEvents: 0
+};
+
+const previewFocus: FocusActivityToday = {
+  lastAppName: null,
+  apps: []
 };
 
 const previewCharacter: CharacterState = {
@@ -91,6 +99,14 @@ function getPreviewDashboard() {
   if (scenario === "active") {
     return {
       summary: { ...previewSummary, activeSeconds: 5_460, xpEarned: 84, aiEvents: 27 },
+      focus: {
+        lastAppName: "VS Code",
+        apps: [
+          { appName: "VS Code", activeSeconds: 3_720 },
+          { appName: "Windows Terminal", activeSeconds: 1_260 },
+          { appName: "Cursor", activeSeconds: 480 }
+        ]
+      },
       character: {
         ...previewCharacter,
         level: 4,
@@ -135,6 +151,7 @@ function getPreviewDashboard() {
   if (scenario === "connected") {
     return {
       summary: previewSummary,
+      focus: previewFocus,
       character: previewCharacter,
       aiUsage: {
         ...previewAiUsage,
@@ -152,6 +169,7 @@ function getPreviewDashboard() {
   }
   return {
     summary: previewSummary,
+    focus: previewFocus,
     character: previewCharacter,
     aiUsage: previewAiUsage,
     claudeUsage: previewClaudeUsage,
@@ -169,6 +187,24 @@ export async function setRunnerSelection(runnerId: RunnerId) {
 export async function openKeyboardPermissionSettings() {
   if (!isTauri()) return;
   await invoke("open_keyboard_permission_settings");
+}
+
+export async function subscribeKeyboardActivity(
+  onActivity: (activity: KeyboardActivityToday) => void
+): Promise<UnlistenFn> {
+  if (!isTauri()) return () => {};
+  return listen<KeyboardActivityToday>("keyboard-activity-updated", (event) => {
+    onActivity(event.payload);
+  });
+}
+
+export async function subscribeFocusActivity(
+  onActivity: (activity: FocusActivityUpdate) => void
+): Promise<UnlistenFn> {
+  if (!isTauri()) return () => {};
+  return listen<FocusActivityUpdate>("focus-activity-updated", (event) => {
+    onActivity(event.payload);
+  });
 }
 
 export async function previewCodexAccount() {
@@ -222,9 +258,10 @@ export async function getDashboard() {
     return getPreviewDashboard();
   }
 
-  const [summary, character, aiUsage, claudeUsage, aiActivity, keyboard, runner] =
+  const [summary, focus, character, aiUsage, claudeUsage, aiActivity, keyboard, runner] =
     await Promise.all([
     invoke<DailySummary>("get_daily_summary"),
+    invoke<FocusActivityToday>("get_focus_activity_today"),
     invoke<CharacterState>("get_character_state"),
     invoke<AiUsageToday>("get_ai_usage_today"),
     invoke<ClaudeUsageToday>("get_claude_usage_today"),
@@ -233,5 +270,5 @@ export async function getDashboard() {
     invoke<RunnerSelection>("get_runner_selection")
   ]);
 
-  return { summary, character, aiUsage, claudeUsage, aiActivity, keyboard, runner };
+  return { summary, focus, character, aiUsage, claudeUsage, aiActivity, keyboard, runner };
 }

@@ -24,6 +24,7 @@ ADR은 이미 내려진 중요한 기술 결정을 기록한다. 결정이 바�
 | [0008](0008-claude-opentelemetry-usage.md) | Claude Code 로컬 OpenTelemetry 사용량 수집 | Accepted |
 | [0009](0009-ai-session-activity.md) | 익명 키 기반 AI 세션 활동 집계 | Accepted |
 | [0010](0010-keyboard-count-collection.md) | 키 입력 횟수의 로컬 집계 | Accepted |
+| [0011](0011-focus-time-classification.md) | 활성 개발 앱과 입력 유휴 시간으로 집중시간 집계 | Accepted |
 
 ## 새 ADR 작성 형식
 

@@ -6,14 +6,15 @@ import {
   Code2,
   Flame,
   Keyboard,
-  Settings2,
   Sparkles
 } from "lucide-react";
 import { useDashboardStore } from "./store/dashboard";
 import {
   openKeyboardPermissionSettings,
   previewClaudeConnection,
-  previewCodexAccount
+  previewCodexAccount,
+  subscribeFocusActivity,
+  subscribeKeyboardActivity
 } from "./services/rundev";
 import type {
   ClaudeConnectionPreview,
@@ -26,12 +27,17 @@ import claudeIcon from "./assets/providers/claude.svg";
 function formatDuration(seconds: number) {
   const hours = Math.floor(seconds / 3600);
   const minutes = Math.floor((seconds % 3600) / 60);
-  if (hours === 0) return `${minutes}m`;
-  return `${hours}h ${minutes}m`;
+  if (hours === 0) return `${minutes}분`;
+  if (minutes === 0) return `${hours}시간`;
+  return `${hours}시간 ${minutes}분`;
 }
 
 function formatTokens(tokens: number) {
   return new Intl.NumberFormat("ko-KR").format(tokens);
+}
+
+function formatRemainingMinutes(seconds: number) {
+  return `${Math.max(1, Math.ceil(seconds / 60))}분`;
 }
 
 function formatSyncTime(value: string | null | undefined) {
@@ -70,6 +76,7 @@ export function App() {
   const freezeRunner = new URLSearchParams(window.location.search).has("freezeRunner");
   const {
     summary,
+    focus,
     character,
     aiUsage,
     claudeUsage,
@@ -83,7 +90,9 @@ export function App() {
     disconnectCodex,
     connectClaude,
     disconnectClaude,
-    selectRunner
+    selectRunner,
+    setKeyboardActivity,
+    setFocusActivity
   } = useDashboardStore();
   const runnerFrames = runnerFramesById[runner?.runnerId ?? "coding-cat"];
 
@@ -132,6 +141,22 @@ export function App() {
   }, [refresh]);
 
   useEffect(() => {
+    let unlisten: (() => void) | undefined;
+    void subscribeKeyboardActivity(setKeyboardActivity).then((dispose) => {
+      unlisten = dispose;
+    });
+    return () => unlisten?.();
+  }, [setKeyboardActivity]);
+
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+    void subscribeFocusActivity(setFocusActivity).then((dispose) => {
+      unlisten = dispose;
+    });
+    return () => unlisten?.();
+  }, [setFocusActivity]);
+
+  useEffect(() => {
     if (freezeRunner) return;
     const timer = window.setInterval(
       () => setHeaderFrame((frame) => (frame + 1) % runnerFrames.length),
@@ -145,6 +170,9 @@ export function App() {
     : 0;
   const activeMinutes = Math.floor((summary?.activeSeconds ?? 0) / 60);
   const focusProgress = Math.min(100, (activeMinutes / 120) * 100);
+  const focusRewardProgress = ((summary?.activeSeconds ?? 0) % 1_800) / 18;
+  const focusRewardRemaining =
+    1_800 - ((summary?.activeSeconds ?? 0) % 1_800);
   const keyboardProgress = ((keyboard?.pressCount ?? 0) % 2_000) / 20;
   const keyboardRemaining = Math.max(
     0,
@@ -163,8 +191,13 @@ export function App() {
           <strong>RunDev</strong>
           <span><i className="status-dot" /> 개발 활동 대기 중</span>
         </div>
-        <button className="plain-button" aria-label="설정">
-          <Settings2 size={17} />
+        <button
+          className="plain-button"
+          type="button"
+          aria-label="개발자 변경"
+          onClick={() => setRunnerDialogOpen(true)}
+        >
+          <Sparkles size={17} />
         </button>
       </header>
 
@@ -173,10 +206,33 @@ export function App() {
       <section className="info-section">
         <SectionTitle>개발 활동</SectionTitle>
         <div className="primary-stat">
-          <span>오늘 집중</span>
+          <span>개발 도구 노려본 시간</span>
           <strong>{formatDuration(summary?.activeSeconds ?? 0)}</strong>
         </div>
         <Meter value={focusProgress} />
+        <div className="keyboard-progress focus-reward">
+          <Meter value={focusRewardProgress} />
+          <span>다음 +10 XP까지 {formatRemainingMinutes(focusRewardRemaining)}</span>
+        </div>
+        <details className="focus-apps">
+          <summary>
+            <span>마지막으로 본 도구</span>
+            <strong>{focus?.lastAppName ?? "아직 없음"}</strong>
+          </summary>
+          <div className="focus-app-list">
+            <p className="focus-app-list-title">오늘 앱별 시간</p>
+            {focus?.apps.length ? (
+              focus.apps.map((app) => (
+                <div key={app.appName}>
+                  <span>{app.appName}</span>
+                  <strong>{formatDuration(app.activeSeconds)}</strong>
+                </div>
+              ))
+            ) : (
+              <p className="focus-app-empty">오늘 기록된 개발 도구가 없습니다.</p>
+            )}
+          </div>
+        </details>
         <div className="keyboard-stat">
           <div>
             <Keyboard size={14} />
@@ -376,10 +432,6 @@ export function App() {
       </section>
 
       <nav className="panel-menu">
-        <button type="button" onClick={() => setRunnerDialogOpen(true)}>
-          <span><Sparkles size={15} /> 개발자 변경</span>
-          <ChevronRight size={14} />
-        </button>
         <button>
           <span><CircleHelp size={15} /> RunDev 정보</span>
           <ChevronRight size={14} />

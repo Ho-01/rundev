@@ -37,3 +37,6 @@
 - [0006 PNG 프레임 트레이 애니메이션](decisions/0006-png-frame-tray-animation.md)
 - [0007 AI 사용량 관찰 모델](decisions/0007-ai-usage-observation-model.md)
 - [0008 Claude Code OpenTelemetry 수집](decisions/0008-claude-opentelemetry-usage.md)
+- [0009 AI 세션 활동 집계](decisions/0009-ai-session-activity.md)
+- [0010 키 입력 횟수 집계](decisions/0010-keyboard-count-collection.md)
+- [0011 개발 집중시간 집계](decisions/0011-focus-time-classification.md)

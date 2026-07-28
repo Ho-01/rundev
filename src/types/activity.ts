@@ -5,6 +5,16 @@ export type DailySummary = {
   aiEvents: number;
 };
 
+export type FocusAppUsage = {
+  appName: string;
+  activeSeconds: number;
+};
+
+export type FocusActivityToday = {
+  lastAppName: string | null;
+  apps: FocusAppUsage[];
+};
+
 export type CharacterState = {
   level: number;
   totalXp: number;
@@ -66,6 +76,11 @@ export type KeyboardActivityToday = {
   nextRewardAt: number;
   status: "starting" | "active" | "permission-required" | "error" | "unavailable";
   permissionRequired: boolean;
+};
+
+export type FocusActivityUpdate = {
+  activeSeconds: number;
+  focused: boolean;
 };
 
 export type RunnerId =

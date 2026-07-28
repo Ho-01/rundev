@@ -10,6 +10,7 @@ use std::{
     collections::HashSet,
     sync::atomic::{AtomicU8, Ordering},
 };
+use tauri::{AppHandle, Emitter};
 use tokio::sync::mpsc;
 use uuid::Uuid;
 
@@ -32,7 +33,7 @@ pub(crate) enum KeyEvent {
     Press,
 }
 
-#[derive(Serialize)]
+#[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct KeyboardActivityToday {
     local_date: String,
@@ -44,9 +45,9 @@ pub struct KeyboardActivityToday {
     permission_required: bool,
 }
 
-pub fn start(pool: SqlitePool) {
+pub fn start(pool: SqlitePool, app: AppHandle) {
     let (sender, receiver) = mpsc::unbounded_channel();
-    tauri::async_runtime::spawn(process_events(pool.clone(), receiver));
+    tauri::async_runtime::spawn(process_events(pool.clone(), receiver, app));
 
     #[cfg(windows)]
     windows::start(sender);
@@ -72,17 +73,11 @@ pub async fn today(pool: &SqlitePool) -> Result<KeyboardActivityToday, sqlx::Err
     .fetch_optional(pool)
     .await?;
     let (press_count, rewarded_milestones) = row.unwrap_or((0, 0));
-    let status = current_status();
-
-    Ok(KeyboardActivityToday {
+    Ok(activity_snapshot(
         local_date,
         press_count,
         rewarded_milestones,
-        xp_earned: rewarded_milestones * XP_PER_REWARD,
-        next_reward_at: (press_count / PRESSES_PER_REWARD + 1) * PRESSES_PER_REWARD,
-        status,
-        permission_required: status == "permission-required",
-    })
+    ))
 }
 
 pub fn open_permission_settings() -> Result<(), String> {
@@ -95,14 +90,36 @@ pub fn open_permission_settings() -> Result<(), String> {
     Ok(())
 }
 
-async fn process_events(pool: SqlitePool, mut receiver: mpsc::UnboundedReceiver<KeyEvent>) {
+async fn process_events(
+    pool: SqlitePool,
+    mut receiver: mpsc::UnboundedReceiver<KeyEvent>,
+    app: AppHandle,
+) {
     let mut pressed = HashSet::new();
     let mut pending = 0_i64;
-    let mut flush = tokio::time::interval(std::time::Duration::from_secs(1));
+    let initial = today(&pool).await.ok();
+    let mut persisted = initial.as_ref().map_or(0, |value| value.press_count);
+    let mut pending_date = Local::now().date_naive().to_string();
+    let mut last_emitted = persisted;
+    let mut ui_tick = tokio::time::interval(std::time::Duration::from_millis(250));
+    let mut database_flush = tokio::time::interval(std::time::Duration::from_secs(5));
 
     loop {
         tokio::select! {
             event = receiver.recv() => {
+                let current_date = Local::now().date_naive().to_string();
+                if current_date != pending_date {
+                    if pending > 0 {
+                        if let Err(error) = apply_count_for_date(&pool, pending, &pending_date).await {
+                            tracing::warn!(%error, "Keyboard count persistence failed at date boundary");
+                        }
+                    }
+                    pending = 0;
+                    pending_date = current_date;
+                    persisted = today(&pool).await.map_or(0, |value| value.press_count);
+                    last_emitted = persisted;
+                    pressed.clear();
+                }
                 match event {
                     Some(KeyEvent::Down(key)) if !is_modifier(key) && pressed.insert(key) => {
                         pending += 1;
@@ -115,25 +132,54 @@ async fn process_events(pool: SqlitePool, mut receiver: mpsc::UnboundedReceiver<
                         pending += 1;
                     }
                     Some(KeyEvent::Down(_)) => {}
-                    None => break,
+                    None => {
+                        if pending > 0 {
+                            let _ = apply_count_for_date(&pool, pending, &pending_date).await;
+                        }
+                        break;
+                    },
                 }
             }
-            _ = flush.tick() => {
+            _ = ui_tick.tick() => {
+                let projected = persisted + pending;
+                if projected != last_emitted {
+                    last_emitted = projected;
+                    let milestones = projected / PRESSES_PER_REWARD;
+                    let activity = activity_snapshot(
+                        pending_date.clone(),
+                        projected,
+                        milestones,
+                    );
+                    let _ = app.emit("keyboard-activity-updated", activity);
+                }
+            }
+            _ = database_flush.tick() => {
                 if pending == 0 {
                     continue;
                 }
                 let count = std::mem::take(&mut pending);
-                if let Err(error) = apply_count(&pool, count).await {
+                if let Err(error) = apply_count_for_date(&pool, count, &pending_date).await {
                     pending += count;
                     tracing::warn!(%error, "Keyboard count persistence failed");
+                } else {
+                    persisted += count;
                 }
             }
         }
     }
 }
 
+#[cfg(test)]
 async fn apply_count(pool: &SqlitePool, count: i64) -> Result<(), sqlx::Error> {
     let local_date = Local::now().date_naive().to_string();
+    apply_count_for_date(pool, count, &local_date).await
+}
+
+async fn apply_count_for_date(
+    pool: &SqlitePool,
+    count: i64,
+    local_date: &str,
+) -> Result<(), sqlx::Error> {
     let now = Utc::now().to_rfc3339();
     let mut transaction = pool.begin().await?;
     let (press_count, rewarded_milestones): (i64, i64) = sqlx::query_as(
@@ -145,7 +191,7 @@ async fn apply_count(pool: &SqlitePool, count: i64) -> Result<(), sqlx::Error> {
             updated_at = excluded.updated_at
          RETURNING press_count, rewarded_milestones",
     )
-    .bind(&local_date)
+    .bind(local_date)
     .bind(count)
     .bind(&now)
     .fetch_one(&mut *transaction)
@@ -153,7 +199,7 @@ async fn apply_count(pool: &SqlitePool, count: i64) -> Result<(), sqlx::Error> {
 
     let earned_milestones = press_count / PRESSES_PER_REWARD;
     for milestone in (rewarded_milestones + 1)..=earned_milestones {
-        award_keyboard_xp(&mut transaction, &local_date, milestone, &now).await?;
+        award_keyboard_xp(&mut transaction, local_date, milestone, &now).await?;
     }
 
     sqlx::query(
@@ -163,13 +209,13 @@ async fn apply_count(pool: &SqlitePool, count: i64) -> Result<(), sqlx::Error> {
     )
     .bind(earned_milestones)
     .bind(&now)
-    .bind(&local_date)
+    .bind(local_date)
     .execute(&mut *transaction)
     .await?;
 
     upsert_metric(
         &mut transaction,
-        &local_date,
+        local_date,
         "keyboard_presses",
         press_count,
         &now,
@@ -177,13 +223,30 @@ async fn apply_count(pool: &SqlitePool, count: i64) -> Result<(), sqlx::Error> {
     .await?;
     upsert_metric(
         &mut transaction,
-        &local_date,
+        local_date,
         "xp_earned",
         earned_milestones * XP_PER_REWARD,
         &now,
     )
     .await?;
     transaction.commit().await
+}
+
+fn activity_snapshot(
+    local_date: String,
+    press_count: i64,
+    rewarded_milestones: i64,
+) -> KeyboardActivityToday {
+    let status = current_status();
+    KeyboardActivityToday {
+        local_date,
+        press_count,
+        rewarded_milestones,
+        xp_earned: rewarded_milestones * XP_PER_REWARD,
+        next_reward_at: (press_count / PRESSES_PER_REWARD + 1) * PRESSES_PER_REWARD,
+        status,
+        permission_required: status == "permission-required",
+    }
 }
 
 async fn award_keyboard_xp(
