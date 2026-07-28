@@ -1,0 +1,150 @@
+@import "tailwindcss";
+
+:root {
+  font-family: Inter, Pretendard, "Apple SD Gothic Neo", "Segoe UI", sans-serif;
+  color: #f5f5f5;
+  background: transparent;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+* { box-sizing: border-box; }
+html, body, #root { width: 100%; min-height: 100%; margin: 0; }
+body { overflow: hidden; background: #1c1c1e; }
+button { color: inherit; font: inherit; }
+
+.popover {
+  position: relative;
+  min-height: 480px;
+  padding: 14px 14px 10px;
+  overflow: hidden;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.025), transparent 20%),
+    #1c1c1e;
+  border: 1px solid rgba(255,255,255,.1);
+}
+
+.runner-header {
+  display: flex;
+  align-items: center;
+  min-height: 42px;
+}
+
+.runner {
+  position: relative;
+  width: 58px;
+  height: 36px;
+  margin-right: 9px;
+  color: #f1f1f1;
+}
+
+.runner-face {
+  position: absolute;
+  left: 6px;
+  top: 8px;
+  width: 25px;
+  height: 22px;
+  border-radius: 45% 48% 46% 46%;
+  background: currentColor;
+  z-index: 2;
+}
+
+.runner-face i {
+  position: absolute;
+  top: 9px;
+  width: 3px;
+  height: 4px;
+  border-radius: 50%;
+  background: #1c1c1e;
+}
+.runner-face i:first-child { left: 6px; }
+.runner-face i:last-child { right: 6px; }
+.runner-ear {
+  position: absolute;
+  top: 4px;
+  width: 10px;
+  height: 11px;
+  background: currentColor;
+  transform: rotate(45deg);
+}
+.runner-ear.left { left: 7px; }
+.runner-ear.right { left: 22px; }
+.runner-body {
+  position: absolute;
+  left: 25px;
+  top: 16px;
+  width: 27px;
+  height: 15px;
+  border-radius: 9px 12px 7px 5px;
+  background: currentColor;
+}
+.runner-leg {
+  position: absolute;
+  top: 27px;
+  width: 14px;
+  height: 4px;
+  border-radius: 4px;
+  background: currentColor;
+  transform-origin: left center;
+}
+.runner-leg.one { left: 25px; transform: rotate(18deg); }
+.runner-leg.two { left: 42px; transform: rotate(-22deg); }
+.runner-tail {
+  position: absolute;
+  left: 49px;
+  top: 10px;
+  width: 13px;
+  height: 11px;
+  border-top: 4px solid currentColor;
+  border-right: 4px solid currentColor;
+  border-radius: 0 10px 0 0;
+}
+
+.runner-copy { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 4px; }
+.runner-copy strong { font-size: 15px; letter-spacing: -.01em; }
+.runner-copy span { display: flex; align-items: center; color: #99999f; font-size: 11px; }
+.status-dot { width: 6px; height: 6px; margin-right: 6px; border-radius: 50%; background: #8bc34a; box-shadow: 0 0 0 3px rgba(139,195,74,.11); }
+.plain-button { display: grid; place-items: center; width: 30px; height: 30px; padding: 0; color: #9a9a9f; background: transparent; border: 0; border-radius: 6px; }
+.plain-button:hover { color: #fff; background: rgba(255,255,255,.07); }
+
+.divider { height: 1px; margin: 10px 0; background: rgba(255,255,255,.09); }
+.info-section { padding: 0 2px; }
+.info-section.compact { padding-bottom: 1px; }
+.section-title { margin: 0 0 8px; color: #96969c; font-size: 11px; font-weight: 600; letter-spacing: .015em; }
+.primary-stat { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 7px; }
+.primary-stat span { color: #d0d0d2; font-size: 13px; }
+.primary-stat strong { font-size: 24px; font-weight: 500; letter-spacing: -.045em; font-variant-numeric: tabular-nums; }
+
+.meter { width: 100%; height: 5px; overflow: hidden; background: #3a3a3c; border-radius: 99px; }
+.meter span { display: block; height: 100%; min-width: 2px; background: #8bc34a; border-radius: inherit; transition: width .25s ease; }
+.detail-grid { display: grid; grid-template-columns: repeat(3, 1fr); margin-top: 10px; }
+.detail-grid > div { display: grid; grid-template-columns: 17px 1fr; align-items: center; row-gap: 3px; color: #85858a; }
+.detail-grid svg { grid-row: 1 / 3; color: #77777d; }
+.detail-grid span { font-size: 10px; }
+.detail-grid strong { color: #dedee0; font-size: 12px; font-weight: 500; font-variant-numeric: tabular-nums; }
+
+.provider-row { display: flex; align-items: center; }
+.provider-icon { display: grid; flex: 0 0 auto; place-items: center; width: 30px; height: 30px; margin-right: 10px; color: #c9c9cc; background: #303033; border-radius: 7px; }
+.provider-row > div { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 2px; }
+.provider-row strong { font-size: 12px; font-weight: 500; }
+.provider-row span { color: #85858b; font-size: 10px; }
+.provider-row > b { font-size: 22px; font-weight: 500; font-variant-numeric: tabular-nums; }
+.mini-stats { display: flex; gap: 13px; margin: 8px 0 0 40px; color: #838389; font-size: 10px; }
+.mini-stats b { margin-left: 4px; color: #cfcfd1; font-weight: 500; }
+
+.level-row { display: flex; align-items: center; }
+.level-badge { display: grid; flex: 0 0 auto; place-items: center; width: 34px; height: 34px; margin-right: 10px; color: #171717; background: #e8e8e8; border-radius: 50%; font-size: 14px; font-weight: 700; }
+.level-copy { min-width: 0; flex: 1; }
+.level-copy > div { display: flex; align-items: center; justify-content: space-between; margin-bottom: 7px; }
+.level-copy strong { font-size: 12px; font-weight: 500; }
+.level-copy span { color: #89898f; font-size: 10px; font-variant-numeric: tabular-nums; }
+
+.panel-menu { margin: 12px -14px -10px; border-top: 1px solid rgba(255,255,255,.09); }
+.panel-menu button { display: flex; width: 100%; height: 36px; padding: 0 14px; align-items: center; justify-content: space-between; color: #d7d7da; background: transparent; border: 0; border-bottom: 1px solid rgba(255,255,255,.055); font-size: 11px; }
+.panel-menu button:hover { background: rgba(255,255,255,.055); }
+.panel-menu button span { display: flex; align-items: center; gap: 9px; }
+.panel-menu button svg { color: #7e7e84; }
+
+.loading-line { position: absolute; left: 0; top: 0; height: 2px; background: #8bc34a; animation: loading 1s ease-in-out infinite; }
+.error-message { position: absolute; left: 18px; right: 18px; bottom: 8px; margin: 0; color: #ff9a91; font-size: 10px; text-align: center; }
+@keyframes loading { 0% { width: 0; left: 0; } 50% { width: 50%; } 100% { width: 0; left: 100%; } }
