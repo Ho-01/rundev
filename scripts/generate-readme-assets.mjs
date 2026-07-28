@@ -131,6 +131,7 @@ for (const runner of runners) {
       palette: index === 0 ? palette : undefined,
       delay: 170,
       repeat: 0,
+      dispose: 2,
       transparent: true,
       transparentIndex
     });

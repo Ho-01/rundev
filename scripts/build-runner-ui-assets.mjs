@@ -13,7 +13,7 @@ const runnerIds = [
   "coding-vtuber"
 ];
 const uiScale = {
-  "coding-vtuber": 1.25
+  "coding-cat": 1.15
 };
 
 for (const runnerId of runnerIds) {

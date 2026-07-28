@@ -8,6 +8,12 @@ const greenKey = process.argv.includes("--green-key");
 const magentaKey = process.argv.includes("--magenta-key");
 const flipHorizontal = process.argv.includes("--flip-horizontal");
 const normalizeReference = process.argv.includes("--normalize-reference");
+const cellEdgeArgument = process.argv.find((argument) =>
+  argument.startsWith("--cell-edge-clear=")
+);
+const cellEdgeClear = cellEdgeArgument
+  ? Number(cellEdgeArgument.split("=")[1])
+  : 0;
 const sizeArgument = process.argv.find((argument) => argument.startsWith("--size="));
 const outputSize = sizeArgument ? Number(sizeArgument.split("=")[1]) : 32;
 if (!Number.isInteger(outputSize) || outputSize < 32 || outputSize % 32 !== 0) {
@@ -60,6 +66,22 @@ for (let index = 0; index < data.length; index += 4) {
 }
 
 const frameWidth = Math.floor(info.width / 4);
+if (!Number.isInteger(cellEdgeClear) || cellEdgeClear < 0 || cellEdgeClear * 2 >= frameWidth) {
+  throw new Error("--cell-edge-clear must fit within each sprite cell");
+}
+
+if (cellEdgeClear > 0) {
+  for (let frame = 0; frame < 4; frame += 1) {
+    const frameStart = frame * frameWidth;
+    for (let y = 0; y < info.height; y += 1) {
+      for (let localX = 0; localX < frameWidth; localX += 1) {
+        if (localX >= cellEdgeClear && localX < frameWidth - cellEdgeClear) continue;
+        data[(y * info.width + frameStart + localX) * 4 + 3] = 0;
+      }
+    }
+  }
+}
+
 let crop = { left: 0, top: 150, width: frameWidth, height: 480 };
 
 if (greenKey || magentaKey) {
