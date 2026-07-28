@@ -52,6 +52,18 @@ ImageGen에서 만든 마젠타 chroma-key 4열 스프라이트를 입력으로 
 npm.cmd run tray:frames -- <sprite.png> src-tauri/icons/tray/coding
 ```
 
+README에 들어가는 상태별 화면과 러너 GIF는 실제 사용자 데이터 대신 URL의 고정
+미리보기 시나리오를 사용한다.
+
+```powershell
+npm.cmd run build
+npm.cmd run docs:assets
+```
+
+생성 결과는 `docs/assets/readme/`에 저장한다. UI나 트레이 러너 변경이 `main`에
+푸시되면 `readme-assets.yml`이 같은 명령을 실행하고, 결과가 달라졌을 때만
+`github-actions[bot]` 커밋을 만든다.
+
 출력:
 
 ```text

@@ -1,0 +1,63 @@
+name: Refresh README previews
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "src/**"
+      - "src-tauri/icons/tray/**"
+      - "scripts/generate-readme-assets.mjs"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/readme-assets.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: readme-assets
+  cancel-in-progress: true
+
+jobs:
+  refresh:
+    name: Generate screenshots and runner GIFs
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Generate README assets
+        run: |
+          npm run build
+          npm run docs:assets
+
+      - name: Commit changed previews
+        shell: bash
+        run: |
+          if git diff --quiet -- docs/assets/readme; then
+            echo "README assets are already current."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/assets/readme
+          git commit -m "docs(readme-assets): 주요 화면과 러너 미리보기 갱신 [skip ci]"
+          git push

@@ -13,6 +13,9 @@
     "version:check": "node scripts/version.mjs check",
     "version:check-tag": "node scripts/version.mjs tag",
     "tray:frames": "node scripts/build-tray-animation.mjs",
+    "docs:assets": "node scripts/generate-readme-assets.mjs",
+    "docs:assets:refresh": "npm run build && npm run docs:assets",
+    "docs:assets:check": "npm run docs:assets && git diff --exit-code -- docs/assets/readme",
     "tauri": "tauri"
   },
   "dependencies": {
@@ -30,6 +33,7 @@
     "zustand": "^5.0.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.0",
     "@tailwindcss/vite": "^4.0.0",
     "@tauri-apps/cli": "^2.0.0",
     "@testing-library/jest-dom": "^6.6.0",
@@ -38,6 +42,7 @@
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^4.3.0",
+    "gifenc": "^1.0.3",
     "jsdom": "^25.0.0",
     "sharp": "^0.35.3",
     "tailwindcss": "^4.0.0",
