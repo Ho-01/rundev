@@ -142,6 +142,7 @@ button { color: inherit; font: inherit; }
 .status-dot { width: 6px; height: 6px; margin-right: 6px; border-radius: 50%; background: #8bc34a; box-shadow: 0 0 0 3px rgba(139,195,74,.11); }
 .plain-button { display: grid; place-items: center; width: 30px; height: 30px; padding: 0; color: #9a9a9f; background: transparent; border: 0; border-radius: 6px; }
 .plain-button:hover { color: #fff; background: rgba(255,255,255,.07); }
+.header-actions { display: flex; align-items: center; gap: 2px; }
 
 .divider { height: 1px; margin: 8px 0; background: rgba(255,255,255,.09); }
 .info-section { padding: 0 2px; }
@@ -200,6 +201,10 @@ button { color: inherit; font: inherit; }
 .dialog-backdrop { position: absolute; z-index: 20; inset: 0; display: grid; place-items: center; padding: 18px; background: rgba(0,0,0,.66); backdrop-filter: blur(3px); }
 .account-dialog { width: 100%; padding: 16px; background: #29292c; border: 1px solid rgba(255,255,255,.13); border-radius: 10px; box-shadow: 0 16px 40px rgba(0,0,0,.38); }
 .account-dialog h2 { margin: 0 0 13px; font-size: 14px; }
+.app-info-dialog { text-align: center; }
+.app-info-mark { display: grid; place-items: center; width: 38px; height: 38px; margin: 0 auto 9px; color: #9bce5a; background: rgba(155,206,90,.12); border: 1px solid rgba(155,206,90,.3); border-radius: 11px; }
+.app-info-dialog > p { text-align: left; }
+.app-info-dialog dl { text-align: left; }
 .account-dialog dl { margin: 0; }
 .account-dialog dl div { display: flex; justify-content: space-between; gap: 12px; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,.07); font-size: 10px; }
 .account-dialog dt { color: #88888e; }
@@ -209,12 +214,47 @@ button { color: inherit; font: inherit; }
 .dialog-actions button { padding: 6px 10px; color: #d7d7da; background: #39393d; border: 0; border-radius: 6px; font-size: 10px; }
 .dialog-actions .confirm-button { color: #171717; background: #e8e8e8; font-weight: 700; }
 
-.level-row { display: flex; align-items: center; }
-.level-badge { display: grid; flex: 0 0 auto; place-items: center; width: 34px; height: 34px; margin-right: 10px; color: #171717; background: #e8e8e8; border-radius: 50%; font-size: 14px; font-weight: 700; }
+.level-row {
+  --tier-color: #93bc56;
+  --tier-dark: #344426;
+  display: flex;
+  align-items: center;
+}
+.level-row.tier-rookie { --tier-color: #55c7a3; --tier-dark: #21473c; }
+.level-row.tier-maker { --tier-color: #56b9db; --tier-dark: #20475a; }
+.level-row.tier-debugger { --tier-color: #e69a59; --tier-dark: #5b3823; }
+.level-row.tier-hacker { --tier-color: #62aaf2; --tier-dark: #223e5a; }
+.level-row.tier-systems { --tier-color: #788fe7; --tier-dark: #2f3968; }
+.level-row.tier-architect { --tier-color: #a986ef; --tier-dark: #40325e; }
+.level-row.tier-lead { --tier-color: #d477c8; --tier-dark: #5c3158; }
+.level-row.tier-master { --tier-color: #e78098; --tier-dark: #5f303c; }
+.level-row.tier-legend { --tier-color: #f2c75c; --tier-dark: #5b4720; }
+.level-badge {
+  display: flex;
+  flex: 0 0 auto;
+  width: 43px;
+  height: 48px;
+  margin-right: 11px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #f8f8f8;
+  background: linear-gradient(145deg, var(--tier-color), var(--tier-dark));
+  border: 1px solid color-mix(in srgb, var(--tier-color) 70%, white 10%);
+  border-radius: 45% 45% 50% 50%;
+  clip-path: polygon(50% 0, 92% 15%, 86% 72%, 50% 100%, 14% 72%, 8% 15%);
+  box-shadow: 0 5px 14px color-mix(in srgb, var(--tier-color) 18%, transparent);
+  line-height: 1;
+}
+.level-badge svg { filter: drop-shadow(0 1px 1px rgba(0,0,0,.25)); stroke-width: 2.2; }
 .level-copy { min-width: 0; flex: 1; }
 .level-copy > div { display: flex; align-items: center; justify-content: space-between; margin-bottom: 7px; }
 .level-copy strong { font-size: 12px; font-weight: 500; }
 .level-copy span { color: #89898f; font-size: 10px; font-variant-numeric: tabular-nums; }
+.level-copy .tier-name { display: flex; align-items: center; gap: 5px; color: var(--tier-color); }
+.level-copy .tier-name svg { stroke-width: 2; }
+.level-copy .tier-name .level-label { margin-left: 2px; padding: 2px 5px; color: var(--tier-color); background: color-mix(in srgb, var(--tier-color) 14%, transparent); border: 1px solid color-mix(in srgb, var(--tier-color) 30%, transparent); border-radius: 99px; font-size: 9px; font-weight: 650; }
+.level-row .meter span { background: var(--tier-color); }
 .activity-history { margin-top: 10px; }
 .activity-history-heading { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; color: #85858b; font-size: 9px; }
 .activity-history-heading strong { color: #bdbdc1; font-weight: 500; }
@@ -225,6 +265,28 @@ button { color: inherit; font: inherit; }
 .activity-cell.intensity-3 { background: #76a246; }
 .activity-cell.intensity-4 { background: #9bce5a; }
 .activity-legend { display: flex; align-items: center; justify-content: flex-end; gap: 3px; margin-top: 5px; color: #6f6f75; font-size: 8px; }
+
+.level-showcase {
+  min-height: 480px;
+  padding: 22px 20px;
+  background:
+    radial-gradient(circle at 85% 0, rgba(155,206,90,.12), transparent 35%),
+    #1c1c1e;
+}
+.level-showcase header > span { color: #8fb84c; font-size: 9px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
+.level-showcase h1 { margin: 5px 0 4px; font-size: 22px; letter-spacing: -.04em; }
+.level-showcase header p { margin: 0; color: #88888e; font-size: 10px; }
+.level-showcase-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; margin-top: 17px; }
+.level-showcase-list section { position: relative; padding: 9px 11px; background: rgba(255,255,255,.035); border: 1px solid rgba(255,255,255,.07); border-radius: 10px; }
+.level-showcase-list section > p { position: absolute; right: 11px; bottom: 5px; margin: 0; color: #65656b; font-size: 8px; }
+.level-showcase-list .level-copy > div { margin-bottom: 6px; }
+.level-showcase-list .level-row { min-width: 0; }
+.level-showcase-list .level-badge { width: 31px; height: 36px; margin-right: 7px; }
+.level-showcase-list .level-badge svg { width: 17px; height: 17px; }
+.level-showcase-list .level-copy .tier-name { gap: 3px; font-size: 10px; white-space: nowrap; }
+.level-showcase-list .level-copy .tier-name > svg { width: 11px; height: 11px; }
+.level-showcase-list .level-copy .level-label { display: none; }
+.level-showcase-list .level-copy > div:first-child > span { display: none; }
 
 .panel-menu { margin: 10px -14px -10px; border-top: 1px solid rgba(255,255,255,.09); }
 .panel-menu button { display: flex; width: 100%; height: 36px; padding: 0 14px; align-items: center; justify-content: space-between; color: #d7d7da; background: transparent; border: 0; border-bottom: 1px solid rgba(255,255,255,.055); font-size: 11px; }

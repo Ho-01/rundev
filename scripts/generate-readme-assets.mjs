@@ -71,6 +71,11 @@ try {
     },
     { name: "dashboard-active", query: "?preview=active&runner=coding-fish&freezeRunner=1" },
     {
+      name: "level-progression",
+      query: "?preview=active&levelShowcase=1&freezeRunner=1",
+      fullPage: true
+    },
+    {
       name: "runner-picker",
       query: "?preview=disconnected&runner=coding-fish&freezeRunner=1",
       action: async () => page.getByRole("button", { name: "개발자 변경" }).click()
@@ -82,7 +87,8 @@ try {
     await scenario.action?.();
     await page.screenshot({
       path: path.join(outputDir, `${scenario.name}.png`),
-      animations: "disabled"
+      animations: "disabled",
+      fullPage: scenario.fullPage ?? false
     });
   }
 } finally {

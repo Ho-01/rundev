@@ -125,5 +125,5 @@ macOS:
 - `CI`: PR과 `main` 푸시에서 Windows 빌드, 프론트/Rust 테스트, 버전 일치와 npm
   audit을 검사한다.
 - `macOS test build`: 앱 관련 `main` 변경에서 universal DMG를 만든다.
-- `Test release`: `v*` 태그에서 태그와 앱 버전을 확인하고 Windows NSIS와 macOS
-  universal DMG를 draft prerelease에 업로드한다.
+- `Release RunDev`: `v*` 태그에서 태그와 앱 버전을 확인하고 Windows NSIS와 macOS
+  universal DMG를 GitHub Release 자산으로 업로드한다.

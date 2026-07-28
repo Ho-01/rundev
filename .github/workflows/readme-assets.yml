@@ -8,6 +8,7 @@ on:
       - "src/**"
       - "src-tauri/icons/tray/**"
       - "scripts/generate-readme-assets.mjs"
+      - "src/domain/level.ts"
       - "package.json"
       - "package-lock.json"
       - ".github/workflows/readme-assets.yml"

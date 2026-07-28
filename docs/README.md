@@ -40,3 +40,4 @@
 - [0009 AI 세션 활동 집계](decisions/0009-ai-session-activity.md)
 - [0010 키 입력 횟수 집계](decisions/0010-keyboard-count-collection.md)
 - [0011 개발 집중시간 집계](decisions/0011-focus-time-classification.md)
+- [0012 개발자 레벨 등급](decisions/0012-developer-level-tiers.md)

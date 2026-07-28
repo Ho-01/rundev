@@ -1,10 +1,19 @@
 import { useEffect, useState } from "react";
 import {
-  ChevronRight,
-  CircleHelp,
   Clock3,
+  Cpu,
+  Crown,
+  Bug,
+  BadgeCheck,
+  Code2,
+  Hammer,
+  Info,
   Keyboard,
-  Settings2
+  Network,
+  Settings2,
+  Sprout,
+  SquareTerminal,
+  Workflow
 } from "lucide-react";
 import { useDashboardStore } from "./store/dashboard";
 import {
@@ -21,6 +30,12 @@ import type {
 import { runnerFramesById, runnerOptions } from "./assets/runners";
 import openAiIcon from "./assets/providers/openai.svg";
 import claudeIcon from "./assets/providers/claude.svg";
+import packageJson from "../package.json";
+import {
+  getLevelTier,
+  levelTiers,
+  type LevelTierId
+} from "./domain/level";
 
 function formatDuration(seconds: number) {
   const hours = Math.floor(seconds / 3600);
@@ -64,6 +79,91 @@ function Meter({ value }: { value: number }) {
   );
 }
 
+function TierIcon({ tierId, size = 13 }: { tierId: LevelTierId; size?: number }) {
+  const props = { size, "aria-hidden": true as const };
+  switch (tierId) {
+    case "rookie":
+      return <Hammer {...props} />;
+    case "maker":
+      return <Code2 {...props} />;
+    case "debugger":
+      return <Bug {...props} />;
+    case "hacker":
+      return <SquareTerminal {...props} />;
+    case "systems":
+      return <Network {...props} />;
+    case "architect":
+      return <Cpu {...props} />;
+    case "lead":
+      return <Workflow {...props} />;
+    case "master":
+      return <BadgeCheck {...props} />;
+    case "legend":
+      return <Crown {...props} />;
+    default:
+      return <Sprout {...props} />;
+  }
+}
+
+function LevelStatus({
+  level,
+  xpIntoLevel,
+  xpForNextLevel
+}: {
+  level: number;
+  xpIntoLevel: number;
+  xpForNextLevel: number;
+}) {
+  const tier = getLevelTier(level);
+  const progress = (xpIntoLevel / xpForNextLevel) * 100;
+
+  return (
+    <div className={`level-row tier-${tier.id}`}>
+      <div className="level-badge" aria-label={`${tier.name} 엠블럼`}>
+        <TierIcon tierId={tier.id} size={21} />
+      </div>
+      <div className="level-copy">
+        <div>
+          <strong className="tier-name">
+            <TierIcon tierId={tier.id} />
+            {tier.name}
+            <span className="level-label">Lv. {level}</span>
+          </strong>
+          <span>{xpIntoLevel} / {xpForNextLevel} XP</span>
+        </div>
+        <Meter value={progress} />
+      </div>
+    </div>
+  );
+}
+
+function LevelShowcase() {
+  return (
+    <main className="level-showcase">
+      <header>
+        <span>RunDev Level System</span>
+        <h1>개발자 등급</h1>
+        <p>활동 XP가 쌓일수록 배지와 등급이 성장합니다.</p>
+      </header>
+      <div className="level-showcase-list">
+        {levelTiers.map((tier) => (
+          <section key={tier.id}>
+            <LevelStatus
+              level={tier.minLevel}
+              xpIntoLevel={tier.id === "legend" ? 100 : 40}
+              xpForNextLevel={100}
+            />
+            <p>
+              Lv.{tier.minLevel}
+              {tier.maxLevel ? `–${tier.maxLevel}` : "+"}
+            </p>
+          </section>
+        ))}
+      </div>
+    </main>
+  );
+}
+
 export function App() {
   const [accountPreview, setAccountPreview] = useState<CodexAccountPreview | null>(null);
   const [claudePreview, setClaudePreview] = useState<ClaudeConnectionPreview | null>(null);
@@ -71,7 +171,9 @@ export function App() {
   const [previewLoading, setPreviewLoading] = useState(false);
   const [headerFrame, setHeaderFrame] = useState(0);
   const [runnerDialogOpen, setRunnerDialogOpen] = useState(false);
+  const [infoDialogOpen, setInfoDialogOpen] = useState(false);
   const freezeRunner = new URLSearchParams(window.location.search).has("freezeRunner");
+  const showLevelShowcase = new URLSearchParams(window.location.search).has("levelShowcase");
   const {
     summary,
     focus,
@@ -163,9 +265,6 @@ export function App() {
     return () => window.clearInterval(timer);
   }, [freezeRunner, runnerFrames.length]);
 
-  const levelProgress = character
-    ? (character.xpIntoLevel / character.xpForNextLevel) * 100
-    : 0;
   const focusRewardProgress = ((summary?.activeSeconds ?? 0) % 1_800) / 18;
   const focusRewardRemaining =
     1_800 - ((summary?.activeSeconds ?? 0) % 1_800);
@@ -178,6 +277,10 @@ export function App() {
     aiUsage?.status !== "disconnected" || claudeUsage?.status !== "disconnected";
   const activeHistoryDays = activityHistory.filter((day) => day.activeSeconds > 0).length;
 
+  if (showLevelShowcase) {
+    return <LevelShowcase />;
+  }
+
   return (
     <main className={`popover${hasUsageDetails ? " dense" : ""}`}>
       <header className="runner-header">
@@ -188,14 +291,24 @@ export function App() {
           <strong>RunDev</strong>
           <span><i className="status-dot" /> 개발 활동 대기 중</span>
         </div>
-        <button
-          className="plain-button"
-          type="button"
-          aria-label="개발자 변경"
-          onClick={() => setRunnerDialogOpen(true)}
-        >
-          <Settings2 size={17} />
-        </button>
+        <div className="header-actions">
+          <button
+            className="plain-button"
+            type="button"
+            aria-label="RunDev 정보"
+            onClick={() => setInfoDialogOpen(true)}
+          >
+            <Info size={17} />
+          </button>
+          <button
+            className="plain-button"
+            type="button"
+            aria-label="개발자 변경"
+            onClick={() => setRunnerDialogOpen(true)}
+          >
+            <Settings2 size={17} />
+          </button>
+        </div>
       </header>
 
       <div className="divider" />
@@ -384,16 +497,11 @@ export function App() {
 
       <section className="info-section compact">
         <SectionTitle>개발자 상태</SectionTitle>
-        <div className="level-row">
-          <div className="level-badge">{character?.level ?? 1}</div>
-          <div className="level-copy">
-            <div>
-              <strong>새싹 개발자</strong>
-              <span>{character?.xpIntoLevel ?? 0} / {character?.xpForNextLevel ?? 100} XP</span>
-            </div>
-            <Meter value={levelProgress} />
-          </div>
-        </div>
+        <LevelStatus
+          level={character?.level ?? 1}
+          xpIntoLevel={character?.xpIntoLevel ?? 0}
+          xpForNextLevel={character?.xpForNextLevel ?? 100}
+        />
         <div className="activity-history">
           <div className="activity-history-heading">
             <span>최근 20주 활동</span>
@@ -422,15 +530,31 @@ export function App() {
         </div>
       </section>
 
-      <nav className="panel-menu">
-        <button>
-          <span><CircleHelp size={15} /> RunDev 정보</span>
-          <ChevronRight size={14} />
-        </button>
-      </nav>
-
       {loading && <div className="loading-line" />}
       {error && <p className="error-message">{error}</p>}
+      {infoDialogOpen && (
+        <div className="dialog-backdrop" role="presentation">
+          <section
+            className="account-dialog app-info-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="app-info-title"
+          >
+            <div className="app-info-mark"><Info size={20} /></div>
+            <h2 id="app-info-title">RunDev 정보</h2>
+            <p>개발 활동을 기록하고 성장으로 보여주는 로컬 우선 트레이 앱입니다.</p>
+            <dl>
+              <div><dt>버전</dt><dd>v{packageJson.version}</dd></div>
+              <div><dt>기술</dt><dd>Tauri 2 · React · Rust · SQLite</dd></div>
+              <div><dt>데이터</dt><dd>이 기기에만 저장</dd></div>
+            </dl>
+            <p>프롬프트, 소스 코드, 키 입력 내용은 저장하지 않습니다.</p>
+            <div className="dialog-actions">
+              <button type="button" onClick={() => setInfoDialogOpen(false)}>닫기</button>
+            </div>
+          </section>
+        </div>
+      )}
       {runnerDialogOpen && (
         <div className="dialog-backdrop" role="presentation">
           <section
