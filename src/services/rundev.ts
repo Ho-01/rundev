@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import type {
+  ActivityHistoryDay,
   AiUsageToday,
   CharacterState,
   ClaudeConnectionPreview,
@@ -25,6 +26,19 @@ const previewFocus: FocusActivityToday = {
   lastAppName: null,
   apps: []
 };
+
+function previewActivityHistory(): ActivityHistoryDay[] {
+  const today = new Date();
+  return Array.from({ length: 140 }, (_, index) => {
+    const date = new Date(today);
+    date.setDate(today.getDate() - (139 - index));
+    return {
+      date: date.toLocaleDateString("en-CA"),
+      activeSeconds: 0,
+      intensity: 0 as const
+    };
+  });
+}
 
 const previewCharacter: CharacterState = {
   level: 1,
@@ -99,6 +113,15 @@ function getPreviewDashboard() {
           { appName: "Cursor", activeSeconds: 480 }
         ]
       },
+      activityHistory: previewActivityHistory().map((day, index) =>
+        index > 126 && index % 3 !== 0
+          ? {
+              ...day,
+              activeSeconds: ((index % 4) + 1) * 1_800,
+              intensity: ((index % 4) + 1) as 1 | 2 | 3 | 4
+            }
+          : day
+      ),
       character: {
         ...previewCharacter,
         level: 4,
@@ -138,6 +161,7 @@ function getPreviewDashboard() {
     return {
       summary: previewSummary,
       focus: previewFocus,
+      activityHistory: previewActivityHistory(),
       character: previewCharacter,
       aiUsage: {
         ...previewAiUsage,
@@ -155,6 +179,7 @@ function getPreviewDashboard() {
   return {
     summary: previewSummary,
     focus: previewFocus,
+    activityHistory: previewActivityHistory(),
     character: previewCharacter,
     aiUsage: previewAiUsage,
     claudeUsage: previewClaudeUsage,
@@ -242,10 +267,11 @@ export async function getDashboard() {
     return getPreviewDashboard();
   }
 
-  const [summary, focus, character, aiUsage, claudeUsage, keyboard, runner] =
+  const [summary, focus, activityHistory, character, aiUsage, claudeUsage, keyboard, runner] =
     await Promise.all([
     invoke<DailySummary>("get_daily_summary"),
     invoke<FocusActivityToday>("get_focus_activity_today"),
+    invoke<ActivityHistoryDay[]>("get_activity_history"),
     invoke<CharacterState>("get_character_state"),
     invoke<AiUsageToday>("get_ai_usage_today"),
     invoke<ClaudeUsageToday>("get_claude_usage_today"),
@@ -253,5 +279,14 @@ export async function getDashboard() {
     invoke<RunnerSelection>("get_runner_selection")
   ]);
 
-  return { summary, focus, character, aiUsage, claudeUsage, keyboard, runner };
+  return {
+    summary,
+    focus,
+    activityHistory,
+    character,
+    aiUsage,
+    claudeUsage,
+    keyboard,
+    runner
+  };
 }

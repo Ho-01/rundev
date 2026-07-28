@@ -29,6 +29,14 @@ pub struct FocusActivityToday {
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct ActivityHistoryDay {
+    date: String,
+    active_seconds: i64,
+    intensity: u8,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct CharacterState {
     level: i64,
     total_xp: i64,
@@ -157,7 +165,7 @@ fn is_supported_runner(runner_id: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::is_supported_runner;
+    use super::{activity_intensity, is_supported_runner};
 
     #[test]
     fn accepts_only_packaged_runner_ids() {
@@ -167,6 +175,16 @@ mod tests {
         assert!(is_supported_runner("coding-shrimp"));
         assert!(is_supported_runner("coding-vtuber"));
         assert!(!is_supported_runner("../custom"));
+    }
+
+    #[test]
+    fn maps_focus_seconds_to_grass_intensity() {
+        assert_eq!(activity_intensity(0), 0);
+        assert_eq!(activity_intensity(1), 1);
+        assert_eq!(activity_intensity(1_799), 1);
+        assert_eq!(activity_intensity(1_800), 2);
+        assert_eq!(activity_intensity(3_600), 3);
+        assert_eq!(activity_intensity(7_200), 4);
     }
 }
 
@@ -266,6 +284,51 @@ pub async fn get_focus_activity_today(
             .map(activity::catalog::display_name),
         apps,
     })
+}
+
+#[tauri::command]
+pub async fn get_activity_history(
+    state: State<'_, AppState>,
+) -> Result<Vec<ActivityHistoryDay>, String> {
+    const HISTORY_DAYS: i64 = 20 * 7;
+
+    let today = Local::now().date_naive();
+    let start = today - Duration::days(HISTORY_DAYS - 1);
+    let rows: Vec<(String, i64)> = sqlx::query_as(
+        "SELECT date(started_at, 'localtime'), COALESCE(SUM(active_seconds), 0)
+         FROM activity_sessions
+         WHERE activity_type = 'development'
+           AND date(started_at, 'localtime') >= ?
+         GROUP BY date(started_at, 'localtime')",
+    )
+    .bind(start.to_string())
+    .fetch_all(&state.pool)
+    .await
+    .map_err(|error| error.to_string())?;
+    let totals: HashMap<_, _> = rows.into_iter().collect();
+
+    Ok((0..HISTORY_DAYS)
+        .map(|offset| {
+            let date = start + Duration::days(offset);
+            let date_text = date.to_string();
+            let active_seconds = totals.get(&date_text).copied().unwrap_or(0);
+            ActivityHistoryDay {
+                date: date_text,
+                active_seconds,
+                intensity: activity_intensity(active_seconds),
+            }
+        })
+        .collect())
+}
+
+fn activity_intensity(active_seconds: i64) -> u8 {
+    match active_seconds {
+        0 => 0,
+        1..1_800 => 1,
+        1_800..3_600 => 2,
+        3_600..7_200 => 3,
+        _ => 4,
+    }
 }
 
 fn source_identifier(source: &str) -> &str {

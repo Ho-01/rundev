@@ -63,6 +63,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::get_daily_summary,
             commands::get_focus_activity_today,
+            commands::get_activity_history,
             commands::get_character_state,
             commands::get_ai_usage_today,
             commands::set_codex_usage_enabled,

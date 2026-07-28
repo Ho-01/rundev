@@ -8,6 +8,7 @@ import {
   setRunnerSelection
 } from "../services/rundev";
 import type {
+  ActivityHistoryDay,
   AiUsageToday,
   CharacterState,
   ClaudeUsageToday,
@@ -22,6 +23,7 @@ import type {
 type DashboardStore = {
   summary: DailySummary | null;
   focus: FocusActivityToday | null;
+  activityHistory: ActivityHistoryDay[];
   character: CharacterState | null;
   aiUsage: AiUsageToday | null;
   claudeUsage: ClaudeUsageToday | null;
@@ -42,6 +44,7 @@ type DashboardStore = {
 export const useDashboardStore = create<DashboardStore>((set) => ({
   summary: null,
   focus: null,
+  activityHistory: [],
   character: null,
   aiUsage: null,
   claudeUsage: null,

@@ -12,6 +12,7 @@ describe("App", () => {
     expect(await screen.findByText("마지막으로 본 도구")).toBeInTheDocument();
     expect(await screen.findByText("Claude Code")).toBeInTheDocument();
     expect(await screen.findByText("오늘 두드린 키보드")).toBeInTheDocument();
+    expect(await screen.findByText("최근 20주 활동")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "개발자 변경" }));
     expect(screen.getByText("주황 고양이")).toBeInTheDocument();
     expect(screen.getByText("주황 새우")).toBeInTheDocument();

@@ -75,6 +75,7 @@ export function App() {
   const {
     summary,
     focus,
+    activityHistory,
     character,
     aiUsage,
     claudeUsage,
@@ -175,6 +176,7 @@ export function App() {
   );
   const hasUsageDetails =
     aiUsage?.status !== "disconnected" || claudeUsage?.status !== "disconnected";
+  const activeHistoryDays = activityHistory.filter((day) => day.activeSeconds > 0).length;
 
   return (
     <main className={`popover${hasUsageDetails ? " dense" : ""}`}>
@@ -390,6 +392,32 @@ export function App() {
               <span>{character?.xpIntoLevel ?? 0} / {character?.xpForNextLevel ?? 100} XP</span>
             </div>
             <Meter value={levelProgress} />
+          </div>
+        </div>
+        <div className="activity-history">
+          <div className="activity-history-heading">
+            <span>최근 20주 활동</span>
+            <strong>{activeHistoryDays}일</strong>
+          </div>
+          <div
+            className="activity-grass"
+            role="img"
+            aria-label={`최근 20주 중 ${activeHistoryDays}일 개발 활동`}
+          >
+            {activityHistory.map((day) => (
+              <i
+                key={day.date}
+                className={`activity-cell intensity-${day.intensity}`}
+                title={`${day.date} · ${formatDuration(day.activeSeconds)}`}
+              />
+            ))}
+          </div>
+          <div className="activity-legend" aria-hidden="true">
+            <span>적음</span>
+            {[0, 1, 2, 3, 4].map((intensity) => (
+              <i key={intensity} className={`activity-cell intensity-${intensity}`} />
+            ))}
+            <span>많음</span>
           </div>
         </div>
       </section>

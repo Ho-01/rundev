@@ -15,6 +15,12 @@ export type FocusActivityToday = {
   apps: FocusAppUsage[];
 };
 
+export type ActivityHistoryDay = {
+  date: string;
+  activeSeconds: number;
+  intensity: 0 | 1 | 2 | 3 | 4;
+};
+
 export type CharacterState = {
   level: number;
   totalXp: number;

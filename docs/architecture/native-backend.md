@@ -48,6 +48,7 @@ Updater 의존성은 포함되어 있지만 서명키와 endpoint가 없으므�
 - 실행된 tick만 누적하여 절전 중 경과 시간을 제외
 - 매초 `focus-activity-updated` 이벤트와 10초 단위 SQLite 세션 갱신
 - `get_focus_activity_today` command로 마지막 개발 도구와 오늘의 앱별 합계 조회
+- `get_activity_history` command로 최근 20주의 날짜별 개발시간과 잔디 강도 조회
 - 30분 단위 10 XP를 `focus_milestone` 원장 이벤트로 멱등 지급
 - 앱 식별자 외 창 제목, 파일 경로, URL은 수집하지 않음
 

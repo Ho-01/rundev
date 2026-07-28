@@ -15,14 +15,22 @@ button { color: inherit; font: inherit; }
 
 .popover {
   position: relative;
+  height: 480px;
   min-height: 480px;
   padding: 14px 14px 10px;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-color: #48484c transparent;
+  scrollbar-width: thin;
   background:
     linear-gradient(180deg, rgba(255,255,255,.025), transparent 20%),
     #1c1c1e;
   border: 1px solid rgba(255,255,255,.1);
 }
+
+.popover::-webkit-scrollbar { width: 5px; }
+.popover::-webkit-scrollbar-track { background: transparent; }
+.popover::-webkit-scrollbar-thumb { background: #48484c; border-radius: 99px; }
 
 .runner-header {
   display: flex;
@@ -207,6 +215,16 @@ button { color: inherit; font: inherit; }
 .level-copy > div { display: flex; align-items: center; justify-content: space-between; margin-bottom: 7px; }
 .level-copy strong { font-size: 12px; font-weight: 500; }
 .level-copy span { color: #89898f; font-size: 10px; font-variant-numeric: tabular-nums; }
+.activity-history { margin-top: 10px; }
+.activity-history-heading { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; color: #85858b; font-size: 9px; }
+.activity-history-heading strong { color: #bdbdc1; font-weight: 500; }
+.activity-grass { display: grid; grid-template-rows: repeat(7, 9px); grid-auto-columns: 9px; grid-auto-flow: column; justify-content: center; gap: 3px; }
+.activity-cell { display: block; width: 9px; height: 9px; background: #303034; border-radius: 2px; }
+.activity-cell.intensity-1 { background: #3d4c32; }
+.activity-cell.intensity-2 { background: #58713d; }
+.activity-cell.intensity-3 { background: #76a246; }
+.activity-cell.intensity-4 { background: #9bce5a; }
+.activity-legend { display: flex; align-items: center; justify-content: flex-end; gap: 3px; margin-top: 5px; color: #6f6f75; font-size: 8px; }
 
 .panel-menu { margin: 10px -14px -10px; border-top: 1px solid rgba(255,255,255,.09); }
 .panel-menu button { display: flex; width: 100%; height: 36px; padding: 0 14px; align-items: center; justify-content: space-between; color: #d7d7da; background: transparent; border: 0; border-bottom: 1px solid rgba(255,255,255,.055); font-size: 11px; }
