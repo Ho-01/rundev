@@ -12,7 +12,7 @@ pub fn create(app: &App) -> tauri::Result<()> {
 
     TrayIconBuilder::with_id("rundev-tray")
         .icon(icon)
-        .icon_as_template(true)
+        .icon_as_template(false)
         .tooltip("RunDev")
         .menu(&menu)
         .show_menu_on_left_click(false)

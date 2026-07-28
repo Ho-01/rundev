@@ -6,6 +6,7 @@
 - [네이티브 백엔드](architecture/native-backend.md)
 - [프론트엔드](architecture/frontend.md)
 - [개발 및 검증](architecture/development.md)
+- [macOS 테스트 배포](architecture/macos-test-distribution.md)
 
 ## Architecture Decision Records
 
@@ -16,4 +17,3 @@
 - [0004 이벤트 원장 기반 XP](decisions/0004-event-ledger-xp.md)
 - [0005 개인정보 최소 수집](decisions/0005-privacy-minimal-collection.md)
 - [0006 PNG 프레임 트레이 애니메이션](decisions/0006-png-frame-tray-animation.md)
-

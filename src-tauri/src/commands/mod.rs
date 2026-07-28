@@ -1,4 +1,4 @@
-use crate::database::AppState;
+use crate::{adapters, database::AppState};
 use chrono::Local;
 use serde::Serialize;
 use tauri::State;
@@ -20,6 +20,30 @@ pub struct CharacterState {
     current_form: String,
     xp_into_level: i64,
     xp_for_next_level: i64,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AiUsageToday {
+    provider: String,
+    total_tokens: Option<i64>,
+    source: Option<String>,
+    last_synced_at: Option<String>,
+    status: String,
+    error: Option<String>,
+    account_label: Option<String>,
+    environment: Option<String>,
+    latest_available_date: Option<String>,
+    latest_available_tokens: Option<i64>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CodexAccountPreview {
+    account_label: String,
+    auth_type: String,
+    plan_type: Option<String>,
+    environment: String,
 }
 
 #[tauri::command]
@@ -74,4 +98,167 @@ pub async fn get_character_state(state: State<'_, AppState>) -> Result<Character
         xp_into_level: row.1 - level_floor,
         xp_for_next_level: 100,
     })
+}
+
+#[tauri::command]
+pub async fn get_ai_usage_today(state: State<'_, AppState>) -> Result<AiUsageToday, String> {
+    if !adapters::codex::is_enabled(&state.pool).await? {
+        return Ok(AiUsageToday {
+            provider: "codex".to_string(),
+            total_tokens: None,
+            source: None,
+            last_synced_at: None,
+            status: "disconnected".to_string(),
+            error: None,
+            account_label: None,
+            environment: None,
+            latest_available_date: None,
+            latest_available_tokens: None,
+        });
+    }
+
+    let date = Local::now().date_naive().to_string();
+    let snapshot: Option<(i64, String)> = sqlx::query_as(
+        "SELECT total_tokens, source
+         FROM ai_usage_snapshots
+         WHERE provider = 'codex' AND scope = 'account-day' AND bucket_started_at = ?
+         ORDER BY observed_at DESC
+         LIMIT 1",
+    )
+    .bind(date)
+    .fetch_optional(&state.pool)
+    .await
+    .map_err(|error| error.to_string())?;
+
+    let adapter: Option<(Option<String>, Option<String>)> = sqlx::query_as(
+        "SELECT last_success_at, last_error
+         FROM ai_adapter_state WHERE adapter_id = 'codex-account-usage'",
+    )
+    .fetch_optional(&state.pool)
+    .await
+    .map_err(|error| error.to_string())?;
+    let latest: Option<(String, i64)> = sqlx::query_as(
+        "SELECT bucket_started_at, total_tokens
+         FROM ai_usage_snapshots
+         WHERE provider = 'codex' AND scope = 'account-day'
+         ORDER BY bucket_started_at DESC, observed_at DESC
+         LIMIT 1",
+    )
+    .fetch_optional(&state.pool)
+    .await
+    .map_err(|error| error.to_string())?;
+
+    let (last_synced_at, error) = adapter.unwrap_or((None, None));
+    let status = if error.is_some() {
+        "error"
+    } else if last_synced_at.is_some() && snapshot.is_none() && latest.is_some() {
+        "delayed"
+    } else if last_synced_at.is_some() {
+        "connected"
+    } else {
+        "syncing"
+    };
+    let account_label: Option<String> =
+        sqlx::query_scalar("SELECT value FROM app_settings WHERE key = 'ai.codex.account_label'")
+            .fetch_optional(&state.pool)
+            .await
+            .map_err(|error| error.to_string())?;
+    let environment: Option<String> =
+        sqlx::query_scalar("SELECT value FROM app_settings WHERE key = 'ai.codex.environment'")
+            .fetch_optional(&state.pool)
+            .await
+            .map_err(|error| error.to_string())?;
+
+    Ok(AiUsageToday {
+        provider: "codex".to_string(),
+        total_tokens: snapshot.as_ref().map(|row| row.0),
+        source: snapshot.map(|row| row.1),
+        last_synced_at,
+        status: status.to_string(),
+        error,
+        account_label,
+        environment,
+        latest_available_date: latest.as_ref().map(|row| row.0.clone()),
+        latest_available_tokens: latest.map(|row| row.1),
+    })
+}
+
+#[tauri::command]
+pub async fn set_codex_usage_enabled(
+    enabled: bool,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    if enabled {
+        return Err("계정 확인 후 연동해야 합니다.".to_string());
+    }
+    adapters::codex::set_enabled(&state.pool, enabled).await?;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn preview_codex_account() -> Result<CodexAccountPreview, String> {
+    let account = adapters::codex::read_account().await?;
+    let environment = codex_environment();
+
+    match account.account {
+        Some(adapters::codex::Account::ChatGpt { email, plan_type }) => Ok(CodexAccountPreview {
+            account_label: email.unwrap_or_else(|| "이메일 정보 없음".to_string()),
+            auth_type: "ChatGPT".to_string(),
+            plan_type: Some(plan_type),
+            environment,
+        }),
+        Some(adapters::codex::Account::ApiKey) => {
+            Err("API 키 로그인은 계정 사용량 조회를 지원하지 않습니다.".to_string())
+        }
+        Some(adapters::codex::Account::AmazonBedrock) => {
+            Err("Amazon Bedrock 로그인은 계정 사용량 조회를 지원하지 않습니다.".to_string())
+        }
+        None if account.requires_openai_auth => {
+            Err("Codex에 로그인되어 있지 않습니다. Codex CLI에서 먼저 로그인해 주세요.".to_string())
+        }
+        None => Err("사용 가능한 Codex 계정을 찾지 못했습니다.".to_string()),
+    }
+}
+
+#[tauri::command]
+pub async fn connect_codex_account(state: State<'_, AppState>) -> Result<(), String> {
+    let preview = preview_codex_account().await?;
+    let mut transaction = state
+        .pool
+        .begin()
+        .await
+        .map_err(|error| error.to_string())?;
+    for (key, value) in [
+        ("ai.codex.enabled", "true".to_string()),
+        ("ai.codex.account_label", preview.account_label),
+        ("ai.codex.environment", preview.environment),
+    ] {
+        sqlx::query(
+            "INSERT INTO app_settings (key, value) VALUES (?, ?)
+             ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+        )
+        .bind(key)
+        .bind(value)
+        .execute(&mut *transaction)
+        .await
+        .map_err(|error| error.to_string())?;
+    }
+    transaction
+        .commit()
+        .await
+        .map_err(|error| error.to_string())?;
+
+    if let Err(error) = adapters::codex::sync(&state.pool).await {
+        adapters::codex::set_enabled(&state.pool, false).await?;
+        return Err(error);
+    }
+    Ok(())
+}
+
+fn codex_environment() -> String {
+    if std::env::var_os("CODEX_HOME").is_some() {
+        "사용자 지정 CODEX_HOME".to_string()
+    } else {
+        "기본 Codex 환경".to_string()
+    }
 }

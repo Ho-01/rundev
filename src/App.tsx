@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import {
   Bot,
   ChevronRight,
@@ -10,12 +10,38 @@ import {
   Sparkles
 } from "lucide-react";
 import { useDashboardStore } from "./store/dashboard";
+import { previewCodexAccount } from "./services/rundev";
+import type { CodexAccountPreview } from "./types/activity";
+import codingCat1 from "../src-tauri/icons/tray/coding/01.png";
+import codingCat2 from "../src-tauri/icons/tray/coding/02.png";
+import codingCat3 from "../src-tauri/icons/tray/coding/03.png";
+import codingCat4 from "../src-tauri/icons/tray/coding/04.png";
+
+const codingCatFrames = [codingCat1, codingCat2, codingCat3, codingCat4];
 
 function formatDuration(seconds: number) {
   const hours = Math.floor(seconds / 3600);
   const minutes = Math.floor((seconds % 3600) / 60);
   if (hours === 0) return `${minutes}m`;
   return `${hours}h ${minutes}m`;
+}
+
+function formatTokens(tokens: number) {
+  return new Intl.NumberFormat("ko-KR").format(tokens);
+}
+
+function formatSyncTime(value: string | null | undefined) {
+  if (!value) return "동기화 중";
+  return new Intl.DateTimeFormat("ko-KR", {
+    hour: "2-digit",
+    minute: "2-digit"
+  }).format(new Date(value));
+}
+
+function formatUsageDate(value: string | null | undefined) {
+  if (!value) return "";
+  const [, month, day] = value.split("-");
+  return `${Number(month)}/${Number(day)}`;
 }
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
@@ -31,11 +57,53 @@ function Meter({ value }: { value: number }) {
 }
 
 export function App() {
-  const { summary, character, loading, error, refresh } = useDashboardStore();
+  const [accountPreview, setAccountPreview] = useState<CodexAccountPreview | null>(null);
+  const [previewError, setPreviewError] = useState<string | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [headerFrame, setHeaderFrame] = useState(0);
+  const {
+    summary,
+    character,
+    aiUsage,
+    loading,
+    error,
+    refresh,
+    connectCodex,
+    disconnectCodex
+  } = useDashboardStore();
+
+  async function openCodexConnection() {
+    setPreviewLoading(true);
+    setPreviewError(null);
+    try {
+      setAccountPreview(await previewCodexAccount());
+    } catch (connectionError) {
+      setPreviewError(
+        connectionError instanceof Error ? connectionError.message : String(connectionError)
+      );
+    } finally {
+      setPreviewLoading(false);
+    }
+  }
+
+  async function confirmCodexConnection() {
+    await connectCodex();
+    setAccountPreview(null);
+  }
 
   useEffect(() => {
     void refresh();
+    const timer = window.setInterval(() => void refresh(), 30_000);
+    return () => window.clearInterval(timer);
   }, [refresh]);
+
+  useEffect(() => {
+    const timer = window.setInterval(
+      () => setHeaderFrame((frame) => (frame + 1) % codingCatFrames.length),
+      170
+    );
+    return () => window.clearInterval(timer);
+  }, []);
 
   const levelProgress = character
     ? (character.xpIntoLevel / character.xpForNextLevel) * 100
@@ -47,15 +115,7 @@ export function App() {
     <main className="popover">
       <header className="runner-header">
         <div className="runner">
-          <span className="runner-ear left" />
-          <span className="runner-ear right" />
-          <span className="runner-face">
-            <i /><i />
-          </span>
-          <span className="runner-body" />
-          <span className="runner-leg one" />
-          <span className="runner-leg two" />
-          <span className="runner-tail" />
+          <img src={codingCatFrames[headerFrame]} alt="" aria-hidden="true" />
         </div>
         <div className="runner-copy">
           <strong>RunDev</strong>
@@ -97,20 +157,60 @@ export function App() {
       <div className="divider" />
 
       <section className="info-section compact">
-        <SectionTitle>AI 사용</SectionTitle>
+        <SectionTitle>AI 사용량</SectionTitle>
         <div className="provider-row">
           <span className="provider-icon"><Bot size={15} /></span>
           <div>
-            <strong>전체 도구</strong>
-            <span>오늘 감지된 AI 활동</span>
+            <strong>Codex</strong>
+            <span>
+              {aiUsage?.status === "disconnected"
+                ? "연동되지 않음"
+                : aiUsage?.status === "error"
+                ? "연결 확인 필요"
+                : aiUsage?.status === "delayed"
+                ? `${aiUsage.accountLabel ?? "Codex 계정"} · 집계 지연`
+                : `${aiUsage?.accountLabel ?? "Codex 계정"} · ${formatSyncTime(aiUsage?.lastSyncedAt)}`}
+            </span>
           </div>
-          <b>{summary?.aiEvents ?? 0}</b>
+          {aiUsage?.status === "disconnected" ? (
+            <button
+              className="connect-button"
+              type="button"
+              onClick={() => void openCodexConnection()}
+              disabled={loading || previewLoading}
+            >
+              {previewLoading ? "확인 중" : "연동"}
+            </button>
+          ) : (
+            <b>{aiUsage?.totalTokens == null ? "—" : formatTokens(aiUsage.totalTokens)}</b>
+          )}
         </div>
-        <div className="mini-stats">
-          <span>Codex <b>0</b></span>
-          <span>Claude <b>0</b></span>
-          <span>기타 <b>0</b></span>
-        </div>
+        {aiUsage?.status !== "disconnected" && (
+          <div className="mini-stats">
+            <span>
+              {aiUsage?.status === "delayed"
+                ? `오늘 집계 대기 중 · 최신 ${formatUsageDate(aiUsage.latestAvailableDate)}`
+                : aiUsage?.totalTokens == null
+                ? "오늘 데이터 없음"
+                : "오늘 총 토큰"}
+            </span>
+            {aiUsage?.source && <span>출처 <b>Codex 계정</b></span>}
+            <button
+              className="disconnect-button"
+              type="button"
+              onClick={() => void disconnectCodex()}
+              disabled={loading}
+            >
+              연동 해제
+            </button>
+          </div>
+        )}
+        {aiUsage?.error && (
+          <p className="adapter-error" title={aiUsage.error}>
+            Codex 로그인 또는 설치 상태를 확인해 주세요.
+          </p>
+        )}
+        {previewError && <p className="adapter-error">{previewError}</p>}
       </section>
 
       <div className="divider" />
@@ -142,6 +242,36 @@ export function App() {
 
       {loading && <div className="loading-line" />}
       {error && <p className="error-message">{error}</p>}
+      {accountPreview && (
+        <div className="dialog-backdrop" role="presentation">
+          <section
+            className="account-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="account-title"
+          >
+            <h2 id="account-title">이 Codex 계정과 연동할까요?</h2>
+            <dl>
+              <div><dt>계정</dt><dd>{accountPreview.accountLabel}</dd></div>
+              <div><dt>로그인</dt><dd>{accountPreview.authType}</dd></div>
+              <div><dt>요금제</dt><dd>{accountPreview.planType ?? "확인 불가"}</dd></div>
+              <div><dt>인증 환경</dt><dd>{accountPreview.environment}</dd></div>
+            </dl>
+            <p>RunDev는 토큰 합계만 저장하며 프롬프트와 응답은 읽지 않습니다.</p>
+            <div className="dialog-actions">
+              <button type="button" onClick={() => setAccountPreview(null)}>취소</button>
+              <button
+                type="button"
+                className="confirm-button"
+                disabled={loading}
+                onClick={() => void confirmCodexConnection()}
+              >
+                {loading ? "연동 중" : "이 계정 연동"}
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
     </main>
   );
 }

@@ -1,3 +1,4 @@
+mod adapters;
 mod commands;
 mod database;
 mod tray;
@@ -25,7 +26,17 @@ pub fn run() {
             std::fs::create_dir_all(&app_data_dir)?;
             let database_url = format!("sqlite://{}", app_data_dir.join("rundev.db").display());
             let pool = tauri::async_runtime::block_on(database::connect(&database_url))?;
-            app.manage(AppState { pool });
+            app.manage(AppState { pool: pool.clone() });
+            tauri::async_runtime::spawn(async move {
+                loop {
+                    if adapters::codex::is_enabled(&pool).await.unwrap_or(false) {
+                        if let Err(error) = adapters::codex::sync(&pool).await {
+                            tracing::warn!(%error, "Codex usage synchronization failed");
+                        }
+                    }
+                    tokio::time::sleep(std::time::Duration::from_secs(300)).await;
+                }
+            });
             tray::create(app)?;
             Ok(())
         })
@@ -41,7 +52,11 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             commands::get_daily_summary,
-            commands::get_character_state
+            commands::get_character_state,
+            commands::get_ai_usage_today,
+            commands::set_codex_usage_enabled,
+            commands::preview_codex_account,
+            commands::connect_codex_account
         ])
         .run(tauri::generate_context!())
         .expect("error while running RunDev");

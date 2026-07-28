@@ -4,6 +4,7 @@ import sharp from "sharp";
 
 const input = process.argv[2];
 const outputDir = process.argv[3] ?? "src-tauri/icons/tray/coding";
+const greenKey = process.argv.includes("--green-key");
 
 if (!input) {
   throw new Error("Usage: node scripts/build-tray-animation.mjs <sprite.png> [output-dir]");
@@ -19,28 +20,70 @@ for (let index = 0; index < data.length; index += 4) {
   const red = data[index];
   const green = data[index + 1];
   const blue = data[index + 2];
-  const magentaDominance = Math.min(red, blue) - green;
-  const alpha = Math.round(
-    Math.max(0, Math.min(255, ((140 - magentaDominance) / 60) * 255))
-  );
+  const alpha = greenKey
+    ? Math.round(
+        Math.max(
+          0,
+          Math.min(255, ((Math.hypot(red, green - 255, blue) - 42) / 54) * 255)
+        )
+      )
+    : Math.round(
+        Math.max(
+          0,
+          Math.min(255, ((140 - (Math.min(red, blue) - green)) / 60) * 255)
+        )
+      );
   data[index + 3] = alpha;
 
-  if (alpha < 245) {
+  if (greenKey && alpha > 0) {
+    data[index + 1] = Math.min(green, Math.max(red, blue) + 12);
+  } else if (alpha < 245) {
     data[index] = Math.min(red, green + 18);
     data[index + 2] = Math.min(blue, green + 18);
   }
 }
 
 const frameWidth = Math.floor(info.width / 4);
+let crop = { left: 0, top: 150, width: frameWidth, height: 480 };
+
+if (greenKey) {
+  let minX = frameWidth;
+  let minY = info.height;
+  let maxX = 0;
+  let maxY = 0;
+  for (let frame = 0; frame < 4; frame += 1) {
+    for (let y = 0; y < info.height; y += 1) {
+      for (let x = 0; x < frameWidth; x += 1) {
+        const alpha = data[(y * info.width + frame * frameWidth + x) * 4 + 3];
+        if (alpha > 20) {
+          minX = Math.min(minX, x);
+          minY = Math.min(minY, y);
+          maxX = Math.max(maxX, x);
+          maxY = Math.max(maxY, y);
+        }
+      }
+    }
+  }
+  const padding = Math.round(Math.max(info.width, info.height) * 0.008);
+  const left = Math.max(0, minX - padding);
+  const top = Math.max(0, minY - padding);
+  crop = {
+    left,
+    top,
+    width: Math.min(frameWidth - left, maxX - minX + 1 + padding * 2),
+    height: Math.min(info.height - top, maxY - minY + 1 + padding * 2)
+  };
+}
+
 for (let frame = 0; frame < 4; frame += 1) {
   const frameBuffer = await sharp(data, {
     raw: { width: info.width, height: info.height, channels: 4 }
   })
     .extract({
-      left: frame * frameWidth,
-      top: 150,
-      width: frame === 3 ? info.width - frame * frameWidth : frameWidth,
-      height: 480
+      left: frame * frameWidth + crop.left,
+      top: crop.top,
+      width: crop.width,
+      height: crop.height
     })
     .resize({
       width: 30,
@@ -63,4 +106,39 @@ for (let frame = 0; frame < 4; frame += 1) {
     path.join(outputDir, `${String(frame + 1).padStart(2, "0")}.png`),
     frameBuffer
   );
+}
+
+if (greenKey) {
+  const firstFramePath = path.join(outputDir, "01.png");
+  const { data: fixed, info: fixedInfo } = await sharp(firstFramePath)
+    .ensureAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+
+  for (let frame = 2; frame <= 4; frame += 1) {
+    const framePath = path.join(outputDir, `${String(frame).padStart(2, "0")}.png`);
+    const { data: current } = await sharp(framePath)
+      .ensureAlpha()
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+
+    for (let y = 0; y < fixedInfo.height; y += 1) {
+      for (let x = 0; x < fixedInfo.width; x += 1) {
+        const isLaptop = (x <= 14 && y >= 8) || (x <= 20 && y >= 20);
+        if (!isLaptop) continue;
+        const offset = (y * fixedInfo.width + x) * 4;
+        fixed.copy(current, offset, offset, offset + 4);
+      }
+    }
+
+    await sharp(current, {
+      raw: {
+        width: fixedInfo.width,
+        height: fixedInfo.height,
+        channels: 4
+      }
+    })
+      .png()
+      .toFile(framePath);
+  }
 }
