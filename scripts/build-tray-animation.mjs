@@ -8,6 +8,12 @@ const greenKey = process.argv.includes("--green-key");
 const magentaKey = process.argv.includes("--magenta-key");
 const flipHorizontal = process.argv.includes("--flip-horizontal");
 const normalizeReference = process.argv.includes("--normalize-reference");
+const sizeArgument = process.argv.find((argument) => argument.startsWith("--size="));
+const outputSize = sizeArgument ? Number(sizeArgument.split("=")[1]) : 32;
+if (!Number.isInteger(outputSize) || outputSize < 32 || outputSize % 32 !== 0) {
+  throw new Error("--size must be an integer multiple of 32");
+}
+const scale = outputSize / 32;
 
 if (!input) {
   throw new Error("Usage: node scripts/build-tray-animation.mjs <sprite.png> [output-dir]");
@@ -96,17 +102,17 @@ for (let frame = 0; frame < 4; frame += 1) {
       height: crop.height
     })
     .resize({
-      width: 30,
-      height: 28,
+      width: 30 * scale,
+      height: 28 * scale,
       fit: "contain",
       background: { r: 0, g: 0, b: 0, alpha: 0 },
       kernel: sharp.kernel.nearest
     })
     .extend({
-      top: 2,
-      bottom: 2,
-      left: 1,
-      right: 1,
+      top: 2 * scale,
+      bottom: 2 * scale,
+      left: 1 * scale,
+      right: 1 * scale,
       background: { r: 0, g: 0, b: 0, alpha: 0 }
     });
   if (flipHorizontal) framePipeline = framePipeline.flop();
@@ -120,8 +126,8 @@ for (let frame = 0; frame < 4; frame += 1) {
 
 if (normalizeReference) {
   const frameData = [];
-  let minX = 32;
-  let minY = 32;
+  let minX = outputSize;
+  let minY = outputSize;
   let maxX = 0;
   let maxY = 0;
   for (let frame = 1; frame <= 4; frame += 1) {
@@ -153,17 +159,17 @@ if (normalizeReference) {
     })
       .extract({ left: minX, top: minY, width, height })
       .resize({
-        width: 28,
-        height: 22,
+        width: 28 * scale,
+        height: 22 * scale,
         fit: "contain",
         background: { r: 0, g: 0, b: 0, alpha: 0 },
         kernel: sharp.kernel.nearest
       })
       .extend({
-        top: 5,
-        bottom: 5,
-        left: 3,
-        right: 1,
+        top: 5 * scale,
+        bottom: 5 * scale,
+        left: 3 * scale,
+        right: 1 * scale,
         background: { r: 0, g: 0, b: 0, alpha: 0 }
       })
       .png()

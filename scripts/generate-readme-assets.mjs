@@ -11,11 +11,11 @@ const root = process.cwd();
 const distDir = path.join(root, "dist");
 const outputDir = path.join(root, "docs", "assets", "readme");
 const runners = [
-  { id: "coding-cat", directory: "coding" },
-  { id: "coding-orange-cat", directory: "coding-orange-cat" },
-  { id: "coding-white-cat", directory: "coding-white-cat" },
-  { id: "coding-fish", directory: "coding-fish" },
-  { id: "coding-vtuber", directory: "coding-vtuber" }
+  { id: "coding-cat" },
+  { id: "coding-orange-cat" },
+  { id: "coding-white-cat" },
+  { id: "coding-fish" },
+  { id: "coding-vtuber" }
 ];
 
 await fs.mkdir(outputDir, { recursive: true });
@@ -96,14 +96,15 @@ for (const runner of runners) {
     const fileName = `${String(index).padStart(2, "0")}.png`;
     const framePath = path.join(
       root,
-      "src-tauri",
-      "icons",
-      "tray",
-      runner.directory,
+      "src",
+      "assets",
+      "runners",
+      "ui",
+      runner.id,
       fileName
     );
     const { data } = await sharp(framePath)
-      .resize(96, 96, { kernel: sharp.kernel.nearest })
+      .resize(128, 128, { kernel: sharp.kernel.lanczos3 })
       .ensureAlpha()
       .raw()
       .toBuffer({ resolveWithObject: true });
@@ -126,7 +127,7 @@ for (const runner of runners) {
   );
   const gif = GIFEncoder();
   frames.forEach((frame, index) => {
-    gif.writeFrame(applyPalette(frame, palette, "rgba4444"), 96, 96, {
+    gif.writeFrame(applyPalette(frame, palette, "rgba4444"), 128, 128, {
       palette: index === 0 ? palette : undefined,
       delay: 170,
       repeat: 0,

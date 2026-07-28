@@ -52,6 +52,18 @@ ImageGen에서 만든 마젠타 chroma-key 4열 스프라이트를 입력으로 
 npm.cmd run tray:frames -- <sprite.png> src-tauri/icons/tray/coding
 ```
 
+러너는 `src/assets/runners/master/`의 256×256 프레임을 화면 표시의 원본으로
+사용한다. UI용 128×128 프레임은 다음 명령으로 생성하며 `npm.cmd run build`
+실행 전에도 자동으로 갱신된다.
+
+```powershell
+npm.cmd run runners:ui
+```
+
+React는 `src/assets/runners/ui/`만 사용하고 네이티브 트레이는
+`src-tauri/icons/tray/`의 32×32 전용 애셋만 사용한다. 화면에서 트레이 프레임을
+확대해 사용하지 않는다.
+
 README에 들어가는 상태별 화면과 러너 GIF는 실제 사용자 데이터 대신 URL의 고정
 미리보기 시나리오를 사용한다.
 

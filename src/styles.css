@@ -39,7 +39,7 @@ button { color: inherit; font: inherit; }
   margin-right: 9px;
 }
 
-.runner img { width: 48px; height: 48px; object-fit: contain; image-rendering: pixelated; }
+.runner img { width: 48px; height: 48px; object-fit: contain; image-rendering: auto; }
 
 .runner-dialog > p { margin: 0 0 14px; color: #a6a6ab; font-size: 12px; line-height: 1.5; }
 .runner-options { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
@@ -63,7 +63,7 @@ button { color: inherit; font: inherit; }
   width: 48px;
   height: 48px;
   object-fit: contain;
-  image-rendering: pixelated;
+  image-rendering: auto;
 }
 
 .runner-face {
