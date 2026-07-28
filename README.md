@@ -20,9 +20,9 @@ SQLite 데이터나 계정 정보는 문서 이미지 생성에 사용하지 않
 
 ## 지원 러너
 
-| 코딩 고양이 | 노트북하는 노란 물고기 |
-| --- | --- |
-| <img src="docs/assets/readme/coding-cat.gif" width="96" height="96" alt="노트북하는 코딩 고양이 애니메이션"> | <img src="docs/assets/readme/coding-fish.gif" width="96" height="96" alt="노트북하는 노란 물고기 애니메이션"> |
+| 코딩 고양이 | 주황 고양이 | 하양 고양이 | 노란 물고기 | 핑크 버튜버 |
+| --- | --- | --- | --- | --- |
+| <img src="docs/assets/readme/coding-cat.gif" width="96" height="96" alt="노트북하는 코딩 고양이 애니메이션"> | <img src="docs/assets/readme/coding-orange-cat.gif" width="96" height="96" alt="노트북하는 주황 고양이 애니메이션"> | <img src="docs/assets/readme/coding-white-cat.gif" width="96" height="96" alt="노트북하는 하양 고양이 애니메이션"> | <img src="docs/assets/readme/coding-fish.gif" width="96" height="96" alt="노트북하는 노란 물고기 애니메이션"> | <img src="docs/assets/readme/coding-vtuber.gif" width="96" height="96" alt="노트북하는 분홍머리 버튜버 애니메이션"> |
 
 러너는 앱의 **러너 변경** 메뉴에서 선택하며, 헤더와 네이티브 트레이 애니메이션에
 동시에 적용됩니다.
@@ -64,7 +64,7 @@ npm.cmd run version:set -- 0.2.0
 - 창을 닫아도 백그라운드 유지
 - 단일 인스턴스와 우클릭 종료 메뉴
 - 32×32 PNG 프레임 트레이 애니메이션
-- 코딩 고양이와 노란 물고기 러너 선택
+- 고양이 3종, 노란 물고기, 핑크 버튜버 러너 선택
 - SQLite 자동 생성과 초기 마이그레이션
 - Codex 계정 사용량과 Claude Code OpenTelemetry 집계
 - Rust command를 통한 요약·캐릭터·AI 상태 조회

@@ -12,7 +12,10 @@ const distDir = path.join(root, "dist");
 const outputDir = path.join(root, "docs", "assets", "readme");
 const runners = [
   { id: "coding-cat", directory: "coding" },
-  { id: "coding-fish", directory: "coding-fish" }
+  { id: "coding-orange-cat", directory: "coding-orange-cat" },
+  { id: "coding-white-cat", directory: "coding-white-cat" },
+  { id: "coding-fish", directory: "coding-fish" },
+  { id: "coding-vtuber", directory: "coding-vtuber" }
 ];
 
 await fs.mkdir(outputDir, { recursive: true });

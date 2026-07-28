@@ -7,6 +7,7 @@ const outputDir = process.argv[3] ?? "src-tauri/icons/tray/coding";
 const greenKey = process.argv.includes("--green-key");
 const magentaKey = process.argv.includes("--magenta-key");
 const lockLaptop = process.argv.includes("--lock-laptop");
+const liftDarkLaptop = process.argv.includes("--lift-dark-laptop");
 
 if (!input) {
   throw new Error("Usage: node scripts/build-tray-animation.mjs <sprite.png> [output-dir]");
@@ -43,9 +44,9 @@ for (let index = 0; index < data.length; index += 4) {
   if (greenKey && alpha > 0) {
     data[index + 1] = Math.min(green, Math.max(red, blue) + 12);
   } else if (magentaKey && alpha > 0) {
-    const edgeColor = Math.max(red, blue);
-    data[index] = Math.min(red, green + Math.max(12, Math.round((edgeColor - green) * 0.15)));
-    data[index + 2] = Math.min(blue, green + Math.max(12, Math.round((edgeColor - green) * 0.15)));
+    const magentaExcess = Math.max(0, Math.min(red - green, blue - green));
+    data[index] = Math.max(0, red - Math.round(magentaExcess * 0.85));
+    data[index + 2] = Math.max(0, blue - Math.round(magentaExcess * 0.85));
   } else if (alpha < 245) {
     data[index] = Math.min(red, green + 18);
     data[index + 2] = Math.min(blue, green + 18);
@@ -144,6 +145,40 @@ if ((greenKey || magentaKey) && lockLaptop) {
       raw: {
         width: fixedInfo.width,
         height: fixedInfo.height,
+        channels: 4
+      }
+    })
+      .png()
+      .toFile(framePath);
+  }
+}
+
+if (liftDarkLaptop) {
+  for (let frame = 1; frame <= 4; frame += 1) {
+    const framePath = path.join(outputDir, `${String(frame).padStart(2, "0")}.png`);
+    const { data: current, info: currentInfo } = await sharp(framePath)
+      .ensureAlpha()
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+    for (let y = 8; y < currentInfo.height; y += 1) {
+      for (let x = 0; x <= 20; x += 1) {
+        const offset = (y * currentInfo.width + x) * 4;
+        if (current[offset + 3] === 0) continue;
+        const luminance =
+          current[offset] * 0.2126 +
+          current[offset + 1] * 0.7152 +
+          current[offset + 2] * 0.0722;
+        if (luminance >= 72) continue;
+        const lift = Math.round(72 - luminance);
+        current[offset] = Math.min(255, current[offset] + lift);
+        current[offset + 1] = Math.min(255, current[offset + 1] + lift);
+        current[offset + 2] = Math.min(255, current[offset + 2] + lift);
+      }
+    }
+    await sharp(current, {
+      raw: {
+        width: currentInfo.width,
+        height: currentInfo.height,
         channels: 4
       }
     })

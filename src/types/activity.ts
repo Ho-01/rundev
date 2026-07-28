@@ -58,7 +58,12 @@ export type AiActivityStatus = {
   claudeActiveSessions: number;
 };
 
-export type RunnerId = "coding-cat" | "coding-fish";
+export type RunnerId =
+  | "coding-cat"
+  | "coding-fish"
+  | "coding-orange-cat"
+  | "coding-white-cat"
+  | "coding-vtuber";
 
 export type RunnerSelection = {
   runnerId: RunnerId;

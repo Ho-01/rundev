@@ -19,16 +19,43 @@ const FISH_FRAMES: [&[u8]; 4] = [
     include_bytes!("../../icons/tray/coding-fish/03.png").as_slice(),
     include_bytes!("../../icons/tray/coding-fish/04.png").as_slice(),
 ];
+const ORANGE_CAT_FRAMES: [&[u8]; 4] = [
+    include_bytes!("../../icons/tray/coding-orange-cat/01.png").as_slice(),
+    include_bytes!("../../icons/tray/coding-orange-cat/02.png").as_slice(),
+    include_bytes!("../../icons/tray/coding-orange-cat/03.png").as_slice(),
+    include_bytes!("../../icons/tray/coding-orange-cat/04.png").as_slice(),
+];
+const WHITE_CAT_FRAMES: [&[u8]; 4] = [
+    include_bytes!("../../icons/tray/coding-white-cat/01.png").as_slice(),
+    include_bytes!("../../icons/tray/coding-white-cat/02.png").as_slice(),
+    include_bytes!("../../icons/tray/coding-white-cat/03.png").as_slice(),
+    include_bytes!("../../icons/tray/coding-white-cat/04.png").as_slice(),
+];
+const VTUBER_FRAMES: [&[u8]; 4] = [
+    include_bytes!("../../icons/tray/coding-vtuber/01.png").as_slice(),
+    include_bytes!("../../icons/tray/coding-vtuber/02.png").as_slice(),
+    include_bytes!("../../icons/tray/coding-vtuber/03.png").as_slice(),
+    include_bytes!("../../icons/tray/coding-vtuber/04.png").as_slice(),
+];
 
 pub fn set_runner(runner: &str) {
-    SELECTED_RUNNER.store(u8::from(runner == "coding-fish"), Ordering::Relaxed);
+    let runner_index = match runner {
+        "coding-fish" => 1,
+        "coding-orange-cat" => 2,
+        "coding-white-cat" => 3,
+        "coding-vtuber" => 4,
+        _ => 0,
+    };
+    SELECTED_RUNNER.store(runner_index, Ordering::Relaxed);
 }
 
 fn selected_frames() -> &'static [&'static [u8]; 4] {
-    if SELECTED_RUNNER.load(Ordering::Relaxed) == 1 {
-        &FISH_FRAMES
-    } else {
-        &CAT_FRAMES
+    match SELECTED_RUNNER.load(Ordering::Relaxed) {
+        1 => &FISH_FRAMES,
+        2 => &ORANGE_CAT_FRAMES,
+        3 => &WHITE_CAT_FRAMES,
+        4 => &VTUBER_FRAMES,
+        _ => &CAT_FRAMES,
     }
 }
 

@@ -115,7 +115,10 @@ pub async fn set_runner_selection(
 }
 
 fn is_supported_runner(runner_id: &str) -> bool {
-    matches!(runner_id, "coding-cat" | "coding-fish")
+    matches!(
+        runner_id,
+        "coding-cat" | "coding-fish" | "coding-orange-cat" | "coding-white-cat" | "coding-vtuber"
+    )
 }
 
 #[cfg(test)]
@@ -126,6 +129,9 @@ mod tests {
     fn accepts_only_packaged_runner_ids() {
         assert!(is_supported_runner("coding-cat"));
         assert!(is_supported_runner("coding-fish"));
+        assert!(is_supported_runner("coding-orange-cat"));
+        assert!(is_supported_runner("coding-white-cat"));
+        assert!(is_supported_runner("coding-vtuber"));
         assert!(!is_supported_runner("../custom"));
     }
 }

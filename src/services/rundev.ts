@@ -61,7 +61,18 @@ const previewAiActivity: AiActivityStatus = {
 
 function previewRunner(): RunnerSelection {
   const requested = new URLSearchParams(window.location.search).get("runner");
-  return { runnerId: requested === "coding-fish" ? "coding-fish" : "coding-cat" };
+  const supported: RunnerId[] = [
+    "coding-cat",
+    "coding-fish",
+    "coding-orange-cat",
+    "coding-white-cat",
+    "coding-vtuber"
+  ];
+  return {
+    runnerId: supported.includes(requested as RunnerId)
+      ? (requested as RunnerId)
+      : "coding-cat"
+  };
 }
 
 function getPreviewDashboard() {

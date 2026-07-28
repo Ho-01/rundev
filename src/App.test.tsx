@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { App } from "./App";
 
@@ -10,5 +10,9 @@ describe("App", () => {
     expect(await screen.findByText("개발 활동")).toBeInTheDocument();
     expect(await screen.findByText("활성 AI")).toBeInTheDocument();
     expect(await screen.findByText("Claude Code")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "러너 변경" }));
+    expect(screen.getByText("주황 고양이")).toBeInTheDocument();
+    expect(screen.getByText("하양 고양이")).toBeInTheDocument();
+    expect(screen.getByText("핑크 버튜버")).toBeInTheDocument();
   });
 });

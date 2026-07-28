@@ -10,7 +10,11 @@ import {
 } from "lucide-react";
 import { useDashboardStore } from "./store/dashboard";
 import { previewClaudeConnection, previewCodexAccount } from "./services/rundev";
-import type { ClaudeConnectionPreview, CodexAccountPreview } from "./types/activity";
+import type {
+  ClaudeConnectionPreview,
+  CodexAccountPreview,
+  RunnerId
+} from "./types/activity";
 import codingCat1 from "../src-tauri/icons/tray/coding/01.png";
 import codingCat2 from "../src-tauri/icons/tray/coding/02.png";
 import codingCat3 from "../src-tauri/icons/tray/coding/03.png";
@@ -19,11 +23,50 @@ import codingFish1 from "../src-tauri/icons/tray/coding-fish/01.png";
 import codingFish2 from "../src-tauri/icons/tray/coding-fish/02.png";
 import codingFish3 from "../src-tauri/icons/tray/coding-fish/03.png";
 import codingFish4 from "../src-tauri/icons/tray/coding-fish/04.png";
+import codingOrangeCat1 from "../src-tauri/icons/tray/coding-orange-cat/01.png";
+import codingOrangeCat2 from "../src-tauri/icons/tray/coding-orange-cat/02.png";
+import codingOrangeCat3 from "../src-tauri/icons/tray/coding-orange-cat/03.png";
+import codingOrangeCat4 from "../src-tauri/icons/tray/coding-orange-cat/04.png";
+import codingWhiteCat1 from "../src-tauri/icons/tray/coding-white-cat/01.png";
+import codingWhiteCat2 from "../src-tauri/icons/tray/coding-white-cat/02.png";
+import codingWhiteCat3 from "../src-tauri/icons/tray/coding-white-cat/03.png";
+import codingWhiteCat4 from "../src-tauri/icons/tray/coding-white-cat/04.png";
+import codingVtuber1 from "../src-tauri/icons/tray/coding-vtuber/01.png";
+import codingVtuber2 from "../src-tauri/icons/tray/coding-vtuber/02.png";
+import codingVtuber3 from "../src-tauri/icons/tray/coding-vtuber/03.png";
+import codingVtuber4 from "../src-tauri/icons/tray/coding-vtuber/04.png";
 import openAiIcon from "./assets/providers/openai.svg";
 import claudeIcon from "./assets/providers/claude.svg";
 
 const codingCatFrames = [codingCat1, codingCat2, codingCat3, codingCat4];
 const codingFishFrames = [codingFish1, codingFish2, codingFish3, codingFish4];
+const codingOrangeCatFrames = [
+  codingOrangeCat1,
+  codingOrangeCat2,
+  codingOrangeCat3,
+  codingOrangeCat4
+];
+const codingWhiteCatFrames = [
+  codingWhiteCat1,
+  codingWhiteCat2,
+  codingWhiteCat3,
+  codingWhiteCat4
+];
+const codingVtuberFrames = [codingVtuber1, codingVtuber2, codingVtuber3, codingVtuber4];
+const runnerFramesById: Record<RunnerId, string[]> = {
+  "coding-cat": codingCatFrames,
+  "coding-fish": codingFishFrames,
+  "coding-orange-cat": codingOrangeCatFrames,
+  "coding-white-cat": codingWhiteCatFrames,
+  "coding-vtuber": codingVtuberFrames
+};
+const runnerOptions: { id: RunnerId; name: string; frame: string }[] = [
+  { id: "coding-cat", name: "코딩 고양이", frame: codingCat1 },
+  { id: "coding-orange-cat", name: "주황 고양이", frame: codingOrangeCat1 },
+  { id: "coding-white-cat", name: "하양 고양이", frame: codingWhiteCat1 },
+  { id: "coding-fish", name: "노란 물고기", frame: codingFish1 },
+  { id: "coding-vtuber", name: "핑크 버튜버", frame: codingVtuber1 }
+];
 
 function formatDuration(seconds: number) {
   const hours = Math.floor(seconds / 3600);
@@ -86,7 +129,7 @@ export function App() {
     disconnectClaude,
     selectRunner
   } = useDashboardStore();
-  const runnerFrames = runner?.runnerId === "coding-fish" ? codingFishFrames : codingCatFrames;
+  const runnerFrames = runnerFramesById[runner?.runnerId ?? "coding-cat"];
 
   async function openCodexConnection() {
     setPreviewLoading(true);
@@ -362,10 +405,7 @@ export function App() {
             <h2 id="runner-title">러너 변경</h2>
             <p>트레이와 RunDev 화면에서 함께 달릴 러너를 선택하세요.</p>
             <div className="runner-options">
-              {[
-                { id: "coding-cat" as const, name: "코딩 고양이", frame: codingCat1 },
-                { id: "coding-fish" as const, name: "노란 물고기", frame: codingFish1 }
-              ].map((option) => (
+              {runnerOptions.map((option) => (
                 <button
                   key={option.id}
                   type="button"
