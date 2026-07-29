@@ -63,6 +63,9 @@ pub fn start(pool: SqlitePool, app: AppHandle) {
 }
 
 pub async fn today(pool: &SqlitePool) -> Result<KeyboardActivityToday, sqlx::Error> {
+    #[cfg(target_os = "macos")]
+    macos::refresh_permission_status();
+
     let local_date = Local::now().date_naive().to_string();
     let row: Option<(i64, i64)> = sqlx::query_as(
         "SELECT press_count, rewarded_milestones
@@ -88,6 +91,17 @@ pub fn open_permission_settings() -> Result<(), String> {
 
     #[cfg(not(target_os = "macos"))]
     Ok(())
+}
+
+pub fn reset_permission() -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        set_status(STATUS_PERMISSION_REQUIRED);
+        return macos::reset_permission();
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    Err("macOS에서만 입력 모니터링 권한을 초기화할 수 있습니다.".to_string())
 }
 
 async fn process_events(

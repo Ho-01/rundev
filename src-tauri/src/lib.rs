@@ -5,6 +5,7 @@ mod database;
 mod host_metrics;
 mod keyboard;
 mod tray;
+mod whip;
 
 use database::AppState;
 use tauri::Manager;
@@ -44,11 +45,30 @@ pub fn run() {
             keyboard::start(pool.clone(), app.handle().clone());
             host_metrics::start(app.handle().clone());
             tauri::async_runtime::spawn(adapters::claude::serve(pool.clone()));
+            let codex_pool = pool.clone();
             tauri::async_runtime::spawn(async move {
                 loop {
-                    if adapters::codex::is_enabled(&pool).await.unwrap_or(false) {
-                        if let Err(error) = adapters::codex::sync(&pool).await {
+                    if adapters::codex::is_enabled(&codex_pool)
+                        .await
+                        .unwrap_or(false)
+                    {
+                        if let Err(error) = adapters::codex::sync(&codex_pool).await {
                             tracing::warn!(%error, "Codex usage synchronization failed");
+                        }
+                    }
+                    tokio::time::sleep(std::time::Duration::from_secs(300)).await;
+                }
+            });
+            let cursor_pool = pool.clone();
+            tauri::async_runtime::spawn(async move {
+                tokio::time::sleep(std::time::Duration::from_secs(15)).await;
+                loop {
+                    if adapters::cursor::automatic_sync_allowed(&cursor_pool)
+                        .await
+                        .unwrap_or(false)
+                    {
+                        if let Err(error) = adapters::cursor::sync(&cursor_pool).await {
+                            tracing::warn!(%error, "Cursor usage synchronization failed");
                         }
                     }
                     tokio::time::sleep(std::time::Duration::from_secs(300)).await;
@@ -76,6 +96,12 @@ pub fn run() {
             commands::set_codex_usage_enabled,
             commands::preview_codex_account,
             commands::connect_codex_account,
+            commands::grant_cursor_usage_consent,
+            commands::preview_cursor_account,
+            commands::connect_cursor_account,
+            commands::disconnect_cursor_account,
+            commands::get_cursor_usage,
+            commands::refresh_cursor_usage,
             commands::preview_claude_connection,
             commands::connect_claude,
             commands::disconnect_claude,
@@ -83,9 +109,12 @@ pub fn run() {
             commands::get_ai_activity_status,
             commands::get_keyboard_activity_today,
             commands::open_keyboard_permission_settings,
+            commands::reset_keyboard_permission,
             commands::get_runner_selection,
             commands::set_runner_selection,
-            commands::get_system_stats
+            commands::get_system_stats,
+            commands::get_whip_stats,
+            commands::record_whip
         ])
         .run(tauri::generate_context!())
         .expect("error while running RunDev");

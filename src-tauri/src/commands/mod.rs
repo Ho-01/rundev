@@ -1,4 +1,4 @@
-use crate::{activity, adapters, database::AppState, host_metrics, keyboard, tray};
+use crate::{activity, adapters, database::AppState, host_metrics, keyboard, tray, whip};
 use chrono::{DateTime, Duration, Local, Utc};
 use serde::Serialize;
 use std::collections::HashMap;
@@ -91,6 +91,43 @@ pub struct ClaudeUsageToday {
     error: Option<String>,
 }
 
+#[tauri::command]
+pub async fn grant_cursor_usage_consent(state: State<'_, AppState>) -> Result<(), String> {
+    adapters::cursor::grant_consent(&state.pool).await
+}
+
+#[tauri::command]
+pub async fn preview_cursor_account(
+    state: State<'_, AppState>,
+) -> Result<adapters::cursor::AccountPreview, String> {
+    adapters::cursor::preview(&state.pool).await
+}
+
+#[tauri::command]
+pub async fn connect_cursor_account(state: State<'_, AppState>) -> Result<(), String> {
+    adapters::cursor::connect(&state.pool).await
+}
+
+#[tauri::command]
+pub async fn disconnect_cursor_account(
+    revoke_consent: bool,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    adapters::cursor::disconnect(&state.pool, revoke_consent).await
+}
+
+#[tauri::command]
+pub async fn get_cursor_usage(
+    state: State<'_, AppState>,
+) -> Result<adapters::cursor::UsageView, String> {
+    adapters::cursor::get_usage(&state.pool).await
+}
+
+#[tauri::command]
+pub async fn refresh_cursor_usage(state: State<'_, AppState>) -> Result<(), String> {
+    adapters::cursor::sync_if_due(&state.pool, std::time::Duration::from_secs(30)).await
+}
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AiActivityStatus {
@@ -121,8 +158,27 @@ pub fn open_keyboard_permission_settings() -> Result<(), String> {
 }
 
 #[tauri::command]
+pub fn reset_keyboard_permission() -> Result<(), String> {
+    keyboard::reset_permission()
+}
+
+#[tauri::command]
 pub fn get_system_stats(app: AppHandle) -> host_metrics::SystemStats {
     host_metrics::current_stats(&app)
+}
+
+#[tauri::command]
+pub async fn get_whip_stats(state: State<'_, AppState>) -> Result<whip::WhipStats, String> {
+    whip::today(&state.pool)
+        .await
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub async fn record_whip(state: State<'_, AppState>) -> Result<whip::WhipStats, String> {
+    whip::record(&state.pool)
+        .await
+        .map_err(|error| error.to_string())
 }
 
 #[tauri::command]

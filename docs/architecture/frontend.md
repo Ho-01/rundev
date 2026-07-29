@@ -6,6 +6,7 @@ React는 다음 역할만 담당한다.
 
 - 트레이 팝오버 렌더링
 - 오늘 활동, AI 사용량, 캐릭터 상태 표시
+- 개발자 캐릭터 채찍질 연출과 오늘 횟수 표시
 - 사용자 설정 입력
 - command 결과의 로딩 및 오류 상태 관리
 
@@ -19,7 +20,8 @@ src/
 ├─ main.tsx
 ├─ styles.css
 ├─ components/
-│  └─ SystemStatusStrip.tsx
+│  ├─ SystemStatusStrip.tsx
+│  └─ WhipCrackOverlay.tsx
 ├─ services/
 │  └─ rundev.ts
 ├─ store/

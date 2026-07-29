@@ -2,8 +2,10 @@ use std::sync::atomic::{AtomicU8, Ordering};
 use tauri::{
     menu::{Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
-    App, Manager, PhysicalPosition, Rect,
+    App, Emitter, Manager, PhysicalPosition, Rect,
 };
+
+use crate::{adapters, database::AppState};
 
 static SELECTED_RUNNER: AtomicU8 = AtomicU8::new(0);
 
@@ -115,6 +117,7 @@ pub(crate) fn show_main_window(app: &tauri::AppHandle) {
     if let Some(window) = app.get_webview_window("main") {
         let _ = window.show();
         let _ = window.set_focus();
+        refresh_usage_on_open(app);
     }
 }
 
@@ -131,6 +134,16 @@ fn toggle_main_window(app: &tauri::AppHandle, tray_rect: Rect) {
     position_near_tray(app, &window, tray_rect);
     let _ = window.show();
     let _ = window.set_focus();
+    refresh_usage_on_open(app);
+}
+
+fn refresh_usage_on_open(app: &tauri::AppHandle) {
+    let pool = app.state::<AppState>().pool.clone();
+    let app = app.clone();
+    tauri::async_runtime::spawn(async move {
+        adapters::cursor::refresh_codex_and_cursor_on_open(pool).await;
+        let _ = app.emit("usage-refreshed", ());
+    });
 }
 
 fn position_near_tray(app: &tauri::AppHandle, window: &tauri::WebviewWindow, tray_rect: Rect) {

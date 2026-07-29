@@ -4,10 +4,11 @@ use serde_json::{json, Value};
 use sqlx::SqlitePool;
 #[cfg(any(target_os = "macos", test))]
 use std::path::Path;
-use std::{path::PathBuf, process::Stdio};
+use std::{path::PathBuf, process::Stdio, sync::OnceLock, time::Instant};
 use tokio::{
     io::{AsyncBufReadExt, AsyncWriteExt, BufReader},
     process::{ChildStdout, Command},
+    sync::Mutex,
     time::{timeout, Duration},
 };
 use uuid::Uuid;
@@ -15,6 +16,8 @@ use uuid::Uuid;
 const ADAPTER_ID: &str = "codex-account-usage";
 const SOURCE: &str = "codex-app-server";
 const ENABLED_SETTING: &str = "ai.codex.enabled";
+static SYNC_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+static LAST_ATTEMPT: OnceLock<Mutex<Option<Instant>>> = OnceLock::new();
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -52,6 +55,25 @@ pub enum Account {
 }
 
 pub async fn sync(pool: &SqlitePool) -> Result<(), String> {
+    sync_if_due(pool, Duration::ZERO).await
+}
+
+pub async fn sync_if_due(pool: &SqlitePool, minimum_interval: Duration) -> Result<(), String> {
+    let lock = SYNC_LOCK.get_or_init(|| Mutex::new(()));
+    let Ok(_guard) = lock.try_lock() else {
+        return Ok(());
+    };
+    {
+        let attempts = LAST_ATTEMPT.get_or_init(|| Mutex::new(None));
+        let mut last = attempts.lock().await;
+        if last
+            .as_ref()
+            .is_some_and(|instant| instant.elapsed() < minimum_interval)
+        {
+            return Ok(());
+        }
+        *last = Some(Instant::now());
+    }
     let result = fetch().await;
     match result {
         Ok(usage) => {

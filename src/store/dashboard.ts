@@ -2,8 +2,10 @@ import { create } from "zustand";
 import {
   connectClaude,
   connectCodexAccount,
+  connectCursorAccount,
   disconnectClaude,
   disconnectCodexAccount,
+  disconnectCursorAccount,
   getDashboard,
   setRunnerSelection
 } from "../services/rundev";
@@ -12,6 +14,7 @@ import type {
   AiUsageToday,
   CharacterState,
   ClaudeUsageToday,
+  CursorUsage,
   DailySummary,
   FocusActivityToday,
   FocusActivityUpdate,
@@ -28,6 +31,7 @@ type DashboardStore = {
   character: CharacterState | null;
   aiUsage: AiUsageToday | null;
   claudeUsage: ClaudeUsageToday | null;
+  cursorUsage: CursorUsage | null;
   keyboard: KeyboardActivityToday | null;
   runner: RunnerSelection | null;
   systemStats: SystemStats;
@@ -38,6 +42,8 @@ type DashboardStore = {
   disconnectCodex: () => Promise<void>;
   connectClaude: () => Promise<void>;
   disconnectClaude: () => Promise<void>;
+  connectCursor: () => Promise<void>;
+  disconnectCursor: () => Promise<void>;
   selectRunner: (runnerId: RunnerId) => Promise<void>;
   setKeyboardActivity: (keyboard: KeyboardActivityToday) => void;
   setFocusActivity: (activity: FocusActivityUpdate) => void;
@@ -51,6 +57,7 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
   character: null,
   aiUsage: null,
   claudeUsage: null,
+  cursorUsage: null,
   keyboard: null,
   runner: null,
   systemStats: emptySystemStats(),
@@ -118,6 +125,28 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
   disconnectClaude: async () => {
     set({ loading: true, error: null });
     await disconnectClaude();
+    const data = await getDashboard();
+    set({ ...data, loading: false });
+  },
+  connectCursor: async () => {
+    set({ loading: true, error: null });
+    try {
+      await connectCursorAccount();
+      const data = await getDashboard();
+      set({ ...data, loading: false });
+    } catch (error) {
+      const data = await getDashboard();
+      set({
+        ...data,
+        loading: false,
+        error: error instanceof Error ? error.message : String(error)
+      });
+      throw error;
+    }
+  },
+  disconnectCursor: async () => {
+    set({ loading: true, error: null });
+    await disconnectCursorAccount(true);
     const data = await getDashboard();
     set({ ...data, loading: false });
   },

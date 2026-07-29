@@ -1,6 +1,6 @@
 [package]
 name = "rundev"
-version = "0.3.3"
+version = "0.4.0"
 description = "A local-first developer activity companion"
 authors = ["RunDev"]
 edition = "2021"
@@ -32,6 +32,9 @@ axum = "0.8"
 sha2 = "0.10"
 sysinfo = "0.38.4"
 battery = "0.7.8"
+base64 = "0.22"
+reqwest = { version = "0.13", default-features = false, features = ["json", "rustls"] }
+zeroize = { version = "1", features = ["derive"] }
 
 [target.'cfg(windows)'.dependencies]
 windows = { version = "0.61", features = [

@@ -9,6 +9,7 @@
 5. pool을 Tauri managed state로 등록한다.
 6. 집중시간, 키보드 횟수, Claude Code 로컬 OpenTelemetry 수집기를 시작한다.
 7. Codex 사용량 동기화 worker를 시작한다.
+8. 동의된 Cursor 사용량 동기화 worker를 시작한다.
 8. HostMetricsService(시스템 상태 strip)를 시작한다.
 9. 트레이 메뉴와 애니메이션을 시작한다.
 10. command handler를 노출한다.
@@ -74,6 +75,12 @@ Updater는 GitHub Releases의 `latest.json`을 endpoint로 사용한다. 공개�
 - 앱 수명 동안 단일 루프이며 SQLite에 쓰지 않는다
 - `system-stats-updated` 이벤트와 `get_system_stats` 스냅샷 command를 제공한다
 - 자세한 범위는 ADR 0014를 본다
+
+### `whip`
+
+- 팝오버 헤더 캐릭터 클릭의 로컬 일별 횟수만 원자 UPSERT로 저장한다
+- `record_whip` / `get_whip_stats` command를 제공하며 XP·채팅·이벤트 버스와 연결하지 않는다
+- 자세한 범위는 ADR 0015를 본다
 
 ## DB 스키마
 
@@ -168,6 +175,16 @@ macOS 집중시간:
 일별 총 토큰은 해당 날짜의 최신 공식 스냅샷을 사용한다. 향후 요청별
 OpenTelemetry 이벤트를 추가하더라도 스냅샷과 이벤트 합계를 서로 더하지 않는다.
 어댑터는 Codex 인증정보, 프롬프트, 응답, 원본 JSON을 저장하지 않는다.
+
+## Cursor 사용량 동기화
+
+Cursor 어댑터는 동의와 연동이 모두 활성화된 경우에만 로컬 로그인 DB의 인증 key
+하나를 read-only로 읽는다. 네트워크 클라이언트는 redirect를 차단하고
+`cursor.com`의 고정 endpoint만 호출한다. 계정·오늘 집계·현재 주기 한도 결과는
+계정별 스냅샷으로 저장하며 인증정보와 원본 응답은 저장하지 않는다.
+
+백그라운드 주기는 300초다. 트레이에서 팝오버를 표시할 때는 60초 최소 간격과
+single-flight를 적용해 Codex와 Cursor를 병렬 갱신한다.
 ## Claude Code 사용량 수집
 
 `adapters/claude.rs`는 루프백 주소의 OTLP/HTTP JSON 수집기를 실행한다. 사용자가

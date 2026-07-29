@@ -1,6 +1,7 @@
 import type { SystemStats } from "../types/system";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { relaunch } from "@tauri-apps/plugin-process";
 import type {
   ActivityHistoryDay,
   AiUsageToday,
@@ -8,13 +9,27 @@ import type {
   ClaudeConnectionPreview,
   ClaudeUsageToday,
   CodexAccountPreview,
+  CursorAccountPreview,
+  CursorUsage,
   DailySummary,
   FocusActivityToday,
   FocusActivityUpdate,
   KeyboardActivityToday,
   RunnerId,
-  RunnerSelection
+  RunnerSelection,
+  WhipStats
 } from "../types/activity";
+
+const WHIP_COOLDOWN_MS = 100;
+
+let previewWhipCount = 0;
+
+function previewWhipStats(): WhipStats {
+  return {
+    localDate: new Date().toLocaleDateString("en-CA"),
+    whipCount: previewWhipCount
+  };
+}
 
 const previewSummary: DailySummary = {
   date: new Date().toISOString().slice(0, 10),
@@ -73,6 +88,26 @@ const previewClaudeUsage: ClaudeUsageToday = {
   lastReceivedAt: null,
   status: "disconnected",
   error: null
+};
+
+const previewCursorUsage: CursorUsage = {
+  provider: "cursor",
+  status: "disconnected",
+  accountLabel: null,
+  usedMicrousd: null,
+  limitMicrousd: null,
+  remainingMicrousd: null,
+  usedRequests: null,
+  limitRequests: null,
+  remainingRequests: null,
+  todayRequests: null,
+  autoPercent: null,
+  apiPercent: null,
+  todayMicrousd: null,
+  totalTokens: null,
+  cycleEndsAt: null,
+  lastSyncedAt: null,
+  errorCode: null
 };
 
 const previewKeyboard: KeyboardActivityToday = {
@@ -148,6 +183,20 @@ function getPreviewDashboard() {
         lastReceivedAt: "2026-07-28T16:51:00+09:00",
         status: "connected" as const
       },
+      cursorUsage: {
+        ...previewCursorUsage,
+        status: "connected" as const,
+        accountLabel: "p***@example.com",
+        usedMicrousd: 31_200_000,
+        limitMicrousd: 70_000_000,
+        remainingMicrousd: 38_800_000,
+        autoPercent: 36.7,
+        apiPercent: 12.4,
+        todayMicrousd: 2_850_000,
+        totalTokens: 241_820,
+        cycleEndsAt: "2026-08-04T00:00:00Z",
+        lastSyncedAt: "2026-07-29T16:51:00+09:00"
+      },
       keyboard: {
         ...previewKeyboard,
         pressCount: 8_421,
@@ -173,6 +222,7 @@ function getPreviewDashboard() {
         ...previewClaudeUsage,
         status: "waiting" as const
       },
+      cursorUsage: previewCursorUsage,
       keyboard: previewKeyboard,
       runner: previewRunner()
     };
@@ -184,6 +234,7 @@ function getPreviewDashboard() {
     character: previewCharacter,
     aiUsage: previewAiUsage,
     claudeUsage: previewClaudeUsage,
+    cursorUsage: previewCursorUsage,
     keyboard: previewKeyboard,
     runner: previewRunner()
   };
@@ -197,6 +248,12 @@ export async function setRunnerSelection(runnerId: RunnerId) {
 export async function openKeyboardPermissionSettings() {
   if (!isTauri()) return;
   await invoke("open_keyboard_permission_settings");
+}
+
+export async function resetKeyboardPermissionAndRelaunch() {
+  if (!isTauri()) return;
+  await invoke("reset_keyboard_permission");
+  await relaunch();
 }
 
 export async function subscribeKeyboardActivity(
@@ -237,6 +294,43 @@ export async function connectCodexAccount() {
 export async function disconnectCodexAccount() {
   if (!isTauri()) return;
   await invoke("set_codex_usage_enabled", { enabled: false });
+}
+
+export async function grantCursorUsageConsent() {
+  if (!isTauri()) return;
+  await invoke("grant_cursor_usage_consent");
+}
+
+export async function previewCursorAccount() {
+  if (!isTauri()) {
+    return {
+      accountLabel: "p***@example.com",
+      planType: "pro"
+    } satisfies CursorAccountPreview;
+  }
+  return invoke<CursorAccountPreview>("preview_cursor_account");
+}
+
+export async function connectCursorAccount() {
+  if (!isTauri()) return;
+  await invoke("connect_cursor_account");
+}
+
+export async function disconnectCursorAccount(revokeConsent = false) {
+  if (!isTauri()) return;
+  await invoke("disconnect_cursor_account", { revokeConsent });
+}
+
+export async function refreshCursorUsage() {
+  if (!isTauri()) return;
+  await invoke("refresh_cursor_usage");
+}
+
+export async function subscribeUsageRefreshed(
+  onRefresh: () => void
+): Promise<UnlistenFn> {
+  if (!isTauri()) return () => {};
+  return listen("usage-refreshed", onRefresh);
 }
 
 export async function previewClaudeConnection() {
@@ -298,6 +392,23 @@ export async function subscribeSystemStats(
   return unlisten;
 }
 
+export async function getWhipStats() {
+  if (!isTauri()) {
+    return previewWhipStats();
+  }
+  return invoke<WhipStats>("get_whip_stats");
+}
+
+export async function recordWhip() {
+  if (!isTauri()) {
+    previewWhipCount += 1;
+    return previewWhipStats();
+  }
+  return invoke<WhipStats>("record_whip");
+}
+
+export { WHIP_COOLDOWN_MS };
+
 function isTauri() {
   return "__TAURI_INTERNALS__" in window;
 }
@@ -307,7 +418,7 @@ export async function getDashboard() {
     return getPreviewDashboard();
   }
 
-  const [summary, focus, activityHistory, character, aiUsage, claudeUsage, keyboard, runner] =
+  const [summary, focus, activityHistory, character, aiUsage, claudeUsage, cursorUsage, keyboard, runner] =
     await Promise.all([
     invoke<DailySummary>("get_daily_summary"),
     invoke<FocusActivityToday>("get_focus_activity_today"),
@@ -315,6 +426,7 @@ export async function getDashboard() {
     invoke<CharacterState>("get_character_state"),
     invoke<AiUsageToday>("get_ai_usage_today"),
     invoke<ClaudeUsageToday>("get_claude_usage_today"),
+    invoke<CursorUsage>("get_cursor_usage"),
     invoke<KeyboardActivityToday>("get_keyboard_activity_today"),
     invoke<RunnerSelection>("get_runner_selection")
   ]);
@@ -326,6 +438,7 @@ export async function getDashboard() {
     character,
     aiUsage,
     claudeUsage,
+    cursorUsage,
     keyboard,
     runner
   };

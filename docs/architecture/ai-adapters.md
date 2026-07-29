@@ -31,6 +31,23 @@ Claude 어댑터는 `127.0.0.1:43182`에서 OTLP/HTTP JSON 로그를 받는다. 
 생성한 비밀 헤더가 일치하고 `claude_code.api_request`인 이벤트만 정규화해
 `ai_usage_events`에 기록한다.
 
+## Cursor
+
+Cursor의 요청 기반 팀 플랜은 `/api/usage-summary`의 plan 값을 달러로 해석하지
+않는다. 해당 값은 센트 환산 크레딧이므로 요청당 4센트 기준으로 요청 수를
+계산한다. 오늘 토큰과 요청 수는 `get-filtered-usage-events`를 최대 5페이지까지
+조회해 메모리에서 합산하고, 원본 이벤트·대화 ID·모델명은 저장하지 않는다.
+온디맨드가 활성화된 경우에만 별도의 금액 사용량을 해석한다.
+
+Cursor 어댑터는 사용자의 명시 동의 후 Cursor `globalStorage/state.vscdb`를
+read-only로 열어 `cursorAuth/accessToken` 값 하나만 읽는다. 토큰은 메모리에서
+`cursor.com` 요청에만 사용하고 저장하거나 로그에 남기지 않는다.
+
+계정 확인, 오늘 집계 및 현재 결제 주기 한도를 조회해 account-key별
+`cursor_usage_snapshots`에 저장한다. 상세 이벤트에는 안정적인 외부 ID가 없으므로
+1차 어댑터는 이벤트 원장을 만들지 않는다. 기본 polling은 300초이며 RunDev
+팝오버를 열 때 마지막 시도 후 60초가 지났으면 Codex와 병렬 갱신한다.
+
 `external_event_id`의 유니크 인덱스로 여러 세션이나 재전송의 중복을 막는다.
 `session.id`는 SHA-256 `session_key`로 변환해 요청 이벤트에 저장하며 원본 식별자는
 폐기한다. 오늘의 세션 수와 최근 15분 활성 세션은 이 익명 키를 기준으로 계산한다.

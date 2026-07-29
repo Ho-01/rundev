@@ -87,7 +87,7 @@ npm.cmd run version:set -- 0.2.0
 - 256×256 마스터에서 생성하는 128×128 고해상도 화면 개발자 캐릭터
 - 고양이 2종, 주황 새우, 노란 물고기, 핑크 버튜버 선택
 - SQLite 자동 생성과 초기 마이그레이션
-- Codex 계정 사용량과 Claude Code OpenTelemetry 집계
+- Codex·Cursor 계정 사용량과 Claude Code OpenTelemetry 집계
 - 오늘 누른 키보드 횟수 집계와 2,000회당 10 XP 지급
 - 개발 도구 활동 30분당 10 XP 지급과 최근 20주 활동 잔디
 - 레벨 구간별 개발자 등급과 성장 배지

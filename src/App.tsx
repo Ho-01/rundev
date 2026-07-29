@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, type MouseEvent } from "react";
 import {
   Clock3,
   Cpu,
@@ -20,9 +20,16 @@ import {
   openKeyboardPermissionSettings,
   previewClaudeConnection,
   previewCodexAccount,
+  grantCursorUsageConsent,
+  previewCursorAccount,
+  recordWhip,
+  getWhipStats,
+  resetKeyboardPermissionAndRelaunch,
+  WHIP_COOLDOWN_MS,
   subscribeFocusActivity,
   subscribeKeyboardActivity,
-  subscribeSystemStats
+  subscribeSystemStats,
+  subscribeUsageRefreshed
 } from "./services/rundev";
 import {
   UPDATE_CHECK_INTERVAL_MS,
@@ -33,13 +40,20 @@ import {
   type UpdateStatus
 } from "./services/updater";
 import { SystemStatusStrip } from "./components/SystemStatusStrip";
+import {
+  WhipCrackOverlay,
+  type WhipCrackApi
+} from "./components/WhipCrackOverlay";
 import type {
   ClaudeConnectionPreview,
-  CodexAccountPreview
+  CodexAccountPreview,
+  CursorAccountPreview,
+  WhipStats
 } from "./types/activity";
 import { runnerFramesById, runnerOptions } from "./assets/runners";
 import openAiIcon from "./assets/providers/openai.svg";
 import claudeIcon from "./assets/providers/claude.svg";
+import cursorIcon from "./assets/providers/cursor.svg";
 import packageJson from "../package.json";
 import {
   getLevelTier,
@@ -57,6 +71,25 @@ function formatDuration(seconds: number) {
 
 function formatTokens(tokens: number) {
   return new Intl.NumberFormat("ko-KR").format(tokens);
+}
+
+function formatCompactTokens(tokens: number) {
+  const units = [
+    { threshold: 1_000_000_000, suffix: "B" },
+    { threshold: 1_000_000, suffix: "M" },
+    { threshold: 1_000, suffix: "k" }
+  ];
+  const unit = units.find(({ threshold }) => tokens >= threshold);
+  if (!unit) return formatTokens(tokens);
+  const value = tokens / unit.threshold;
+  return `${value.toFixed(1).replace(/\.0$/, "")}${unit.suffix}`;
+}
+
+function formatRequestUnits(requests: number | null | undefined) {
+  if (requests == null) return "—";
+  return new Intl.NumberFormat("ko-KR", {
+    maximumFractionDigits: requests % 1 === 0 ? 0 : 1
+  }).format(requests);
 }
 
 function formatRemainingMinutes(seconds: number) {
@@ -177,6 +210,8 @@ function LevelShowcase() {
 export function App() {
   const [accountPreview, setAccountPreview] = useState<CodexAccountPreview | null>(null);
   const [claudePreview, setClaudePreview] = useState<ClaudeConnectionPreview | null>(null);
+  const [cursorConsentOpen, setCursorConsentOpen] = useState(false);
+  const [cursorPreview, setCursorPreview] = useState<CursorAccountPreview | null>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [headerFrame, setHeaderFrame] = useState(0);
@@ -188,6 +223,15 @@ export function App() {
   const [updateChecking, setUpdateChecking] = useState(false);
   const [updateInstalling, setUpdateInstalling] = useState(false);
   const [updateError, setUpdateError] = useState<string | null>(null);
+  const [permissionRepairing, setPermissionRepairing] = useState(false);
+  const [permissionRepairError, setPermissionRepairError] = useState<string | null>(null);
+  const [whipStats, setWhipStats] = useState<WhipStats | null>(null);
+  const [whipHitClass, setWhipHitClass] = useState<"hit-a" | "hit-b" | null>(null);
+  const [whipSaveError, setWhipSaveError] = useState(false);
+  const [lastWhipAt, setLastWhipAt] = useState(0);
+  const [whipVariant, setWhipVariant] = useState<"a" | "b">("a");
+  const whipCrackRef = useRef<WhipCrackApi>(null);
+  const shellRef = useRef<HTMLElement>(null);
   const freezeRunner = new URLSearchParams(window.location.search).has("freezeRunner");
   const showLevelShowcase = new URLSearchParams(window.location.search).has("levelShowcase");
   const {
@@ -197,6 +241,7 @@ export function App() {
     character,
     aiUsage,
     claudeUsage,
+    cursorUsage,
     keyboard,
     runner,
     systemStats,
@@ -207,12 +252,68 @@ export function App() {
     disconnectCodex,
     connectClaude,
     disconnectClaude,
+    connectCursor,
+    disconnectCursor,
     selectRunner,
     setKeyboardActivity,
     setFocusActivity,
     setSystemStats
   } = useDashboardStore();
   const runnerFrames = runnerFramesById[runner?.runnerId ?? "coding-cat"];
+
+  function mergeWhipStats(next: WhipStats) {
+    setWhipStats((current) => {
+      if (!current || current.localDate !== next.localDate) return next;
+      return next.whipCount >= current.whipCount ? next : current;
+    });
+  }
+
+  async function loadWhipStats() {
+    try {
+      mergeWhipStats(await getWhipStats());
+      setWhipSaveError(false);
+    } catch {
+      // Keep last known count; focus refresh can retry.
+    }
+  }
+
+  function spawnWhipFx(clientX: number, clientY: number, variant: "a" | "b") {
+    const shell = shellRef.current;
+    if (!shell) return;
+    const rect = shell.getBoundingClientRect();
+    whipCrackRef.current?.crackAt(
+      clientX - rect.left,
+      clientY - rect.top,
+      variant
+    );
+  }
+
+  async function handleRunnerWhip(event: MouseEvent<HTMLButtonElement>) {
+    const now = Date.now();
+    if (now - lastWhipAt < WHIP_COOLDOWN_MS) return;
+    setLastWhipAt(now);
+    const nextVariant = whipVariant === "a" ? "b" : "a";
+    setWhipVariant(nextVariant);
+    setWhipHitClass(nextVariant === "a" ? "hit-a" : "hit-b");
+    setWhipSaveError(false);
+
+    if (event.detail > 0) {
+      spawnWhipFx(event.clientX, event.clientY, nextVariant);
+    } else {
+      const rect = event.currentTarget.getBoundingClientRect();
+      spawnWhipFx(
+        rect.left + rect.width / 2,
+        rect.top + rect.height / 2,
+        nextVariant
+      );
+    }
+
+    try {
+      mergeWhipStats(await recordWhip());
+    } catch {
+      setWhipSaveError(true);
+    }
+  }
 
   async function openCodexConnection() {
     setPreviewLoading(true);
@@ -252,6 +353,34 @@ export function App() {
     setClaudePreview(null);
   }
 
+  async function confirmCursorConsent() {
+    setPreviewLoading(true);
+    setPreviewError(null);
+    try {
+      await grantCursorUsageConsent();
+      setCursorConsentOpen(false);
+      setCursorPreview(await previewCursorAccount());
+    } catch (connectionError) {
+      setPreviewError(
+        connectionError instanceof Error ? connectionError.message : String(connectionError)
+      );
+    } finally {
+      setPreviewLoading(false);
+    }
+  }
+
+  async function confirmCursorConnection() {
+    setPreviewError(null);
+    try {
+      await connectCursor();
+      setCursorPreview(null);
+    } catch (connectionError) {
+      setPreviewError(
+        connectionError instanceof Error ? connectionError.message : String(connectionError)
+      );
+    }
+  }
+
   async function runUpdateCheck(force: boolean) {
     setUpdateChecking(true);
     if (force) setUpdateError(null);
@@ -275,6 +404,26 @@ export function App() {
     }
   }
 
+  async function repairKeyboardPermission() {
+    if (
+      !window.confirm(
+        "RunDev의 입력 모니터링 권한을 초기화하고 앱을 재시작할까요? 재시작 후 macOS 설정에서 RunDev를 다시 허용해야 합니다."
+      )
+    ) {
+      return;
+    }
+    setPermissionRepairing(true);
+    setPermissionRepairError(null);
+    try {
+      await resetKeyboardPermissionAndRelaunch();
+    } catch (repairError) {
+      setPermissionRepairError(
+        repairError instanceof Error ? repairError.message : String(repairError)
+      );
+      setPermissionRepairing(false);
+    }
+  }
+
   async function installAvailableUpdate() {
     setUpdateInstalling(true);
     setUpdateError(null);
@@ -290,9 +439,18 @@ export function App() {
 
   useEffect(() => {
     void refresh();
+    void loadWhipStats();
     const timer = window.setInterval(() => void refresh(), 5_000);
     return () => window.clearInterval(timer);
   }, [refresh]);
+
+  useEffect(() => {
+    const onFocus = () => {
+      void loadWhipStats();
+    };
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, []);
 
   useEffect(() => {
     void runUpdateCheck(false);
@@ -343,6 +501,16 @@ export function App() {
   }, [setSystemStats]);
 
   useEffect(() => {
+    let unlisten: (() => void) | undefined;
+    void subscribeUsageRefreshed(() => {
+      void refresh();
+    }).then((dispose) => {
+      unlisten = dispose;
+    });
+    return () => unlisten?.();
+  }, [refresh]);
+
+  useEffect(() => {
     if (freezeRunner) return;
     const timer = window.setInterval(
       () => setHeaderFrame((frame) => (frame + 1) % runnerFrames.length),
@@ -360,7 +528,9 @@ export function App() {
     (keyboard?.nextRewardAt ?? 2_000) - (keyboard?.pressCount ?? 0)
   );
   const hasUsageDetails =
-    aiUsage?.status !== "disconnected" || claudeUsage?.status !== "disconnected";
+    aiUsage?.status !== "disconnected" ||
+    claudeUsage?.status !== "disconnected" ||
+    cursorUsage?.status !== "disconnected";
   const activeHistoryDays = activityHistory.filter((day) => day.activeSeconds > 0).length;
 
   if (showLevelShowcase) {
@@ -368,15 +538,31 @@ export function App() {
   }
 
   return (
-    <main className={`popover-shell${hasUsageDetails ? " dense" : ""}`}>
+    <main
+      ref={shellRef}
+      className={`popover-shell${hasUsageDetails ? " dense" : ""}`}
+    >
+      <WhipCrackOverlay ref={whipCrackRef} width={392} height={480} />
       <div className="popover-main">
       <header className="runner-header">
-        <div className="runner">
+        <button
+          type="button"
+          className={`runner${whipHitClass ? ` ${whipHitClass}` : ""}`}
+          aria-label="개발자 캐릭터 채찍질하기"
+          title={
+            whipSaveError
+              ? "저장 실패"
+              : `오늘 ${whipStats?.whipCount ?? 0}`
+          }
+          onClick={(event) => void handleRunnerWhip(event)}
+        >
           <img src={runnerFrames[headerFrame]} alt="" aria-hidden="true" />
-        </div>
+          <span className="whip-count">오늘 {whipStats?.whipCount ?? 0}</span>
+        </button>
         <div className="runner-copy">
           <strong>RunDev</strong>
           <span><i className="status-dot" /> 개발 활동 대기 중</span>
+          {whipSaveError ? <em className="whip-save-error">저장 실패</em> : null}
         </div>
         <div className="header-actions">
           <button
@@ -498,7 +684,10 @@ export function App() {
               {previewLoading ? "확인 중" : "연동"}
             </button>
           ) : (
-            <b>{aiUsage?.totalTokens == null ? "—" : formatTokens(aiUsage.totalTokens)}</b>
+            <>
+              <span className="provider-token-label">오늘의 토큰 사용량</span>
+              <b>{aiUsage?.totalTokens == null ? "—" : formatTokens(aiUsage.totalTokens)}</b>
+            </>
           )}
         </div>
         {aiUsage?.status !== "disconnected" && (
@@ -552,17 +741,17 @@ export function App() {
               {previewLoading ? "확인 중" : "연동"}
             </button>
           ) : (
-            <b>{formatTokens(claudeUsage?.totalTokens ?? 0)}</b>
+            <>
+              <span className="provider-token-label">오늘의 토큰 사용량</span>
+              <b title={formatTokens(claudeUsage?.totalTokens ?? 0)}>
+                {formatCompactTokens(claudeUsage?.totalTokens ?? 0)}
+              </b>
+            </>
           )}
         </div>
         {claudeUsage?.status !== "disconnected" && (
           <div className="mini-stats">
-            <span>
-              {claudeUsage?.status === "waiting"
-                ? "Claude Code 재시작 후 첫 응답 대기"
-                : "오늘 총 토큰"}
-            </span>
-            <span>오늘 세션 <b>{claudeUsage?.sessionCount ?? 0}개</b></span>
+            <span>최근 활동 세션 <b>{claudeUsage?.sessionCount ?? 0}개</b></span>
             <button
               className="disconnect-button"
               type="button"
@@ -576,6 +765,70 @@ export function App() {
         {claudeUsage?.error && (
           <p className="adapter-error" title={claudeUsage.error}>
             RunDev를 재시작하거나 로컬 포트 상태를 확인해 주세요.
+          </p>
+        )}
+        <div className="provider-row">
+          <span className="provider-icon">
+            <img src={cursorIcon} alt="" aria-hidden="true" />
+          </span>
+          <div>
+            <strong>Cursor</strong>
+            <span>
+              {cursorUsage?.status === "disconnected"
+                ? "연동되지 않음"
+                : cursorUsage?.status === "reauthRequired"
+                ? "Cursor에서 다시 로그인 필요"
+                : cursorUsage?.status === "rateLimited"
+                ? "요청 제한 · 잠시 후 재시도"
+                : cursorUsage?.status === "unsupportedSchema"
+                ? "사용량 형식 변경 감지"
+                : cursorUsage?.status === "stale"
+                ? `${cursorUsage.accountLabel ?? "Cursor 계정"} · 최근 데이터`
+                : `${cursorUsage?.accountLabel ?? "Cursor 계정"} · ${formatSyncTime(cursorUsage?.lastSyncedAt)}`}
+            </span>
+          </div>
+          {cursorUsage?.status === "disconnected" ? (
+            <button
+              className="connect-button"
+              type="button"
+              onClick={() => setCursorConsentOpen(true)}
+              disabled={loading || previewLoading}
+            >
+              연동
+            </button>
+          ) : (
+            <>
+              <span className="provider-token-label">오늘의 토큰 사용량</span>
+              <b title={formatTokens(cursorUsage?.totalTokens ?? 0)}>
+                {formatCompactTokens(cursorUsage?.totalTokens ?? 0)}
+              </b>
+            </>
+          )}
+        </div>
+        {cursorUsage?.status !== "disconnected" && (
+          <div className="mini-stats">
+            <span>
+              요청 한도{" "}
+              <b>
+                {formatRequestUnits(cursorUsage?.usedRequests)}
+                {" / "}
+                {formatRequestUnits(cursorUsage?.limitRequests)}
+              </b>
+            </span>
+            <span>오늘 요청량 <b>{formatRequestUnits(cursorUsage?.todayRequests)}</b></span>
+            <button
+              className="disconnect-button"
+              type="button"
+              onClick={() => void disconnectCursor()}
+              disabled={loading}
+            >
+              연동 해제
+            </button>
+          </div>
+        )}
+        {cursorUsage?.errorCode && (
+          <p className="adapter-error">
+            Cursor 사용량을 갱신하지 못했습니다. 마지막 정상 데이터를 표시합니다.
           </p>
         )}
         {previewError && <p className="adapter-error">{previewError}</p>}
@@ -651,6 +904,22 @@ export function App() {
               </div>
             </dl>
             <p>프롬프트, 소스 코드, 키 입력 내용은 저장하지 않습니다.</p>
+            {/Macintosh|Mac OS X/.test(navigator.userAgent) && (
+              <div className="keyboard-repair">
+                <div>
+                  <strong>키보드 입력이 집계되지 않나요?</strong>
+                  <span>입력 모니터링 권한을 초기화하고 현재 RunDev를 다시 등록합니다.</span>
+                </div>
+                <button
+                  type="button"
+                  disabled={permissionRepairing}
+                  onClick={() => void repairKeyboardPermission()}
+                >
+                  {permissionRepairing ? "복구 중…" : "권한 초기화 후 복구"}
+                </button>
+              </div>
+            )}
+            {permissionRepairError && <p className="error-message">{permissionRepairError}</p>}
             {updateError && <p className="error-message">{updateError}</p>}
             <div className="dialog-actions">
               <button type="button" onClick={() => setInfoDialogOpen(false)}>닫기</button>
@@ -700,6 +969,67 @@ export function App() {
             </div>
             <div className="dialog-actions">
               <button type="button" onClick={() => setRunnerDialogOpen(false)}>닫기</button>
+            </div>
+          </section>
+        </div>
+      )}
+      {cursorConsentOpen && (
+        <div className="dialog-backdrop" role="presentation">
+          <section
+            className="account-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="cursor-consent-title"
+          >
+            <h2 id="cursor-consent-title">Cursor 사용량 조회에 동의할까요?</h2>
+            <p>
+              RunDev는 이 PC의 Cursor 로그인 정보에서 인증 토큰 한 항목을
+              일시적으로 읽어 Cursor 서버에서 내 사용량만 확인합니다. 토큰은
+              RunDev DB에 저장하지 않으며 Cursor 외부로 보내지 않습니다.
+            </p>
+            <p>
+              Cursor의 비공식 인터페이스를 사용하므로 향후 동작하지 않을 수 있습니다.
+            </p>
+            <div className="dialog-actions">
+              <button type="button" onClick={() => setCursorConsentOpen(false)}>취소</button>
+              <button
+                type="button"
+                className="confirm-button"
+                disabled={previewLoading}
+                onClick={() => void confirmCursorConsent()}
+              >
+                {previewLoading ? "확인 중" : "동의하고 계정 확인"}
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
+      {cursorPreview && (
+        <div className="dialog-backdrop" role="presentation">
+          <section
+            className="account-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="cursor-account-title"
+          >
+            <h2 id="cursor-account-title">이 Cursor 계정을 연동할까요?</h2>
+            <dl>
+              <div><dt>계정</dt><dd>{cursorPreview.accountLabel}</dd></div>
+              <div><dt>요금제</dt><dd>{cursorPreview.planType ?? "확인 불가"}</dd></div>
+              <div><dt>수집 범위</dt><dd>사용량 집계와 주기 한도</dd></div>
+            </dl>
+            <p>프롬프트, 응답, 채팅 및 소스 코드는 읽지 않습니다.</p>
+            {previewError && <p className="adapter-error">{previewError}</p>}
+            <div className="dialog-actions">
+              <button type="button" onClick={() => setCursorPreview(null)}>취소</button>
+              <button
+                type="button"
+                className="confirm-button"
+                disabled={loading}
+                onClick={() => void confirmCursorConnection()}
+              >
+                {loading ? "연동 중" : "Cursor 연동"}
+              </button>
             </div>
           </section>
         </div>

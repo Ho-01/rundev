@@ -121,6 +121,23 @@ pub(super) fn open_permission_settings() -> Result<(), String> {
         .map_err(|error| error.to_string())
 }
 
+pub(super) fn reset_permission() -> Result<(), String> {
+    let status = Command::new("/usr/bin/tccutil")
+        .args(["reset", "ListenEvent", "dev.rundev.app"])
+        .status()
+        .map_err(|error| format!("입력 모니터링 권한 초기화를 실행하지 못했습니다: {error}"))?;
+    if !status.success() {
+        return Err("입력 모니터링 권한을 초기화하지 못했습니다.".to_string());
+    }
+    open_permission_settings()
+}
+
+pub(super) fn refresh_permission_status() {
+    if !has_permission() {
+        set_status(STATUS_PERMISSION_REQUIRED);
+    }
+}
+
 fn has_permission() -> bool {
     unsafe { CGPreflightListenEventAccess() }
 }

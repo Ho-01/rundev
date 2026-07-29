@@ -28,6 +28,8 @@ ADR은 이미 내려진 중요한 기술 결정을 기록한다. 결정이 바�
 | [0012](0012-developer-level-tiers.md) | 개발자 레벨을 열 개 등급의 성장 배지로 표현 | Accepted |
 | [0013](0013-github-releases-updater.md) | GitHub Releases 정적 JSON으로 앱 업데이트 | Accepted |
 | [0014](0014-local-host-metrics-display.md) | 로컬 호스트 지표의 표시 전용 수집 | Accepted |
+| [0015](0015-runner-whip-local-count.md) | 개발자 캐릭터 채찍질 횟수의 로컬 집계 | Accepted |
+| [0016](0016-cursor-dashboard-usage.md) | Cursor 비공식 Dashboard 사용량 연동 | Accepted |
 
 ## 새 ADR 작성 형식
 

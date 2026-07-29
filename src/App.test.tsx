@@ -11,6 +11,7 @@ describe("App", () => {
     expect(await screen.findByText("개발 도구 노려본 시간")).toBeInTheDocument();
     expect(await screen.findByText("마지막으로 본 도구")).toBeInTheDocument();
     expect(await screen.findByText("Claude Code")).toBeInTheDocument();
+    expect(await screen.findByText("Cursor")).toBeInTheDocument();
     expect(await screen.findByText("오늘 두드린 키보드")).toBeInTheDocument();
     expect(await screen.findByText("최근 20주 활동")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "RunDev 정보" }));

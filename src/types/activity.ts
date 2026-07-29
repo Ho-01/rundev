@@ -67,6 +67,39 @@ export type ClaudeUsageToday = {
   error: string | null;
 };
 
+export type CursorAccountPreview = {
+  accountLabel: string;
+  planType: string | null;
+};
+
+export type CursorUsage = {
+  provider: "cursor";
+  status:
+    | "disconnected"
+    | "syncing"
+    | "connected"
+    | "stale"
+    | "rateLimited"
+    | "reauthRequired"
+    | "unsupportedSchema"
+    | "error";
+  accountLabel: string | null;
+  usedMicrousd: number | null;
+  limitMicrousd: number | null;
+  remainingMicrousd: number | null;
+  usedRequests: number | null;
+  limitRequests: number | null;
+  remainingRequests: number | null;
+  todayRequests: number | null;
+  autoPercent: number | null;
+  apiPercent: number | null;
+  todayMicrousd: number | null;
+  totalTokens: number | null;
+  cycleEndsAt: string | null;
+  lastSyncedAt: string | null;
+  errorCode: string | null;
+};
+
 export type KeyboardActivityToday = {
   localDate: string;
   pressCount: number;
@@ -91,4 +124,9 @@ export type RunnerId =
 
 export type RunnerSelection = {
   runnerId: RunnerId;
+};
+
+export type WhipStats = {
+  localDate: string;
+  whipCount: number;
 };
