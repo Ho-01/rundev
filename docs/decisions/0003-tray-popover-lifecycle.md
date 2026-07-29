@@ -14,6 +14,9 @@ RunDev의 기본 상호작용은 RunCat과 같은 트레이 유틸리티다. 일
 - 메인 WebView는 시작 시 숨긴다.
 - 트레이 좌클릭은 아이콘에 인접한 `320×480` 팝오버를 토글한다.
 - 팝오버는 프레임리스, 고정 크기, always-on-top, skip-taskbar로 구성한다.
+- macOS에서는 Dock과 Cmd+Tab에 나타나지 않도록 `LSUIElement`와
+  `ActivationPolicy::Accessory`를 사용한다. Windows의 `skipTaskbar`만으로는 Dock이
+  숨겨지지 않는다.
 - 포커스를 잃거나 닫기 요청을 받으면 종료하지 않고 숨긴다.
 - 우클릭 네이티브 메뉴에서 열기와 완전 종료를 제공한다.
 - 트레이 위치와 모니터 work area를 이용해 위·아래·좌·우 작업 표시줄을 지원한다.

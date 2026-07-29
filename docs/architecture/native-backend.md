@@ -12,6 +12,11 @@
 8. 트레이 메뉴와 애니메이션을 시작한다.
 9. command handler를 노출한다.
 
+macOS에서는 부팅 시 `ActivationPolicy::Accessory`를 설정하고, 번들
+`Info.plist`에 `LSUIElement`를 넣어 Dock과 Cmd+Tab에 표시되지 않게 한다.
+Windows의 `skipTaskbar`는 작업 표시줄만 제어하며 macOS Dock에는 영향을 주지
+않는다.
+
 Updater는 GitHub Releases의 `latest.json`을 endpoint로 사용한다. 공개키는
 `tauri.conf.json`에 포함하고, 릴리스 서명은 GitHub Actions secret의 비밀키로
 수행한다. 자세한 결정은 ADR 0013을 본다.
