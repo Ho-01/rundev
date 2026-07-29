@@ -66,6 +66,7 @@ button { color: inherit; font: inherit; }
   font-size: 10px;
   cursor: pointer;
 }
+.runner-options button span { white-space: nowrap; }
 .runner-options button.selected { border-color: #8fb84c; background: #2b3025; color: #f1f4eb; }
 .runner-options img {
   width: 48px;
@@ -251,9 +252,10 @@ button { color: inherit; font: inherit; }
 .level-copy > div { display: flex; align-items: center; justify-content: space-between; margin-bottom: 7px; }
 .level-copy strong { font-size: 12px; font-weight: 500; }
 .level-copy span { color: #89898f; font-size: 10px; font-variant-numeric: tabular-nums; }
-.level-copy .tier-name { display: flex; align-items: center; gap: 5px; color: var(--tier-color); }
+.level-copy .tier-name { display: flex; min-width: 0; align-items: center; gap: 5px; overflow: hidden; color: var(--tier-color); text-overflow: ellipsis; white-space: nowrap; }
 .level-copy .tier-name svg { stroke-width: 2; }
 .level-copy .tier-name .level-label { margin-left: 2px; padding: 2px 5px; color: var(--tier-color); background: color-mix(in srgb, var(--tier-color) 14%, transparent); border: 1px solid color-mix(in srgb, var(--tier-color) 30%, transparent); border-radius: 99px; font-size: 9px; font-weight: 650; }
+.level-copy > div > span { flex: 0 0 auto; white-space: nowrap; }
 .level-row .meter span { background: var(--tier-color); }
 .activity-history { margin-top: 10px; }
 .activity-history-heading { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; color: #85858b; font-size: 9px; }
