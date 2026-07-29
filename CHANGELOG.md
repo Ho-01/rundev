@@ -5,6 +5,12 @@ RunDev의 사용자에게 의미 있는 변경을 기록한다. 커밋 목록이
 
 ## Unreleased
 
+## 0.3.1 - 2026-07-29
+
+### Fixed
+
+- macOS 릴리스 빌드를 Apple Silicon과 Intel DMG로 분리해 릴리스 자산 누락을 방지
+
 ## 0.3.0 - 2026-07-29
 
 ### Added

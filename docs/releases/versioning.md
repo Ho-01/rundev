@@ -48,7 +48,7 @@ npm.cmd run version:check
 3. 전체 검증을 실행한다.
 4. `chore(release): vX.Y.Z 준비` 커밋을 만든다.
 5. `git tag -a vX.Y.Z -m "RunDev vX.Y.Z"`를 생성하고 푸시한다.
-6. 태그 워크플로의 Windows installer와 macOS DMG를 확인한다.
+6. 태그 워크플로의 Windows installer와 Apple Silicon/Intel macOS DMG를 확인한다.
 
 ## 빌드 종류
 

@@ -59,7 +59,7 @@ jobs:
               repo: context.repo.repo,
               tag_name: tag,
               name: `RunDev ${tag}`,
-              body: "Windows NSIS 설치 프로그램과 macOS universal DMG입니다. 현재는 서명 및 notarization 전 단계라 운영체제의 보안 경고가 표시될 수 있습니다.",
+              body: "Windows NSIS 설치 프로그램과 Apple Silicon/Intel용 macOS DMG입니다. 현재는 서명 및 notarization 전 단계라 운영체제의 보안 경고가 표시될 수 있습니다.",
               draft: false,
               prerelease: false
             });
@@ -76,8 +76,11 @@ jobs:
             label: Windows NSIS
             args: --bundles nsis
           - os: macos-latest
-            label: macOS universal DMG
-            args: --target universal-apple-darwin --bundles dmg
+            label: macOS Apple Silicon DMG
+            args: --target aarch64-apple-darwin --bundles dmg
+          - os: macos-latest
+            label: macOS Intel DMG
+            args: --target x86_64-apple-darwin --bundles dmg
     runs-on: ${{ matrix.os }}
     timeout-minutes: 50
 
