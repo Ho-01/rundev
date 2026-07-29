@@ -3,7 +3,7 @@
 ## 부팅 순서
 
 1. tracing subscriber를 초기화한다.
-2. single-instance, autostart, notification 플러그인을 등록한다.
+2. single-instance, autostart, notification, process, updater 플러그인을 등록한다.
 3. 앱 데이터 디렉터리를 생성한다.
 4. SQLite pool을 열고 migration을 실행한다.
 5. pool을 Tauri managed state로 등록한다.
@@ -12,7 +12,9 @@
 8. 트레이 메뉴와 애니메이션을 시작한다.
 9. command handler를 노출한다.
 
-Updater 의존성은 포함되어 있지만 서명키와 endpoint가 없으므로 초기화하지 않는다.
+Updater는 GitHub Releases의 `latest.json`을 endpoint로 사용한다. 공개키는
+`tauri.conf.json`에 포함하고, 릴리스 서명은 GitHub Actions secret의 비밀키로
+수행한다. 자세한 결정은 ADR 0013을 본다.
 
 ## 모듈
 

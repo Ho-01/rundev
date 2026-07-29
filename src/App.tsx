@@ -23,6 +23,14 @@ import {
   subscribeFocusActivity,
   subscribeKeyboardActivity
 } from "./services/rundev";
+import {
+  UPDATE_CHECK_INTERVAL_MS,
+  checkForAppUpdate,
+  downloadAndInstallAppUpdate,
+  getCachedUpdateStatus,
+  notifyIfUpdateAvailable,
+  type UpdateStatus
+} from "./services/updater";
 import type {
   ClaudeConnectionPreview,
   CodexAccountPreview
@@ -172,6 +180,12 @@ export function App() {
   const [headerFrame, setHeaderFrame] = useState(0);
   const [runnerDialogOpen, setRunnerDialogOpen] = useState(false);
   const [infoDialogOpen, setInfoDialogOpen] = useState(false);
+  const [updateStatus, setUpdateStatus] = useState<UpdateStatus>(() =>
+    getCachedUpdateStatus(packageJson.version)
+  );
+  const [updateChecking, setUpdateChecking] = useState(false);
+  const [updateInstalling, setUpdateInstalling] = useState(false);
+  const [updateError, setUpdateError] = useState<string | null>(null);
   const freezeRunner = new URLSearchParams(window.location.search).has("freezeRunner");
   const showLevelShowcase = new URLSearchParams(window.location.search).has("levelShowcase");
   const {
@@ -234,11 +248,61 @@ export function App() {
     setClaudePreview(null);
   }
 
+  async function runUpdateCheck(force: boolean) {
+    setUpdateChecking(true);
+    if (force) setUpdateError(null);
+    try {
+      const status = await checkForAppUpdate({
+        force,
+        currentVersion: packageJson.version
+      });
+      setUpdateStatus(status);
+      if (status.available && status.version) {
+        await notifyIfUpdateAvailable(status.version);
+      }
+    } catch (checkError) {
+      if (force) {
+        setUpdateError(
+          checkError instanceof Error ? checkError.message : String(checkError)
+        );
+      }
+    } finally {
+      setUpdateChecking(false);
+    }
+  }
+
+  async function installAvailableUpdate() {
+    setUpdateInstalling(true);
+    setUpdateError(null);
+    try {
+      await downloadAndInstallAppUpdate();
+    } catch (installError) {
+      setUpdateError(
+        installError instanceof Error ? installError.message : String(installError)
+      );
+      setUpdateInstalling(false);
+    }
+  }
+
   useEffect(() => {
     void refresh();
     const timer = window.setInterval(() => void refresh(), 5_000);
     return () => window.clearInterval(timer);
   }, [refresh]);
+
+  useEffect(() => {
+    void runUpdateCheck(false);
+    const timer = window.setInterval(
+      () => void runUpdateCheck(false),
+      UPDATE_CHECK_INTERVAL_MS
+    );
+    return () => window.clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    if (!infoDialogOpen) return;
+    void runUpdateCheck(false);
+  }, [infoDialogOpen]);
 
   useEffect(() => {
     let unlisten: (() => void) | undefined;
@@ -299,6 +363,7 @@ export function App() {
             onClick={() => setInfoDialogOpen(true)}
           >
             <Info size={17} />
+            {updateStatus.available && <i className="update-dot" aria-hidden="true" />}
           </button>
           <button
             className="plain-button"
@@ -547,10 +612,40 @@ export function App() {
               <div><dt>버전</dt><dd>v{packageJson.version}</dd></div>
               <div><dt>기술</dt><dd>Tauri 2 · React · Rust · SQLite</dd></div>
               <div><dt>데이터</dt><dd>이 기기에만 저장</dd></div>
+              <div>
+                <dt>업데이트</dt>
+                <dd>
+                  {updateInstalling
+                    ? "설치 중…"
+                    : updateChecking
+                      ? "확인 중…"
+                      : updateStatus.available && updateStatus.version
+                        ? `v${updateStatus.version} 사용 가능`
+                        : "최신 버전"}
+                </dd>
+              </div>
             </dl>
             <p>프롬프트, 소스 코드, 키 입력 내용은 저장하지 않습니다.</p>
+            {updateError && <p className="error-message">{updateError}</p>}
             <div className="dialog-actions">
               <button type="button" onClick={() => setInfoDialogOpen(false)}>닫기</button>
+              <button
+                type="button"
+                disabled={updateChecking || updateInstalling}
+                onClick={() => void runUpdateCheck(true)}
+              >
+                {updateChecking ? "확인 중" : "업데이트 확인"}
+              </button>
+              {updateStatus.available && (
+                <button
+                  type="button"
+                  className="confirm-button"
+                  disabled={updateInstalling || updateChecking}
+                  onClick={() => void installAvailableUpdate()}
+                >
+                  {updateInstalling ? "설치 중" : "다운로드 및 재시작"}
+                </button>
+              )}
             </div>
           </section>
         </div>

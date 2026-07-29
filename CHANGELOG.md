@@ -5,6 +5,15 @@ RunDev의 사용자에게 의미 있는 변경을 기록한다. 커밋 목록이
 
 ## Unreleased
 
+### Added
+
+- GitHub Releases `latest.json` 기반 앱 업데이트 확인과 수동 설치
+- RunDev 정보 창의 업데이트 확인 / 다운로드 및 재시작
+
+### Changed
+
+- 릴리스 워크플로에 Tauri updater 서명 아티팩트와 `latest.json` 업로드 추가
+
 ## 0.3.1 - 2026-07-29
 
 ### Fixed

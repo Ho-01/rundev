@@ -26,6 +26,7 @@ ADR은 이미 내려진 중요한 기술 결정을 기록한다. 결정이 바�
 | [0010](0010-keyboard-count-collection.md) | 키 입력 횟수의 로컬 집계 | Accepted |
 | [0011](0011-focus-time-classification.md) | 활성 개발 앱과 입력 유휴 시간으로 집중시간 집계 | Accepted |
 | [0012](0012-developer-level-tiers.md) | 개발자 레벨을 열 개 등급의 성장 배지로 표현 | Accepted |
+| [0013](0013-github-releases-updater.md) | GitHub Releases 정적 JSON으로 앱 업데이트 | Accepted |
 
 ## 새 ADR 작성 형식
 

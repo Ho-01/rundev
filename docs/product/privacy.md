@@ -25,5 +25,9 @@ RunDev는 로컬 우선으로 동작하며 사용자가 명시적으로 연결�
 - 앱 데이터는 OS별 RunDev app data 디렉터리의 SQLite에 저장한다.
 - Claude Code 사용량은 루프백 주소의 RunDev 수집기로만 전송한다.
 - 서버 동기화는 현재 제공하지 않는다.
+- RunDev가 활동 데이터를 외부로 수집하는 것은 아니지만, 업데이트 확인을 위해
+  GitHub Releases에 네트워크 요청이 발생한다. 요청에는 앱 버전과 OS/CPU
+  대상이 실릴 수 있고, IP 주소와 User-Agent는 GitHub/CDN 로그에 남을 수 있다.
+  설치 파일 다운로드도 같은 Release 호스트에서 이뤄진다.
 
 새로운 수집 항목은 구현 전에 ADR로 목적, 보존 범위, 위험과 대안을 기록한다.

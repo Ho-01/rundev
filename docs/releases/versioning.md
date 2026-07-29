@@ -53,7 +53,30 @@ npm.cmd run version:check
 ## 빌드 종류
 
 - `main` macOS build: 최신 개발 상태를 확인하는 임시 artifact
-- `v*` tag build: GitHub Release에 연결되는 버전 고정 테스트 배포물
+- `v*` tag build: GitHub Release에 연결되는 버전 고정 배포물과 updater 아티팩트
 
-현재 인증서와 notarization이 없으므로 태그 릴리스도 외부 공개용 정식 배포가 아니다.
-서명 체계를 갖춘 뒤 별도 ADR로 안정 릴리스 정책을 확정한다.
+현재 macOS 코드 서명과 notarization이 없으므로 태그 릴리스도 Gatekeeper 경고가
+남을 수 있다. Updater 서명(변조 방지)과 OS 코드 서명은 별개다. OS 서명 체계를
+갖춘 뒤 별도 ADR로 안정 릴리스 정책을 확정한다.
+
+## Updater 서명 키와 bootstrap
+
+릴리스 빌드는 Tauri updater 비밀키로 `.sig`를 만들고 `tauri-action`이
+`latest.json`을 Release에 병합한다.
+
+GitHub repository secrets:
+
+- `TAURI_SIGNING_PRIVATE_KEY`: `tauri signer generate`로 만든 비밀키 전체
+- `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`: 키에 비밀번호를 걸었다면 함께 등록
+
+공개키만 `src-tauri/tauri.conf.json`의 `plugins.updater.pubkey`에 커밋한다.
+비밀키는 저장소에 넣지 않는다.
+
+### Updater bootstrap release
+
+Updater 기능이 처음 들어간 버전은 bootstrap release다. 그 이전 설치본에는
+업데이트 확인 코드가 없으므로 자동으로 올라가지 않는다. 해당 버전을 한 번
+수동 설치한 뒤부터 다음 태그 릴리스를 자동 감지할 수 있다.
+
+앱은 시작 시·15분마다·정보 창에서 업데이트를 확인하고, 설치는 사용자가
+“다운로드 및 재시작”을 누를 때만 수행한다.

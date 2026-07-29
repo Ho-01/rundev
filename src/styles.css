@@ -141,8 +141,9 @@ button { color: inherit; font: inherit; }
 .runner-copy strong { font-size: 15px; letter-spacing: -.01em; }
 .runner-copy span { display: flex; align-items: center; color: #99999f; font-size: 11px; }
 .status-dot { width: 6px; height: 6px; margin-right: 6px; border-radius: 50%; background: #8bc34a; box-shadow: 0 0 0 3px rgba(139,195,74,.11); }
-.plain-button { display: grid; place-items: center; width: 30px; height: 30px; padding: 0; color: #9a9a9f; background: transparent; border: 0; border-radius: 6px; }
+.plain-button { position: relative; display: grid; place-items: center; width: 30px; height: 30px; padding: 0; color: #9a9a9f; background: transparent; border: 0; border-radius: 6px; }
 .plain-button:hover { color: #fff; background: rgba(255,255,255,.07); }
+.plain-button .update-dot { position: absolute; top: 5px; right: 5px; width: 6px; height: 6px; background: #9bce5a; border-radius: 50%; }
 .header-actions { display: flex; align-items: center; gap: 2px; }
 
 .divider { height: 1px; margin: 8px 0; background: rgba(255,255,255,.09); }

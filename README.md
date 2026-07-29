@@ -93,9 +93,10 @@ npm.cmd run version:set -- 0.2.0
 - 레벨 구간별 개발자 등급과 성장 배지
 - Rust command를 통한 요약·캐릭터·AI 상태 조회
 - React + Zustand 대시보드
+- GitHub Releases 기반 앱 업데이트 확인과 수동 설치
 
-Updater 구성은 포함하지만 서명된 공개 배포 endpoint를 발급하기 전까지 자동으로
-초기화하지 않습니다.
+Updater는 서명된 `latest.json` endpoint로 새 버전을 확인합니다. Updater가 처음
+포함된 빌드는 한 번 수동 설치해야 이후 버전을 자동으로 감지합니다.
 
 ## 문서
 
