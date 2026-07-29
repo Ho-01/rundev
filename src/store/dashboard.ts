@@ -19,6 +19,7 @@ import type {
   RunnerId,
   RunnerSelection
 } from "../types/activity";
+import { emptySystemStats, type SystemStats } from "../types/system";
 
 type DashboardStore = {
   summary: DailySummary | null;
@@ -29,6 +30,7 @@ type DashboardStore = {
   claudeUsage: ClaudeUsageToday | null;
   keyboard: KeyboardActivityToday | null;
   runner: RunnerSelection | null;
+  systemStats: SystemStats;
   loading: boolean;
   error: string | null;
   refresh: () => Promise<void>;
@@ -39,9 +41,10 @@ type DashboardStore = {
   selectRunner: (runnerId: RunnerId) => Promise<void>;
   setKeyboardActivity: (keyboard: KeyboardActivityToday) => void;
   setFocusActivity: (activity: FocusActivityUpdate) => void;
+  setSystemStats: (stats: SystemStats) => void;
 };
 
-export const useDashboardStore = create<DashboardStore>((set) => ({
+export const useDashboardStore = create<DashboardStore>((set, get) => ({
   summary: null,
   focus: null,
   activityHistory: [],
@@ -50,6 +53,7 @@ export const useDashboardStore = create<DashboardStore>((set) => ({
   claudeUsage: null,
   keyboard: null,
   runner: null,
+  systemStats: emptySystemStats(),
   setKeyboardActivity: (keyboard) => set({ keyboard }),
   setFocusActivity: (activity) =>
     set((state) => ({
@@ -57,6 +61,10 @@ export const useDashboardStore = create<DashboardStore>((set) => ({
         ? { ...state.summary, activeSeconds: activity.activeSeconds }
         : state.summary
     })),
+  setSystemStats: (stats) => {
+    if (stats.sequence < get().systemStats.sequence) return;
+    set({ systemStats: stats });
+  },
   loading: false,
   error: null,
   refresh: async () => {

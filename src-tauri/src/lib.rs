@@ -2,6 +2,7 @@ mod activity;
 mod adapters;
 mod commands;
 mod database;
+mod host_metrics;
 mod keyboard;
 mod tray;
 
@@ -41,6 +42,7 @@ pub fn run() {
             app.manage(AppState { pool: pool.clone() });
             activity::start(pool.clone(), app.handle().clone());
             keyboard::start(pool.clone(), app.handle().clone());
+            host_metrics::start(app.handle().clone());
             tauri::async_runtime::spawn(adapters::claude::serve(pool.clone()));
             tauri::async_runtime::spawn(async move {
                 loop {
@@ -82,7 +84,8 @@ pub fn run() {
             commands::get_keyboard_activity_today,
             commands::open_keyboard_permission_settings,
             commands::get_runner_selection,
-            commands::set_runner_selection
+            commands::set_runner_selection,
+            commands::get_system_stats
         ])
         .run(tauri::generate_context!())
         .expect("error while running RunDev");

@@ -1,8 +1,8 @@
-use crate::{activity, adapters, database::AppState, keyboard, tray};
+use crate::{activity, adapters, database::AppState, host_metrics, keyboard, tray};
 use chrono::{DateTime, Duration, Local, Utc};
 use serde::Serialize;
 use std::collections::HashMap;
-use tauri::State;
+use tauri::{AppHandle, State};
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -118,6 +118,11 @@ pub async fn get_keyboard_activity_today(
 #[tauri::command]
 pub fn open_keyboard_permission_settings() -> Result<(), String> {
     keyboard::open_permission_settings()
+}
+
+#[tauri::command]
+pub fn get_system_stats(app: AppHandle) -> host_metrics::SystemStats {
+    host_metrics::current_stats(&app)
 }
 
 #[tauri::command]

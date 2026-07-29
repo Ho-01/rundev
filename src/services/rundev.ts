@@ -1,3 +1,4 @@
+import type { SystemStats } from "../types/system";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import type {
@@ -256,6 +257,45 @@ export async function connectClaude() {
 export async function disconnectClaude() {
   if (!isTauri()) return;
   await invoke("disconnect_claude");
+}
+
+export async function getSystemStats() {
+  if (!isTauri()) {
+    return {
+      cpuPercent: 12,
+      memoryPercent: 48,
+      batteryPercent: 76,
+      batteryState: "discharging" as const,
+      temperatureCelsius: 54,
+      diskPercent: 61,
+      networkDownBps: 120_000,
+      networkUpBps: 18_000,
+      sequence: 1
+    };
+  }
+  return invoke<SystemStats>("get_system_stats");
+}
+
+export async function subscribeSystemStats(
+  onStats: (stats: SystemStats) => void
+): Promise<UnlistenFn> {
+  if (!isTauri()) {
+    onStats(await getSystemStats());
+    return () => {};
+  }
+
+  const unlisten = await listen<SystemStats>(
+    "system-stats-updated",
+    (event) => {
+      onStats(event.payload);
+    }
+  );
+  try {
+    onStats(await getSystemStats());
+  } catch {
+    // Snapshot can fail during early startup; events will fill in.
+  }
+  return unlisten;
 }
 
 function isTauri() {

@@ -9,8 +9,9 @@
 5. pool을 Tauri managed state로 등록한다.
 6. 집중시간, 키보드 횟수, Claude Code 로컬 OpenTelemetry 수집기를 시작한다.
 7. Codex 사용량 동기화 worker를 시작한다.
-8. 트레이 메뉴와 애니메이션을 시작한다.
-9. command handler를 노출한다.
+8. HostMetricsService(시스템 상태 strip)를 시작한다.
+9. 트레이 메뉴와 애니메이션을 시작한다.
+10. command handler를 노출한다.
 
 macOS에서는 부팅 시 `ActivationPolicy::Accessory`를 설정하고, 번들
 `Info.plist`에 `LSUIElement`를 넣어 Dock과 Cmd+Tab에 표시되지 않게 한다.
@@ -66,6 +67,13 @@ Updater는 GitHub Releases의 `latest.json`을 endpoint로 사용한다. 공개�
 - 우클릭 네이티브 메뉴
 - PNG 프레임 애니메이션
 - 향후 `CharacterAnimation` 상태 머신의 소유자가 된다.
+
+### `host_metrics`
+
+- CPU·메모리·온도·디스크·배터리·네트워크 활동을 표시용으로만 샘플링한다
+- 앱 수명 동안 단일 루프이며 SQLite에 쓰지 않는다
+- `system-stats-updated` 이벤트와 `get_system_stats` 스냅샷 command를 제공한다
+- 자세한 범위는 ADR 0014를 본다
 
 ## DB 스키마
 

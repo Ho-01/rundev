@@ -18,12 +18,15 @@ src/
 ├─ App.tsx
 ├─ main.tsx
 ├─ styles.css
+├─ components/
+│  └─ SystemStatusStrip.tsx
 ├─ services/
 │  └─ rundev.ts
 ├─ store/
 │  └─ dashboard.ts
 ├─ types/
-│  └─ activity.ts
+│  ├─ activity.ts
+│  └─ system.ts
 └─ lib/
    └─ cn.ts
 ```
@@ -46,7 +49,7 @@ flowchart LR
 ## 디자인 원칙
 
 - RunCat 계열 메뉴바 유틸리티의 작은 정보 패널 밀도를 따른다.
-- 기본 팝오버 크기는 320×480이다.
+- 기본 팝오버 크기는 392×480이다 (본문 폭 유지 + 오른쪽 상태 타일 strip).
 - 큰 관리자 페이지형 카드보다 구분선, 짧은 행, 얇은 meter를 사용한다.
 - 초록색은 상태와 진행률 강조에만 제한적으로 사용한다.
 - 기본 창에는 타이틀바와 네이티브 window control을 표시하지 않는다.

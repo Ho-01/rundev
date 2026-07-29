@@ -21,7 +21,8 @@ import {
   previewClaudeConnection,
   previewCodexAccount,
   subscribeFocusActivity,
-  subscribeKeyboardActivity
+  subscribeKeyboardActivity,
+  subscribeSystemStats
 } from "./services/rundev";
 import {
   UPDATE_CHECK_INTERVAL_MS,
@@ -31,6 +32,7 @@ import {
   notifyIfUpdateAvailable,
   type UpdateStatus
 } from "./services/updater";
+import { SystemStatusStrip } from "./components/SystemStatusStrip";
 import type {
   ClaudeConnectionPreview,
   CodexAccountPreview
@@ -197,6 +199,7 @@ export function App() {
     claudeUsage,
     keyboard,
     runner,
+    systemStats,
     loading,
     error,
     refresh,
@@ -206,7 +209,8 @@ export function App() {
     disconnectClaude,
     selectRunner,
     setKeyboardActivity,
-    setFocusActivity
+    setFocusActivity,
+    setSystemStats
   } = useDashboardStore();
   const runnerFrames = runnerFramesById[runner?.runnerId ?? "coding-cat"];
 
@@ -321,6 +325,24 @@ export function App() {
   }, [setFocusActivity]);
 
   useEffect(() => {
+    let unlisten: (() => void) | undefined;
+    let cancelled = false;
+    void subscribeSystemStats((stats) => {
+      if (!cancelled) setSystemStats(stats);
+    }).then((dispose) => {
+      if (cancelled) {
+        dispose();
+        return;
+      }
+      unlisten = dispose;
+    });
+    return () => {
+      cancelled = true;
+      unlisten?.();
+    };
+  }, [setSystemStats]);
+
+  useEffect(() => {
     if (freezeRunner) return;
     const timer = window.setInterval(
       () => setHeaderFrame((frame) => (frame + 1) % runnerFrames.length),
@@ -346,7 +368,8 @@ export function App() {
   }
 
   return (
-    <main className={`popover${hasUsageDetails ? " dense" : ""}`}>
+    <main className={`popover-shell${hasUsageDetails ? " dense" : ""}`}>
+      <div className="popover-main">
       <header className="runner-header">
         <div className="runner">
           <img src={runnerFrames[headerFrame]} alt="" aria-hidden="true" />
@@ -597,6 +620,8 @@ export function App() {
 
       {loading && <div className="loading-line" />}
       {error && <p className="error-message">{error}</p>}
+      </div>
+      <SystemStatusStrip stats={systemStats} />
       {infoDialogOpen && (
         <div className="dialog-backdrop" role="presentation">
           <section
