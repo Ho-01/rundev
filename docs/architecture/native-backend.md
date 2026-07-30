@@ -48,6 +48,8 @@ Updater는 GitHub Releases의 `latest.json`을 endpoint로 사용한다. 공개�
 - 2,000회 단위 XP 원장 기록과 `daily_activity_metrics` 갱신
 - 250ms 단위 `keyboard-activity-updated` 이벤트와 5초 단위 SQLite 합계 저장
 - macOS Input Monitoring 권한 상태 및 설정 화면 연결
+- 앱 교체 후 권한 복구 시 TCC 등록과 `keyboard.macos.permission_prompted` 안내
+  상태를 함께 초기화하고 재시작 뒤 권한을 다시 요청
 
 ### `activity`
 

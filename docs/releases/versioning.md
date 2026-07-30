@@ -64,6 +64,10 @@ npm.cmd run version:check
 릴리스 빌드는 Tauri updater 비밀키로 `.sig`를 만들고 `tauri-action`이
 `latest.json`을 Release에 병합한다.
 
+macOS 빌드는 `app,dmg` 번들을 함께 생성한다. DMG는 수동 설치용이며, `app`
+번들에서 생성되는 `.app.tar.gz`와 `.sig`가 자동 업데이트에 사용된다.
+`latest.json`에는 `darwin-aarch64`와 `darwin-x86_64`가 모두 포함되어야 한다.
+
 GitHub repository secrets:
 
 - `TAURI_SIGNING_PRIVATE_KEY`: `tauri signer generate`로 만든 비밀키 전체

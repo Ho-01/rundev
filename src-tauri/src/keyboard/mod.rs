@@ -93,15 +93,18 @@ pub fn open_permission_settings() -> Result<(), String> {
     Ok(())
 }
 
-pub fn reset_permission() -> Result<(), String> {
+pub async fn reset_permission(pool: &SqlitePool) -> Result<(), String> {
     #[cfg(target_os = "macos")]
     {
         set_status(STATUS_PERMISSION_REQUIRED);
-        return macos::reset_permission();
+        return macos::reset_permission(pool).await;
     }
 
     #[cfg(not(target_os = "macos"))]
-    Err("macOS에서만 입력 모니터링 권한을 초기화할 수 있습니다.".to_string())
+    {
+        let _ = pool;
+        Err("macOS에서만 입력 모니터링 권한을 초기화할 수 있습니다.".to_string())
+    }
 }
 
 async fn process_events(

@@ -160,8 +160,10 @@ pub fn open_keyboard_permission_settings() -> Result<(), String> {
 }
 
 #[tauri::command]
-pub fn reset_keyboard_permission() -> Result<(), String> {
-    keyboard::reset_permission()
+pub async fn reset_keyboard_permission(
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    keyboard::reset_permission(&state.pool).await
 }
 
 #[tauri::command]

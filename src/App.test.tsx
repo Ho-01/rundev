@@ -1,6 +1,7 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { App } from "./App";
+import { useDashboardStore } from "./store/dashboard";
 
 describe("App", () => {
   it("renders the starter dashboard", async () => {
@@ -43,5 +44,32 @@ describe("App", () => {
     expect(screen.getByText("주황 고양이")).toBeInTheDocument();
     expect(screen.getByText("주황 새우")).toBeInTheDocument();
     expect(screen.getByText("핑크 버튜버")).toBeInTheDocument();
+  });
+
+  it("offers permission recovery directly from the keyboard card", async () => {
+    localStorage.clear();
+    render(<App />);
+    expect(await screen.findByText("RunDev")).toBeInTheDocument();
+
+    act(() => {
+      useDashboardStore.setState({
+        keyboard: {
+          localDate: "2026-07-30",
+          pressCount: 0,
+          rewardedMilestones: 0,
+          xpEarned: 0,
+          nextRewardAt: 2_000,
+          status: "permission-required",
+          permissionRequired: true
+        }
+      });
+    });
+
+    expect(
+      screen.getByText("새 설치 후에는 입력 권한을 다시 연결해야 할 수 있습니다.")
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "권한 다시 연결" })
+    ).toBeInTheDocument();
   });
 });

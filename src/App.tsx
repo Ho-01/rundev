@@ -17,7 +17,6 @@ import {
 } from "lucide-react";
 import { useDashboardStore } from "./store/dashboard";
 import {
-  openKeyboardPermissionSettings,
   previewClaudeConnection,
   previewCodexAccount,
   grantCursorUsageConsent,
@@ -53,6 +52,9 @@ import type {
 } from "./types/activity";
 import { runnerFramesById, runnerOptions } from "./assets/runners";
 import openAiIcon from "./assets/providers/openai.svg";
+
+const KEYBOARD_PERMISSION_REPAIR_PENDING_KEY =
+  "keyboard.macos.permissionRepairPending";
 import claudeIcon from "./assets/providers/claude.svg";
 import cursorIcon from "./assets/providers/cursor.svg";
 import packageJson from "../package.json";
@@ -245,6 +247,9 @@ export function App() {
   const [updateError, setUpdateError] = useState<string | null>(null);
   const [permissionRepairing, setPermissionRepairing] = useState(false);
   const [permissionRepairError, setPermissionRepairError] = useState<string | null>(null);
+  const [permissionRepairPending, setPermissionRepairPending] = useState(
+    () => localStorage.getItem(KEYBOARD_PERMISSION_REPAIR_PENDING_KEY) === "true"
+  );
   const [whipStats, setWhipStats] = useState<WhipStats | null>(null);
   const [whipHitClass, setWhipHitClass] = useState<"hit-a" | "hit-b" | null>(null);
   const [whipSaveError, setWhipSaveError] = useState(false);
@@ -437,9 +442,13 @@ export function App() {
     }
     setPermissionRepairing(true);
     setPermissionRepairError(null);
+    localStorage.setItem(KEYBOARD_PERMISSION_REPAIR_PENDING_KEY, "true");
+    setPermissionRepairPending(true);
     try {
       await resetKeyboardPermissionAndRelaunch();
     } catch (repairError) {
+      localStorage.removeItem(KEYBOARD_PERMISSION_REPAIR_PENDING_KEY);
+      setPermissionRepairPending(false);
       setPermissionRepairError(
         repairError instanceof Error ? repairError.message : String(repairError)
       );
@@ -466,6 +475,13 @@ export function App() {
     const timer = window.setInterval(() => void refresh(), 5_000);
     return () => window.clearInterval(timer);
   }, [refresh]);
+
+  useEffect(() => {
+    if (keyboard?.status !== "active" || !permissionRepairPending) return;
+    localStorage.removeItem(KEYBOARD_PERMISSION_REPAIR_PENDING_KEY);
+    setPermissionRepairPending(false);
+    setPermissionRepairError(null);
+  }, [keyboard?.status, permissionRepairPending]);
 
   useEffect(() => {
     const onFocus = () => {
@@ -677,12 +693,17 @@ export function App() {
         </div>
         {keyboard?.permissionRequired ? (
           <div className="keyboard-permission">
-            <span>입력 내용은 저장하지 않고 횟수만 집계합니다.</span>
+            <span>
+              {permissionRepairPending
+                ? "입력 모니터링에서 RunDev를 켠 뒤 앱으로 돌아오세요."
+                : "새 설치 후에는 입력 권한을 다시 연결해야 할 수 있습니다."}
+            </span>
             <button
               type="button"
-              onClick={() => void openKeyboardPermissionSettings()}
+              disabled={permissionRepairing}
+              onClick={() => void repairKeyboardPermission()}
             >
-              설정 열기
+              {permissionRepairing ? "복구 중…" : "권한 다시 연결"}
             </button>
           </div>
         ) : keyboard?.status === "error" || keyboard?.status === "unavailable" ? (
@@ -1043,7 +1064,7 @@ export function App() {
                   disabled={permissionRepairing}
                   onClick={() => void repairKeyboardPermission()}
                 >
-                  {permissionRepairing ? "복구 중…" : "권한 초기화 후 복구"}
+                  {permissionRepairing ? "복구 중…" : "권한 다시 연결"}
                 </button>
               </div>
             )}

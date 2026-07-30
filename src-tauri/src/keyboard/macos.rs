@@ -121,7 +121,7 @@ pub(super) fn open_permission_settings() -> Result<(), String> {
         .map_err(|error| error.to_string())
 }
 
-pub(super) fn reset_permission() -> Result<(), String> {
+pub(super) async fn reset_permission(pool: &SqlitePool) -> Result<(), String> {
     let status = Command::new("/usr/bin/tccutil")
         .args(["reset", "ListenEvent", "dev.rundev.app"])
         .status()
@@ -129,7 +129,14 @@ pub(super) fn reset_permission() -> Result<(), String> {
     if !status.success() {
         return Err("입력 모니터링 권한을 초기화하지 못했습니다.".to_string());
     }
-    open_permission_settings()
+    sqlx::query(
+        "DELETE FROM app_settings
+         WHERE key = 'keyboard.macos.permission_prompted'",
+    )
+    .execute(pool)
+    .await
+    .map_err(|error| format!("입력 모니터링 권한 안내 상태를 초기화하지 못했습니다: {error}"))?;
+    Ok(())
 }
 
 pub(super) fn refresh_permission_status() {
