@@ -125,7 +125,7 @@ pub async fn get_cursor_usage(
 
 #[tauri::command]
 pub async fn refresh_cursor_usage(state: State<'_, AppState>) -> Result<(), String> {
-    adapters::cursor::sync_if_due(&state.pool, std::time::Duration::from_secs(30)).await
+    adapters::cursor::manual_sync_if_due(&state.pool, std::time::Duration::from_secs(30)).await
 }
 
 #[derive(Serialize)]

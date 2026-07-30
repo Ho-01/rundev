@@ -2,6 +2,7 @@
 
 ## 제품
 
+- [해결하려는 문제와 목표](product/problem-and-goal.md)
 - [제품 비전](product/vision.md)
 - [로드맵](product/roadmap.md)
 - [개인정보 원칙](product/privacy.md)

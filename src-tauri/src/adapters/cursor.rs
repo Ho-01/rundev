@@ -273,10 +273,25 @@ pub async fn sync(pool: &SqlitePool) -> Result<(), String> {
 }
 
 pub async fn sync_if_due(pool: &SqlitePool, minimum_interval: Duration) -> Result<(), String> {
+    sync_with_policy(pool, minimum_interval, true).await
+}
+
+pub async fn manual_sync_if_due(
+    pool: &SqlitePool,
+    minimum_interval: Duration,
+) -> Result<(), String> {
+    sync_with_policy(pool, minimum_interval, false).await
+}
+
+async fn sync_with_policy(
+    pool: &SqlitePool,
+    minimum_interval: Duration,
+    require_automatic_permission: bool,
+) -> Result<(), String> {
     if !is_enabled(pool).await? {
         return Ok(());
     }
-    if !automatic_sync_allowed(pool).await? {
+    if require_automatic_permission && !automatic_sync_allowed(pool).await? {
         return Ok(());
     }
     {
@@ -440,7 +455,7 @@ pub async fn refresh_codex_and_cursor_on_open(pool: SqlitePool) {
                 Ok(())
             }
         },
-        async move { sync_if_due(&cursor_pool, Duration::from_secs(60)).await }
+        async move { manual_sync_if_due(&cursor_pool, Duration::from_secs(60)).await }
     );
 }
 
@@ -617,10 +632,7 @@ impl ClientHandle {
                     })),
                 )
                 .await?;
-            let events = payload
-                .get("usageEventsDisplay")
-                .and_then(Value::as_array)
-                .ok_or(CursorError::UnsupportedSchema)?;
+            let events = usage_events_page(&payload)?;
             let page_len = events.len();
             all_events.extend(events.iter().cloned());
             let total = integer(payload.get("totalUsageEventsCount"))
@@ -694,6 +706,16 @@ impl ClientHandle {
         }
         serde_json::from_slice(&bytes).map_err(|_| CursorError::UnsupportedSchema)
     }
+}
+
+fn usage_events_page(payload: &Value) -> Result<&[Value], CursorError> {
+    if let Some(events) = payload.get("usageEventsDisplay").and_then(Value::as_array) {
+        return Ok(events);
+    }
+    if payload.as_object().is_some_and(serde_json::Map::is_empty) {
+        return Ok(&[]);
+    }
+    Err(CursorError::UnsupportedSchema)
 }
 
 fn cookie_value(token: &SecretToken) -> Result<String, CursorError> {
@@ -1079,6 +1101,15 @@ mod tests {
         assert_eq!(snapshot.limit_requests, Some(1250.0));
         assert_eq!(snapshot.today_microusd, None);
         assert_eq!(snapshot.total_tokens, Some(0));
+    }
+
+    #[test]
+    fn treats_empty_usage_event_response_as_zero_events() {
+        assert!(usage_events_page(&json!({})).unwrap().is_empty());
+        assert!(matches!(
+            usage_events_page(&json!({ "unexpected": [] })),
+            Err(CursorError::UnsupportedSchema)
+        ));
     }
 
     #[test]
