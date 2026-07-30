@@ -1,5 +1,5 @@
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
-use chrono::{DateTime, Local, TimeZone, Utc};
+use chrono::{DateTime, Datelike, Local, TimeZone, Utc};
 use reqwest::{
     header::{HeaderMap, HeaderValue, ACCEPT, CONTENT_TYPE, COOKIE, ORIGIN, USER_AGENT},
     redirect::Policy,
@@ -58,6 +58,7 @@ pub struct UsageView {
     pub api_percent: Option<f64>,
     pub today_microusd: Option<i64>,
     pub total_tokens: Option<i64>,
+    pub week_tokens: Option<i64>,
     pub cycle_ends_at: Option<String>,
     pub last_synced_at: Option<String>,
     pub error_code: Option<String>,
@@ -391,7 +392,7 @@ pub async fn get_usage(pool: &SqlitePool) -> Result<UsageView, String> {
     .fetch_optional(pool)
     .await
     .map_err(|error| error.to_string())?;
-    let snapshot = if let Some(key) = account_key {
+    let snapshot = if let Some(key) = account_key.as_ref() {
         sqlx::query(
             "SELECT used_microusd, limit_microusd, remaining_microusd,
                     used_requests, limit_requests, remaining_requests, today_requests,
@@ -404,6 +405,35 @@ pub async fn get_usage(pool: &SqlitePool) -> Result<UsageView, String> {
         .fetch_optional(pool)
         .await
         .map_err(|error| error.to_string())?
+    } else {
+        None
+    };
+    let week_tokens = if let Some(key) = account_key.as_ref() {
+        let today = Local::now().date_naive();
+        let week_started_at =
+            today - chrono::Duration::days(i64::from(today.weekday().num_days_from_monday()));
+        Some(
+            sqlx::query_scalar(
+                "SELECT COALESCE(SUM(total_tokens), 0)
+                 FROM (
+                   SELECT total_tokens,
+                          ROW_NUMBER() OVER (
+                            PARTITION BY date(observed_at, 'localtime')
+                            ORDER BY observed_at DESC
+                          ) AS row_number
+                   FROM cursor_usage_snapshots
+                   WHERE account_key = ?
+                     AND date(observed_at, 'localtime') BETWEEN ? AND ?
+                 )
+                 WHERE row_number = 1",
+            )
+            .bind(key)
+            .bind(week_started_at.to_string())
+            .bind(today.to_string())
+            .fetch_one(pool)
+            .await
+            .map_err(|error| error.to_string())?,
+        )
     } else {
         None
     };
@@ -438,6 +468,7 @@ pub async fn get_usage(pool: &SqlitePool) -> Result<UsageView, String> {
             .map(|value| value as f64 / 100.0),
         today_microusd: snapshot.as_ref().and_then(|row| row.try_get(9).ok()),
         total_tokens: snapshot.as_ref().and_then(|row| row.try_get(10).ok()),
+        week_tokens,
         cycle_ends_at: snapshot.as_ref().and_then(|row| row.try_get(11).ok()),
         last_synced_at,
         error_code,
@@ -475,6 +506,7 @@ fn disconnected_view() -> UsageView {
         api_percent: None,
         today_microusd: None,
         total_tokens: None,
+        week_tokens: None,
         cycle_ends_at: None,
         last_synced_at: None,
         error_code: None,

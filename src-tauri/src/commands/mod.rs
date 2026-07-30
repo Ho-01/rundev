@@ -1,5 +1,5 @@
 use crate::{activity, adapters, database::AppState, host_metrics, keyboard, tray, whip};
-use chrono::{DateTime, Duration, Local, Utc};
+use chrono::{DateTime, Datelike, Duration, Local, NaiveDate, Utc};
 use serde::Serialize;
 use std::collections::HashMap;
 use tauri::{AppHandle, State};
@@ -50,6 +50,7 @@ pub struct CharacterState {
 pub struct AiUsageToday {
     provider: String,
     total_tokens: Option<i64>,
+    week_tokens: Option<i64>,
     source: Option<String>,
     last_synced_at: Option<String>,
     status: String,
@@ -81,6 +82,7 @@ pub struct ClaudeConnectionPreview {
 pub struct ClaudeUsageToday {
     provider: String,
     total_tokens: i64,
+    week_tokens: i64,
     input_tokens: i64,
     output_tokens: i64,
     cached_tokens: i64,
@@ -226,7 +228,8 @@ fn is_supported_runner(runner_id: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{activity_intensity, is_supported_runner};
+    use super::{activity_intensity, is_supported_runner, week_start};
+    use chrono::NaiveDate;
 
     #[test]
     fn accepts_only_packaged_runner_ids() {
@@ -247,6 +250,22 @@ mod tests {
         assert_eq!(activity_intensity(3_600), 3);
         assert_eq!(activity_intensity(7_200), 4);
     }
+
+    #[test]
+    fn starts_usage_week_on_monday() {
+        assert_eq!(
+            week_start(NaiveDate::from_ymd_opt(2026, 7, 30).unwrap()),
+            NaiveDate::from_ymd_opt(2026, 7, 27).unwrap()
+        );
+        assert_eq!(
+            week_start(NaiveDate::from_ymd_opt(2026, 7, 27).unwrap()),
+            NaiveDate::from_ymd_opt(2026, 7, 27).unwrap()
+        );
+    }
+}
+
+fn week_start(date: NaiveDate) -> NaiveDate {
+    date - Duration::days(i64::from(date.weekday().num_days_from_monday()))
 }
 
 #[tauri::command]
@@ -420,6 +439,7 @@ pub async fn get_ai_usage_today(state: State<'_, AppState>) -> Result<AiUsageTod
         return Ok(AiUsageToday {
             provider: "codex".to_string(),
             total_tokens: None,
+            week_tokens: None,
             source: None,
             last_synced_at: None,
             status: "disconnected".to_string(),
@@ -431,7 +451,9 @@ pub async fn get_ai_usage_today(state: State<'_, AppState>) -> Result<AiUsageTod
         });
     }
 
-    let date = Local::now().date_naive().to_string();
+    let today = Local::now().date_naive();
+    let date = today.to_string();
+    let week_started_at = week_start(today).to_string();
     let snapshot: Option<(i64, String)> = sqlx::query_as(
         "SELECT total_tokens, source
          FROM ai_usage_snapshots
@@ -461,6 +483,25 @@ pub async fn get_ai_usage_today(state: State<'_, AppState>) -> Result<AiUsageTod
     .fetch_optional(&state.pool)
     .await
     .map_err(|error| error.to_string())?;
+    let week_tokens: i64 = sqlx::query_scalar(
+        "SELECT COALESCE(SUM(total_tokens), 0)
+         FROM (
+           SELECT total_tokens,
+                  ROW_NUMBER() OVER (
+                    PARTITION BY bucket_started_at ORDER BY observed_at DESC
+                  ) AS row_number
+           FROM ai_usage_snapshots
+           WHERE provider = 'codex'
+             AND scope = 'account-day'
+             AND bucket_started_at BETWEEN ? AND ?
+         )
+         WHERE row_number = 1",
+    )
+    .bind(&week_started_at)
+    .bind(&date)
+    .fetch_one(&state.pool)
+    .await
+    .map_err(|error| error.to_string())?;
 
     let (last_synced_at, error) = adapter.unwrap_or((None, None));
     let status = if error.is_some() {
@@ -486,6 +527,7 @@ pub async fn get_ai_usage_today(state: State<'_, AppState>) -> Result<AiUsageTod
     Ok(AiUsageToday {
         provider: "codex".to_string(),
         total_tokens: snapshot.as_ref().map(|row| row.0),
+        week_tokens: Some(week_tokens),
         source: snapshot.map(|row| row.1),
         last_synced_at,
         status: status.to_string(),
@@ -596,6 +638,7 @@ pub async fn get_claude_usage_today(
         return Ok(ClaudeUsageToday {
             provider: "claude".to_string(),
             total_tokens: 0,
+            week_tokens: 0,
             input_tokens: 0,
             output_tokens: 0,
             cached_tokens: 0,
@@ -607,7 +650,9 @@ pub async fn get_claude_usage_today(
         });
     }
 
-    let date = Local::now().date_naive().to_string();
+    let today = Local::now().date_naive();
+    let date = today.to_string();
+    let week_started_at = week_start(today).to_string();
     let totals: (i64, i64, i64, i64, i64) = sqlx::query_as(
         "SELECT
             COALESCE(SUM(total_tokens), 0),
@@ -618,6 +663,17 @@ pub async fn get_claude_usage_today(
          FROM ai_usage_events
          WHERE provider = 'claude' AND date(occurred_at, 'localtime') = ?",
     )
+    .bind(&date)
+    .fetch_one(&state.pool)
+    .await
+    .map_err(|error| error.to_string())?;
+    let week_tokens: i64 = sqlx::query_scalar(
+        "SELECT COALESCE(SUM(total_tokens), 0)
+         FROM ai_usage_events
+         WHERE provider = 'claude'
+           AND date(occurred_at, 'localtime') BETWEEN ? AND ?",
+    )
+    .bind(&week_started_at)
     .bind(&date)
     .fetch_one(&state.pool)
     .await
@@ -652,6 +708,7 @@ pub async fn get_claude_usage_today(
     Ok(ClaudeUsageToday {
         provider: "claude".to_string(),
         total_tokens: totals.0,
+        week_tokens,
         input_tokens: totals.1,
         output_tokens: totals.2,
         cached_tokens: totals.3,

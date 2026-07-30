@@ -104,14 +104,33 @@ function formatSyncTime(value: string | null | undefined) {
   }).format(new Date(value));
 }
 
-function formatUsageDate(value: string | null | undefined) {
-  if (!value) return "";
-  const [, month, day] = value.split("-");
-  return `${Number(month)}/${Number(day)}`;
-}
-
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return <h2 className="section-title">{children}</h2>;
+}
+
+function ProviderInlineDetails({
+  rows,
+  error,
+  children
+}: {
+  rows: Array<{ label: string; value: React.ReactNode }>;
+  error?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="provider-inline-detail">
+      <dl>
+        {rows.map((row) => (
+          <div key={row.label}>
+            <dt>{row.label}</dt>
+            <dd>{row.value}</dd>
+          </div>
+        ))}
+      </dl>
+      {error && <p className="provider-inline-error">{error}</p>}
+      <div className="provider-inline-actions">{children}</div>
+    </div>
+  );
 }
 
 function Meter({ value }: { value: number }) {
@@ -522,11 +541,13 @@ export function App() {
   const focusRewardProgress = ((summary?.activeSeconds ?? 0) % 1_800) / 18;
   const focusRewardRemaining =
     1_800 - ((summary?.activeSeconds ?? 0) % 1_800);
+  const focusRewardCount = Math.floor((summary?.activeSeconds ?? 0) / 1_800);
   const keyboardProgress = ((keyboard?.pressCount ?? 0) % 2_000) / 20;
   const keyboardRemaining = Math.max(
     0,
     (keyboard?.nextRewardAt ?? 2_000) - (keyboard?.pressCount ?? 0)
   );
+  const keyboardRewardCount = Math.floor((keyboard?.pressCount ?? 0) / 2_000);
   const hasUsageDetails =
     aiUsage?.status !== "disconnected" ||
     claudeUsage?.status !== "disconnected" ||
@@ -542,7 +563,7 @@ export function App() {
       ref={shellRef}
       className={`popover-shell${hasUsageDetails ? " dense" : ""}`}
     >
-      <WhipCrackOverlay ref={whipCrackRef} width={392} height={480} />
+      <WhipCrackOverlay ref={whipCrackRef} width={360} height={480} />
       <div className="popover-main">
       <header className="runner-header">
         <button
@@ -596,10 +617,6 @@ export function App() {
           </div>
           <strong>{formatDuration(summary?.activeSeconds ?? 0)}</strong>
         </div>
-        <div className="keyboard-progress focus-reward">
-          <Meter value={focusRewardProgress} />
-          <span>다음 +10 XP까지 {formatRemainingMinutes(focusRewardRemaining)}</span>
-        </div>
         <details className="focus-apps">
           <summary>
             <span>마지막으로 본 도구</span>
@@ -619,6 +636,19 @@ export function App() {
             )}
           </div>
         </details>
+        <div className="reward-cycle-summary">
+          <span className="reward-rule">
+            <BadgeCheck size={11} />
+            30분마다 <b>+10 XP</b>
+          </span>
+          <strong>오늘 {focusRewardCount}회 달성</strong>
+        </div>
+        <div className="keyboard-progress focus-reward">
+          <span>
+            {focusRewardCount + 1}회차 · {formatRemainingMinutes(focusRewardRemaining)} 남음
+          </span>
+          <Meter value={focusRewardProgress} />
+        </div>
         <div className="keyboard-stat">
           <div>
             <Keyboard size={14} />
@@ -645,12 +675,21 @@ export function App() {
             <span>키보드 측정을 준비하고 있습니다.</span>
           </div>
         ) : (
-          <div className="keyboard-progress">
-            <Meter value={keyboardProgress} />
-            <span>
-              다음 +10 XP까지 {formatTokens(keyboardRemaining)}회
-            </span>
-          </div>
+          <>
+            <div className="reward-cycle-summary keyboard-reward-summary">
+              <span className="reward-rule">
+                <BadgeCheck size={11} />
+                2,000회마다 <b>+10 XP</b>
+              </span>
+              <strong>오늘 {keyboardRewardCount}회 달성</strong>
+            </div>
+            <div className="keyboard-progress">
+              <span>
+                {keyboardRewardCount + 1}회차 · {formatTokens(keyboardRemaining)}회 남음
+              </span>
+              <Meter value={keyboardProgress} />
+            </div>
+          </>
         )}
       </section>
 
@@ -658,180 +697,246 @@ export function App() {
 
       <section className="info-section compact">
         <SectionTitle>AI 사용량</SectionTitle>
-        <div className="provider-row">
-          <span className="provider-icon">
-            <img className="openai-icon" src={openAiIcon} alt="" aria-hidden="true" />
-          </span>
-          <div>
+        <details className="provider-details">
+          <summary className="provider-summary-row">
+            <span className="provider-icon">
+              <img className="openai-icon" src={openAiIcon} alt="" aria-hidden="true" />
+            </span>
             <strong>Codex</strong>
-            <span>
-              {aiUsage?.status === "disconnected"
-                ? "연동되지 않음"
-                : aiUsage?.status === "error"
-                ? "연결 확인 필요"
-                : aiUsage?.status === "delayed"
-                ? `${aiUsage.accountLabel ?? "Codex 계정"} · 집계 지연`
-                : `${aiUsage?.accountLabel ?? "Codex 계정"} · ${formatSyncTime(aiUsage?.lastSyncedAt)}`}
+            <div className="provider-summary-value">
+              <span>오늘의 토큰 사용량</span>
+              <b className={aiUsage?.status === "error" ? "needs-attention" : ""}>
+                {aiUsage?.status === "disconnected"
+                  ? "연동하기"
+                  : aiUsage?.status === "error"
+                  ? "확인 필요"
+                  : aiUsage?.status === "delayed"
+                  ? "집계 지연"
+                  : aiUsage?.totalTokens == null
+                  ? "—"
+                  : formatCompactTokens(aiUsage.totalTokens)}
+              </b>
+            </div>
+          </summary>
+          <ProviderInlineDetails
+            rows={[
+              {
+                label: "상태",
+                value:
+                  aiUsage?.status === "disconnected"
+                    ? "연동되지 않음"
+                    : aiUsage?.status === "error"
+                    ? "연결 확인 필요"
+                    : aiUsage?.status === "delayed"
+                    ? "오늘 집계 지연"
+                    : "정상"
+              },
+              {
+                label: "오늘의 토큰 사용량",
+                value: aiUsage?.totalTokens == null ? "—" : formatTokens(aiUsage.totalTokens)
+              },
+              {
+                label: "이번 주 토큰 사용량",
+                value: aiUsage?.weekTokens == null ? "—" : formatTokens(aiUsage.weekTokens)
+              },
+              { label: "계정", value: aiUsage?.accountLabel ?? "확인되지 않음" },
+              { label: "마지막 갱신", value: formatSyncTime(aiUsage?.lastSyncedAt) },
+              { label: "출처", value: aiUsage?.source ? "Codex 계정" : "—" }
+            ]}
+            error={
+              aiUsage?.error
+                ? "Codex 로그인 또는 설치 상태를 확인해 주세요."
+                : previewError
+            }
+          >
+            {aiUsage?.status === "disconnected" ? (
+              <button
+                type="button"
+                disabled={loading || previewLoading}
+                onClick={() => void openCodexConnection()}
+              >
+                {previewLoading ? "확인 중" : "연동하기"}
+              </button>
+            ) : (
+              <button type="button" disabled={loading} onClick={() => void disconnectCodex()}>
+                연동 해제
+              </button>
+            )}
+          </ProviderInlineDetails>
+        </details>
+
+        <details className="provider-details">
+          <summary className="provider-summary-row">
+            <span className="provider-icon">
+              <img src={claudeIcon} alt="" aria-hidden="true" />
             </span>
-          </div>
-          {aiUsage?.status === "disconnected" ? (
-            <button
-              className="connect-button"
-              type="button"
-              onClick={() => void openCodexConnection()}
-              disabled={loading || previewLoading}
-            >
-              {previewLoading ? "확인 중" : "연동"}
-            </button>
-          ) : (
-            <>
-              <span className="provider-token-label">오늘의 토큰 사용량</span>
-              <b>{aiUsage?.totalTokens == null ? "—" : formatTokens(aiUsage.totalTokens)}</b>
-            </>
-          )}
-        </div>
-        {aiUsage?.status !== "disconnected" && (
-          <div className="mini-stats">
-            <span>
-              {aiUsage?.status === "delayed"
-                ? `오늘 집계 대기 중 · 최신 ${formatUsageDate(aiUsage.latestAvailableDate)}`
-                : aiUsage?.totalTokens == null
-                ? "오늘 데이터 없음"
-                : "오늘 총 토큰"}
-            </span>
-            {aiUsage?.source && <span>출처 <b>Codex 계정</b></span>}
-            <button
-              className="disconnect-button"
-              type="button"
-              onClick={() => void disconnectCodex()}
-              disabled={loading}
-            >
-              연동 해제
-            </button>
-          </div>
-        )}
-        {aiUsage?.error && (
-          <p className="adapter-error" title={aiUsage.error}>
-            Codex 로그인 또는 설치 상태를 확인해 주세요.
-          </p>
-        )}
-        <div className="provider-row">
-          <span className="provider-icon">
-            <img src={claudeIcon} alt="" aria-hidden="true" />
-          </span>
-          <div>
             <strong>Claude Code</strong>
-            <span>
-              {claudeUsage?.status === "disconnected"
-                ? "연동되지 않음"
-                : claudeUsage?.status === "waiting"
-                ? "첫 사용량 대기 중"
-                : claudeUsage?.status === "error"
-                ? "로컬 수집기 확인 필요"
-                : `로컬 텔레메트리 · ${formatSyncTime(claudeUsage?.lastReceivedAt)}`}
-            </span>
-          </div>
-          {claudeUsage?.status === "disconnected" ? (
-            <button
-              className="connect-button"
-              type="button"
-              onClick={() => void openClaudeConnection()}
-              disabled={loading || previewLoading}
-            >
-              {previewLoading ? "확인 중" : "연동"}
-            </button>
-          ) : (
-            <>
-              <span className="provider-token-label">오늘의 토큰 사용량</span>
-              <b title={formatTokens(claudeUsage?.totalTokens ?? 0)}>
-                {formatCompactTokens(claudeUsage?.totalTokens ?? 0)}
+            <div className="provider-summary-value">
+              <span>오늘의 토큰 사용량</span>
+              <b className={claudeUsage?.status === "error" ? "needs-attention" : ""}>
+                {claudeUsage?.status === "disconnected"
+                  ? "연동하기"
+                  : claudeUsage?.status === "waiting"
+                  ? "대기 중"
+                  : claudeUsage?.status === "error"
+                  ? "확인 필요"
+                  : formatCompactTokens(claudeUsage?.totalTokens ?? 0)}
               </b>
-            </>
-          )}
-        </div>
-        {claudeUsage?.status !== "disconnected" && (
-          <div className="mini-stats">
-            <span>최근 활동 세션 <b>{claudeUsage?.sessionCount ?? 0}개</b></span>
-            <button
-              className="disconnect-button"
-              type="button"
-              onClick={() => void disconnectClaude()}
-              disabled={loading}
-            >
-              연동 해제
-            </button>
-          </div>
-        )}
-        {claudeUsage?.error && (
-          <p className="adapter-error" title={claudeUsage.error}>
-            RunDev를 재시작하거나 로컬 포트 상태를 확인해 주세요.
-          </p>
-        )}
-        <div className="provider-row">
-          <span className="provider-icon">
-            <img src={cursorIcon} alt="" aria-hidden="true" />
-          </span>
-          <div>
+            </div>
+          </summary>
+          <ProviderInlineDetails
+            rows={[
+              {
+                label: "상태",
+                value:
+                  claudeUsage?.status === "disconnected"
+                    ? "연동되지 않음"
+                    : claudeUsage?.status === "waiting"
+                    ? "첫 사용량 대기 중"
+                    : claudeUsage?.status === "error"
+                    ? "로컬 수집기 확인 필요"
+                    : "정상"
+              },
+              {
+                label: "오늘의 토큰 사용량",
+                value:
+                  claudeUsage?.status === "disconnected"
+                    ? "—"
+                    : formatTokens(claudeUsage?.totalTokens ?? 0)
+              },
+              {
+                label: "이번 주 토큰 사용량",
+                value:
+                  claudeUsage?.status === "disconnected"
+                    ? "—"
+                    : formatTokens(claudeUsage?.weekTokens ?? 0)
+              },
+              { label: "최근 활동 세션", value: `${claudeUsage?.sessionCount ?? 0}개` },
+              { label: "마지막 수신", value: formatSyncTime(claudeUsage?.lastReceivedAt) },
+              { label: "출처", value: "로컬 OpenTelemetry" }
+            ]}
+            error={
+              claudeUsage?.error
+                ? "RunDev를 재시작하거나 로컬 포트 상태를 확인해 주세요."
+                : previewError
+            }
+          >
+            {claudeUsage?.status === "disconnected" ? (
+              <button
+                type="button"
+                disabled={loading || previewLoading}
+                onClick={() => void openClaudeConnection()}
+              >
+                {previewLoading ? "확인 중" : "연동하기"}
+              </button>
+            ) : (
+              <button type="button" disabled={loading} onClick={() => void disconnectClaude()}>
+                연동 해제
+              </button>
+            )}
+          </ProviderInlineDetails>
+        </details>
+
+        <details className="provider-details">
+          <summary className="provider-summary-row">
+            <span className="provider-icon">
+              <img src={cursorIcon} alt="" aria-hidden="true" />
+            </span>
             <strong>Cursor</strong>
-            <span>
-              {cursorUsage?.status === "disconnected"
-                ? "연동되지 않음"
-                : cursorUsage?.status === "reauthRequired"
-                ? "Cursor에서 다시 로그인 필요"
-                : cursorUsage?.status === "rateLimited"
-                ? "요청 제한 · 잠시 후 재시도"
-                : cursorUsage?.status === "unsupportedSchema"
-                ? "사용량 형식 변경 감지"
-                : cursorUsage?.status === "stale"
-                ? `${cursorUsage.accountLabel ?? "Cursor 계정"} · 최근 데이터`
-                : `${cursorUsage?.accountLabel ?? "Cursor 계정"} · ${formatSyncTime(cursorUsage?.lastSyncedAt)}`}
-            </span>
-          </div>
-          {cursorUsage?.status === "disconnected" ? (
-            <button
-              className="connect-button"
-              type="button"
-              onClick={() => setCursorConsentOpen(true)}
-              disabled={loading || previewLoading}
-            >
-              연동
-            </button>
-          ) : (
-            <>
-              <span className="provider-token-label">오늘의 토큰 사용량</span>
-              <b title={formatTokens(cursorUsage?.totalTokens ?? 0)}>
-                {formatCompactTokens(cursorUsage?.totalTokens ?? 0)}
+            <div className="provider-summary-value">
+              <span>오늘의 토큰 사용량</span>
+              <b
+                className={
+                  cursorUsage?.status === "reauthRequired" ||
+                  cursorUsage?.status === "unsupportedSchema" ||
+                  cursorUsage?.status === "error"
+                    ? "needs-attention"
+                    : ""
+                }
+              >
+                {cursorUsage?.status === "disconnected"
+                  ? "연동하기"
+                  : cursorUsage?.status === "syncing"
+                  ? "동기화 중"
+                  : cursorUsage?.status === "rateLimited"
+                  ? "잠시 후"
+                  : cursorUsage?.status === "reauthRequired" ||
+                    cursorUsage?.status === "unsupportedSchema" ||
+                    cursorUsage?.status === "error"
+                  ? "확인 필요"
+                  : formatCompactTokens(cursorUsage?.totalTokens ?? 0)}
               </b>
-            </>
-          )}
-        </div>
-        {cursorUsage?.status !== "disconnected" && (
-          <div className="mini-stats">
-            <span>
-              요청 한도{" "}
-              <b>
-                {formatRequestUnits(cursorUsage?.usedRequests)}
-                {" / "}
-                {formatRequestUnits(cursorUsage?.limitRequests)}
-              </b>
-            </span>
-            <span>오늘 요청량 <b>{formatRequestUnits(cursorUsage?.todayRequests)}</b></span>
-            <button
-              className="disconnect-button"
-              type="button"
-              onClick={() => void disconnectCursor()}
-              disabled={loading}
-            >
-              연동 해제
-            </button>
-          </div>
-        )}
-        {cursorUsage?.errorCode && (
-          <p className="adapter-error">
-            Cursor 사용량을 갱신하지 못했습니다. 마지막 정상 데이터를 표시합니다.
-          </p>
-        )}
-        {previewError && <p className="adapter-error">{previewError}</p>}
+            </div>
+          </summary>
+          <ProviderInlineDetails
+            rows={[
+              {
+                label: "상태",
+                value:
+                  cursorUsage?.status === "disconnected"
+                    ? "연동되지 않음"
+                    : cursorUsage?.status === "reauthRequired"
+                    ? "Cursor에서 다시 로그인 필요"
+                    : cursorUsage?.status === "rateLimited"
+                    ? "요청 제한 · 잠시 후 재시도"
+                    : cursorUsage?.status === "unsupportedSchema"
+                    ? "사용량 형식 확인 필요"
+                    : cursorUsage?.status === "stale"
+                    ? "마지막 정상 데이터"
+                    : cursorUsage?.status === "syncing"
+                    ? "동기화 중"
+                    : cursorUsage?.status === "error"
+                    ? "동기화 오류"
+                    : "정상"
+              },
+              {
+                label: "오늘의 토큰 사용량",
+                value:
+                  cursorUsage?.status === "disconnected"
+                    ? "—"
+                    : formatTokens(cursorUsage?.totalTokens ?? 0)
+              },
+              {
+                label: "이번 주 토큰 사용량",
+                value:
+                  cursorUsage?.status === "disconnected"
+                    ? "—"
+                    : formatTokens(cursorUsage?.weekTokens ?? 0)
+              },
+              {
+                label: "요청 한도",
+                value: `${formatRequestUnits(cursorUsage?.usedRequests)} / ${formatRequestUnits(
+                  cursorUsage?.limitRequests
+                )}`
+              },
+              {
+                label: "오늘 요청량",
+                value: formatRequestUnits(cursorUsage?.todayRequests)
+              },
+              { label: "마지막 갱신", value: formatSyncTime(cursorUsage?.lastSyncedAt) },
+              { label: "출처", value: "Cursor Dashboard" }
+            ]}
+            error={
+              cursorUsage?.errorCode
+                ? "Cursor 사용량을 갱신하지 못했습니다. 화면을 다시 열어 재시도할 수 있습니다."
+                : previewError
+            }
+          >
+            {cursorUsage?.status === "disconnected" ? (
+              <button
+                type="button"
+                disabled={loading || previewLoading}
+                onClick={() => setCursorConsentOpen(true)}
+              >
+                연동하기
+              </button>
+            ) : (
+              <button type="button" disabled={loading} onClick={() => void disconnectCursor()}>
+                연동 해제
+              </button>
+            )}
+          </ProviderInlineDetails>
+        </details>
       </section>
 
       <div className="divider" />

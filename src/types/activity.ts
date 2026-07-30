@@ -32,6 +32,7 @@ export type CharacterState = {
 export type AiUsageToday = {
   provider: string;
   totalTokens: number | null;
+  weekTokens: number | null;
   source: string | null;
   lastSyncedAt: string | null;
   status: "disconnected" | "syncing" | "connected" | "delayed" | "error";
@@ -57,6 +58,7 @@ export type ClaudeConnectionPreview = {
 export type ClaudeUsageToday = {
   provider: string;
   totalTokens: number;
+  weekTokens: number;
   inputTokens: number;
   outputTokens: number;
   cachedTokens: number;
@@ -95,6 +97,7 @@ export type CursorUsage = {
   apiPercent: number | null;
   todayMicrousd: number | null;
   totalTokens: number | null;
+  weekTokens: number | null;
   cycleEndsAt: string | null;
   lastSyncedAt: string | null;
   errorCode: string | null;

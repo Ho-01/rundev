@@ -67,6 +67,7 @@ const previewCharacter: CharacterState = {
 const previewAiUsage: AiUsageToday = {
   provider: "codex",
   totalTokens: null,
+  weekTokens: null,
   source: null,
   lastSyncedAt: null,
   status: "disconnected",
@@ -80,6 +81,7 @@ const previewAiUsage: AiUsageToday = {
 const previewClaudeUsage: ClaudeUsageToday = {
   provider: "claude",
   totalTokens: 0,
+  weekTokens: 0,
   inputTokens: 0,
   outputTokens: 0,
   cachedTokens: 0,
@@ -105,6 +107,7 @@ const previewCursorUsage: CursorUsage = {
   apiPercent: null,
   todayMicrousd: null,
   totalTokens: null,
+  weekTokens: null,
   cycleEndsAt: null,
   lastSyncedAt: null,
   errorCode: null

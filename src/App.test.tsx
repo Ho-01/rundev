@@ -1,17 +1,30 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { App } from "./App";
 
 describe("App", () => {
   it("renders the starter dashboard", async () => {
     render(<App />);
+    expect(document.querySelector(".whip-crack-canvas")).toHaveAttribute("width", "360");
     expect(await screen.findByText("RunDev")).toBeInTheDocument();
     expect(await screen.findByText("새싹 개발자")).toBeInTheDocument();
     expect(await screen.findByText("개발 활동")).toBeInTheDocument();
     expect(await screen.findByText("개발 도구 노려본 시간")).toBeInTheDocument();
     expect(await screen.findByText("마지막으로 본 도구")).toBeInTheDocument();
+    expect(await screen.findByText("30분마다")).toBeInTheDocument();
+    expect(await screen.findByText("2,000회마다")).toBeInTheDocument();
+    expect(await screen.findAllByText(/^오늘 \d+회 달성$/)).toHaveLength(2);
     expect(await screen.findByText("Claude Code")).toBeInTheDocument();
     expect(await screen.findByText("Cursor")).toBeInTheDocument();
+    const claudeSummary = screen.getByText("Claude Code").closest("summary");
+    expect(claudeSummary).not.toBeNull();
+    const claudeDetails = claudeSummary!.parentElement!;
+    expect(within(claudeDetails).getByText("최근 활동 세션")).not.toBeVisible();
+    fireEvent.click(claudeSummary!);
+    expect(within(claudeDetails).getByText("최근 활동 세션")).toBeVisible();
+    expect(within(claudeDetails).getByText("이번 주 토큰 사용량")).toBeVisible();
+    fireEvent.click(claudeSummary!);
+    expect(within(claudeDetails).getByText("최근 활동 세션")).not.toBeVisible();
     expect(await screen.findByText("오늘 두드린 키보드")).toBeInTheDocument();
     expect(await screen.findByText("최근 20주 활동")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "RunDev 정보" }));
