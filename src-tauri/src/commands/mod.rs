@@ -170,6 +170,11 @@ pub fn get_system_stats(app: AppHandle) -> host_metrics::SystemStats {
 }
 
 #[tauri::command]
+pub fn set_system_panel_expanded(app: AppHandle, expanded: bool) -> Result<(), String> {
+    tray::set_system_panel_expanded(&app, expanded)
+}
+
+#[tauri::command]
 pub async fn get_whip_stats(state: State<'_, AppState>) -> Result<whip::WhipStats, String> {
     whip::today(&state.pool)
         .await

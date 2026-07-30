@@ -360,17 +360,30 @@ export async function getSystemStats() {
   if (!isTauri()) {
     return {
       cpuPercent: 12,
+      logicalCpuCount: 12,
       memoryPercent: 48,
+      memoryTotalBytes: 34_359_738_368,
+      memoryUsedBytes: 16_492_674_416,
+      memoryAvailableBytes: 17_867_063_952,
       batteryPercent: 76,
       batteryState: "discharging" as const,
       temperatureCelsius: 54,
+      temperatureMaxCelsius: 67,
       diskPercent: 61,
+      diskTotalBytes: 1_000_204_886_016,
+      diskUsedBytes: 610_124_980_470,
+      diskAvailableBytes: 390_079_905_546,
       networkDownBps: 120_000,
       networkUpBps: 18_000,
       sequence: 1
     };
   }
   return invoke<SystemStats>("get_system_stats");
+}
+
+export async function setSystemPanelExpanded(expanded: boolean) {
+  if (!isTauri()) return;
+  await invoke("set_system_panel_expanded", { expanded });
 }
 
 export async function subscribeSystemStats(

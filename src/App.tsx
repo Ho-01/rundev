@@ -28,6 +28,7 @@ import {
   WHIP_COOLDOWN_MS,
   subscribeFocusActivity,
   subscribeKeyboardActivity,
+  setSystemPanelExpanded as resizeSystemPanel,
   subscribeSystemStats,
   subscribeUsageRefreshed
 } from "./services/rundev";
@@ -249,6 +250,9 @@ export function App() {
   const [whipSaveError, setWhipSaveError] = useState(false);
   const [lastWhipAt, setLastWhipAt] = useState(0);
   const [whipVariant, setWhipVariant] = useState<"a" | "b">("a");
+  const [systemPanelExpanded, setSystemPanelExpanded] = useState(
+    () => localStorage.getItem("rundev.systemPanelExpanded") === "true"
+  );
   const whipCrackRef = useRef<WhipCrackApi>(null);
   const shellRef = useRef<HTMLElement>(null);
   const freezeRunner = new URLSearchParams(window.location.search).has("freezeRunner");
@@ -520,6 +524,10 @@ export function App() {
   }, [setSystemStats]);
 
   useEffect(() => {
+    void resizeSystemPanel(systemPanelExpanded);
+  }, []);
+
+  useEffect(() => {
     let unlisten: (() => void) | undefined;
     void subscribeUsageRefreshed(() => {
       void refresh();
@@ -558,12 +566,23 @@ export function App() {
     return <LevelShowcase />;
   }
 
+  function toggleSystemPanel() {
+    const expanded = !systemPanelExpanded;
+    setSystemPanelExpanded(expanded);
+    localStorage.setItem("rundev.systemPanelExpanded", String(expanded));
+    void resizeSystemPanel(expanded);
+  }
+
   return (
     <main
       ref={shellRef}
       className={`popover-shell${hasUsageDetails ? " dense" : ""}`}
     >
-      <WhipCrackOverlay ref={whipCrackRef} width={360} height={480} />
+      <WhipCrackOverlay
+        ref={whipCrackRef}
+        width={systemPanelExpanded ? 512 : 340}
+        height={480}
+      />
       <div className="popover-main">
       <header className="runner-header">
         <button
@@ -979,7 +998,11 @@ export function App() {
       {loading && <div className="loading-line" />}
       {error && <p className="error-message">{error}</p>}
       </div>
-      <SystemStatusStrip stats={systemStats} />
+      <SystemStatusStrip
+        stats={systemStats}
+        expanded={systemPanelExpanded}
+        onToggle={toggleSystemPanel}
+      />
       {infoDialogOpen && (
         <div className="dialog-backdrop" role="presentation">
           <section

@@ -4,8 +4,9 @@ import { App } from "./App";
 
 describe("App", () => {
   it("renders the starter dashboard", async () => {
+    localStorage.clear();
     render(<App />);
-    expect(document.querySelector(".whip-crack-canvas")).toHaveAttribute("width", "360");
+    expect(document.querySelector(".whip-crack-canvas")).toHaveAttribute("width", "340");
     expect(await screen.findByText("RunDev")).toBeInTheDocument();
     expect(await screen.findByText("새싹 개발자")).toBeInTheDocument();
     expect(await screen.findByText("개발 활동")).toBeInTheDocument();
@@ -16,6 +17,15 @@ describe("App", () => {
     expect(await screen.findAllByText(/^오늘 \d+회 달성$/)).toHaveLength(2);
     expect(await screen.findByText("Claude Code")).toBeInTheDocument();
     expect(await screen.findByText("Cursor")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "장치 상세 펼치기" }));
+    expect(screen.getByRole("button", { name: "장치 상세 접기" })).toHaveAttribute(
+      "aria-expanded",
+      "true"
+    );
+    expect(document.querySelector(".whip-crack-canvas")).toHaveAttribute("width", "512");
+    expect(screen.getByText("논리 코어")).toBeInTheDocument();
+    expect(screen.getByText("실행 후 최고")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "장치 상세 접기" }));
     const claudeSummary = screen.getByText("Claude Code").closest("summary");
     expect(claudeSummary).not.toBeNull();
     const claudeDetails = claudeSummary!.parentElement!;

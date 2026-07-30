@@ -17,11 +17,19 @@ const EVENT_NAME: &str = "system-stats-updated";
 #[serde(rename_all = "camelCase")]
 pub struct SystemStats {
     pub cpu_percent: Option<f32>,
+    pub logical_cpu_count: usize,
     pub memory_percent: f32,
+    pub memory_total_bytes: u64,
+    pub memory_used_bytes: u64,
+    pub memory_available_bytes: u64,
     pub temperature_celsius: Option<f32>,
+    pub temperature_max_celsius: Option<f32>,
     pub battery_percent: Option<f32>,
     pub battery_state: Option<String>,
     pub disk_percent: Option<f32>,
+    pub disk_total_bytes: Option<u64>,
+    pub disk_used_bytes: Option<u64>,
+    pub disk_available_bytes: Option<u64>,
     pub network_down_bps: Option<f64>,
     pub network_up_bps: Option<f64>,
     pub sequence: u64,
@@ -49,11 +57,19 @@ impl HostMetricsState {
 pub fn start(app: AppHandle) {
     let latest = Arc::new(RwLock::new(SystemStats {
         cpu_percent: None,
+        logical_cpu_count: 0,
         memory_percent: 0.0,
+        memory_total_bytes: 0,
+        memory_used_bytes: 0,
+        memory_available_bytes: 0,
         temperature_celsius: None,
+        temperature_max_celsius: None,
         battery_percent: None,
         battery_state: None,
         disk_percent: None,
+        disk_total_bytes: None,
+        disk_used_bytes: None,
+        disk_available_bytes: None,
         network_down_bps: None,
         network_up_bps: None,
         sequence: 0,
@@ -84,11 +100,19 @@ pub fn current_stats(app: &AppHandle) -> SystemStats {
         Some(state) => state.snapshot(),
         None => SystemStats {
             cpu_percent: None,
+            logical_cpu_count: 0,
             memory_percent: 0.0,
+            memory_total_bytes: 0,
+            memory_used_bytes: 0,
+            memory_available_bytes: 0,
             temperature_celsius: None,
+            temperature_max_celsius: None,
             battery_percent: None,
             battery_state: None,
             disk_percent: None,
+            disk_total_bytes: None,
+            disk_used_bytes: None,
+            disk_available_bytes: None,
             network_down_bps: None,
             network_up_bps: None,
             sequence: 0,
@@ -181,8 +205,9 @@ fn run_sampler(
         .unwrap_or_else(Instant::now);
     let mut network_ready = false;
     let mut sequence = 0_u64;
-    let mut disk_percent = read_disk_percent(&disks);
+    let mut disk = read_disk_snapshot(&disks);
     let mut temperature_celsius = read_temperature_celsius(&components);
+    let mut temperature_max_celsius = temperature_celsius;
     let mut cpu_warmed = false;
 
     // Prime CPU counters without publishing a misleading 0%.
@@ -210,13 +235,20 @@ fn run_sampler(
 
         if now.duration_since(last_disk) >= DISK_INTERVAL {
             disks.refresh(true);
-            disk_percent = read_disk_percent(&disks);
+            disk = read_disk_snapshot(&disks);
             last_disk = now;
         }
 
         if now.duration_since(last_temp) >= TEMP_INTERVAL {
             components.refresh(true);
             temperature_celsius = read_temperature_celsius(&components);
+            if let Some(temperature) = temperature_celsius {
+                temperature_max_celsius = Some(
+                    temperature_max_celsius
+                        .map(|current| current.max(temperature))
+                        .unwrap_or(temperature),
+                );
+            }
             last_temp = now;
         }
 
@@ -227,9 +259,12 @@ fn run_sampler(
             None
         };
 
-        let total_memory = system.total_memory().max(1) as f64;
+        let memory_total_bytes = system.total_memory();
+        let memory_used_bytes = system.used_memory();
+        let memory_available_bytes = system.available_memory();
+        let total_memory = memory_total_bytes.max(1) as f64;
         let memory_percent =
-            ((system.used_memory() as f64 / total_memory) * 100.0).clamp(0.0, 100.0) as f32;
+            ((memory_used_bytes as f64 / total_memory) * 100.0).clamp(0.0, 100.0) as f32;
 
         let (network_down_bps, network_up_bps) = if gap_reset || !network_ready {
             network_ready = true;
@@ -256,11 +291,19 @@ fn run_sampler(
         sequence = sequence.wrapping_add(1);
         let stats = SystemStats {
             cpu_percent,
+            logical_cpu_count: system.cpus().len(),
             memory_percent,
+            memory_total_bytes,
+            memory_used_bytes,
+            memory_available_bytes,
             temperature_celsius,
+            temperature_max_celsius,
             battery_percent: battery_snap.percent,
             battery_state: battery_snap.state,
-            disk_percent,
+            disk_percent: disk.as_ref().map(|snapshot| snapshot.percent),
+            disk_total_bytes: disk.as_ref().map(|snapshot| snapshot.total_bytes),
+            disk_used_bytes: disk.as_ref().map(|snapshot| snapshot.used_bytes),
+            disk_available_bytes: disk.as_ref().map(|snapshot| snapshot.available_bytes),
             network_down_bps,
             network_up_bps,
             sequence,
@@ -311,7 +354,15 @@ fn read_temperature_celsius(components: &Components) -> Option<f32> {
     cpu_temp.or(any_temp)
 }
 
-fn read_disk_percent(disks: &Disks) -> Option<f32> {
+#[derive(Clone)]
+struct DiskSnapshot {
+    percent: f32,
+    total_bytes: u64,
+    used_bytes: u64,
+    available_bytes: u64,
+}
+
+fn read_disk_snapshot(disks: &Disks) -> Option<DiskSnapshot> {
     let target = primary_mount_hint();
     let mut fallback = None;
 
@@ -321,14 +372,21 @@ fn read_disk_percent(disks: &Disks) -> Option<f32> {
         if total == 0 {
             continue;
         }
-        let used = total.saturating_sub(disk.available_space());
+        let available = disk.available_space();
+        let used = total.saturating_sub(available);
         let percent = ((used as f64 / total as f64) * 100.0).clamp(0.0, 100.0) as f32;
+        let snapshot = DiskSnapshot {
+            percent,
+            total_bytes: total,
+            used_bytes: used,
+            available_bytes: available,
+        };
 
         if mount_matches(mount, &target) {
-            return Some(percent);
+            return Some(snapshot);
         }
         if fallback.is_none() {
-            fallback = Some(percent);
+            fallback = Some(snapshot);
         }
     }
 

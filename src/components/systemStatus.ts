@@ -5,7 +5,7 @@ function clampPercent(value: number | null | undefined) {
   return Math.max(0, Math.min(100, value));
 }
 
-function formatRate(bps: number) {
+export function formatRate(bps: number) {
   if (bps < 1024) return `${bps.toFixed(0)} B/s`;
   if (bps < 1024 * 1024) return `${(bps / 1024).toFixed(1)} KB/s`;
   return `${(bps / (1024 * 1024)).toFixed(1)} MB/s`;

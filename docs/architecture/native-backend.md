@@ -76,6 +76,9 @@ Updater는 GitHub Releases의 `latest.json`을 endpoint로 사용한다. 공개�
 - `system-stats-updated` 이벤트와 `get_system_stats` 스냅샷 command를 제공한다
 - 자세한 범위는 ADR 0014를 본다
 
+상세 패널에는 논리 CPU 수, 메모리·주 저장 장치의 전체/사용/가용 용량과 실행 후
+최고 온도를 함께 제공한다. 수집 경계는 ADR 0014와 ADR 0017을 따른다.
+
 ### `whip`
 
 - 팝오버 헤더 캐릭터 클릭의 로컬 일별 횟수만 원자 UPSERT로 저장한다

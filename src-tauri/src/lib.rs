@@ -113,6 +113,7 @@ pub fn run() {
             commands::get_runner_selection,
             commands::set_runner_selection,
             commands::get_system_stats,
+            commands::set_system_panel_expanded,
             commands::get_whip_stats,
             commands::record_whip
         ])
