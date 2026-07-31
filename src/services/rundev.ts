@@ -259,6 +259,11 @@ export async function resetKeyboardPermissionAndRelaunch() {
   await relaunch();
 }
 
+export async function openDiagnosticsFolder() {
+  if (!isTauri()) return;
+  await invoke("open_diagnostics_folder");
+}
+
 export async function subscribeKeyboardActivity(
   onActivity: (activity: KeyboardActivityToday) => void
 ): Promise<UnlistenFn> {

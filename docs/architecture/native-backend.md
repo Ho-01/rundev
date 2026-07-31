@@ -40,6 +40,14 @@ Updater는 GitHub Releases의 `latest.json`을 endpoint로 사용한다. 공개�
 - 내부 오류를 현재는 문자열로 변환한다. 오류 종류가 늘어나면 안정적인 command
   error enum을 도입한다.
 
+### `diagnostics`
+
+- 앱 데이터 디렉터리의 `diagnostics/rundev-diagnostics.jsonl`에 명시적으로 허용한
+  진단 이벤트만 기록
+- 1 MiB 단위 회전과 현재 파일 포함 최근 3개 유지
+- 키 값, 입력 순서, 창 제목, 파일 경로, 프롬프트, 응답, 계정·인증정보 기록 금지
+- 자동 전송 없이 `open_diagnostics_folder` command로 사용자가 직접 폴더를 열어 공유
+
 ### `keyboard`
 
 - Windows Raw Input 메시지 창과 macOS listen-only event tap 관리
@@ -50,6 +58,7 @@ Updater는 GitHub Releases의 `latest.json`을 endpoint로 사용한다. 공개�
 - macOS Input Monitoring 권한 상태 및 설정 화면 연결
 - 앱 교체 후 권한 복구 시 TCC 등록과 `keyboard.macos.permission_prompted` 안내
   상태를 함께 초기화하고 재시작 뒤 권한을 다시 요청
+- macOS event tap 비활성화 이벤트를 감지해 tap을 다시 활성화
 
 ### `activity`
 

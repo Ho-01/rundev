@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { useDashboardStore } from "./store/dashboard";
 import {
+  openDiagnosticsFolder,
   previewClaudeConnection,
   previewCodexAccount,
   grantCursorUsageConsent,
@@ -453,6 +454,19 @@ export function App() {
         repairError instanceof Error ? repairError.message : String(repairError)
       );
       setPermissionRepairing(false);
+    }
+  }
+
+  async function showDiagnosticsFolder() {
+    setPermissionRepairError(null);
+    try {
+      await openDiagnosticsFolder();
+    } catch (diagnosticError) {
+      setPermissionRepairError(
+        diagnosticError instanceof Error
+          ? diagnosticError.message
+          : String(diagnosticError)
+      );
     }
   }
 
@@ -1071,6 +1085,9 @@ export function App() {
             {permissionRepairError && <p className="error-message">{permissionRepairError}</p>}
             {updateError && <p className="error-message">{updateError}</p>}
             <div className="dialog-actions">
+              <button type="button" onClick={() => void showDiagnosticsFolder()}>
+                진단 로그 폴더
+              </button>
               <button type="button" onClick={() => setInfoDialogOpen(false)}>닫기</button>
               <button
                 type="button"

@@ -31,6 +31,7 @@ ADR은 이미 내려진 중요한 기술 결정을 기록한다. 결정이 바�
 | [0015](0015-runner-whip-local-count.md) | 개발자 캐릭터 채찍질 횟수의 로컬 집계 | Accepted |
 | [0016](0016-cursor-dashboard-usage.md) | Cursor 비공식 Dashboard 사용량 연동 | Accepted |
 | [0017](0017-expandable-host-metrics-detail.md) | 장치 상태 요약과 상세 패널 분리 | Accepted |
+| [0018](0018-local-diagnostic-logs.md) | 제한된 로컬 진단 로그 | Accepted |
 
 ## 새 ADR 작성 형식
 

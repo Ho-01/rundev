@@ -1,4 +1,6 @@
-use crate::{activity, adapters, database::AppState, host_metrics, keyboard, tray, whip};
+use crate::{
+    activity, adapters, database::AppState, diagnostics, host_metrics, keyboard, tray, whip,
+};
 use chrono::{DateTime, Datelike, Duration, Local, NaiveDate, Utc};
 use serde::Serialize;
 use std::collections::HashMap;
@@ -160,10 +162,13 @@ pub fn open_keyboard_permission_settings() -> Result<(), String> {
 }
 
 #[tauri::command]
-pub async fn reset_keyboard_permission(
-    state: State<'_, AppState>,
-) -> Result<(), String> {
+pub async fn reset_keyboard_permission(state: State<'_, AppState>) -> Result<(), String> {
     keyboard::reset_permission(&state.pool).await
+}
+
+#[tauri::command]
+pub fn open_diagnostics_folder() -> Result<(), String> {
+    diagnostics::open_folder()
 }
 
 #[tauri::command]

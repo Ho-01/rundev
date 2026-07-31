@@ -2,6 +2,7 @@ mod activity;
 mod adapters;
 mod commands;
 mod database;
+mod diagnostics;
 mod host_metrics;
 mod keyboard;
 mod tray;
@@ -33,6 +34,7 @@ pub fn run() {
 
             let app_data_dir = app.path().app_data_dir()?;
             std::fs::create_dir_all(&app_data_dir)?;
+            diagnostics::init(&app_data_dir)?;
             let database_url = format!("sqlite://{}", app_data_dir.join("rundev.db").display());
             let pool = tauri::async_runtime::block_on(database::connect(&database_url))?;
             let selected_runner: Option<String> = tauri::async_runtime::block_on(
@@ -110,6 +112,7 @@ pub fn run() {
             commands::get_keyboard_activity_today,
             commands::open_keyboard_permission_settings,
             commands::reset_keyboard_permission,
+            commands::open_diagnostics_folder,
             commands::get_runner_selection,
             commands::set_runner_selection,
             commands::get_system_stats,

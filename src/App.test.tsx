@@ -40,6 +40,7 @@ describe("App", () => {
     expect(await screen.findByText("최근 20주 활동")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "RunDev 정보" }));
     expect(screen.getByRole("heading", { name: "RunDev 정보" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "진단 로그 폴더" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "개발자 변경" }));
     expect(screen.getByText("주황 고양이")).toBeInTheDocument();
     expect(screen.getByText("주황 새우")).toBeInTheDocument();

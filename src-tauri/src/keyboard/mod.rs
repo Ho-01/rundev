@@ -120,6 +120,8 @@ async fn process_events(
     let mut last_emitted = persisted;
     let mut ui_tick = tokio::time::interval(std::time::Duration::from_millis(250));
     let mut database_flush = tokio::time::interval(std::time::Duration::from_secs(5));
+    let mut first_event_recorded = false;
+    let mut first_persist_recorded = false;
 
     loop {
         tokio::select! {
@@ -139,6 +141,10 @@ async fn process_events(
                 }
                 match event {
                     Some(KeyEvent::Down(key)) if !is_modifier(key) && pressed.insert(key) => {
+                        if !first_event_recorded {
+                            first_event_recorded = true;
+                            crate::diagnostics::record("keyboard_first_event_processed", &[]);
+                        }
                         pending += 1;
                     }
                     Some(KeyEvent::Up(key)) => {
@@ -146,6 +152,10 @@ async fn process_events(
                     }
                     #[cfg(target_os = "macos")]
                     Some(KeyEvent::Press) => {
+                        if !first_event_recorded {
+                            first_event_recorded = true;
+                            crate::diagnostics::record("keyboard_first_event_processed", &[]);
+                        }
                         pending += 1;
                     }
                     Some(KeyEvent::Down(_)) => {}
@@ -180,6 +190,13 @@ async fn process_events(
                     tracing::warn!(%error, "Keyboard count persistence failed");
                 } else {
                     persisted += count;
+                    if !first_persist_recorded {
+                        first_persist_recorded = true;
+                        crate::diagnostics::record(
+                            "keyboard_first_count_persisted",
+                            &[("count", count.to_string())],
+                        );
+                    }
                 }
             }
         }
@@ -332,11 +349,24 @@ fn is_modifier(key: u32) -> bool {
 }
 
 pub(crate) fn set_status(status: u8) {
-    STATUS.store(status, Ordering::Relaxed);
+    let previous = STATUS.swap(status, Ordering::Relaxed);
+    if previous != status {
+        crate::diagnostics::record(
+            "keyboard_status_changed",
+            &[
+                ("from", status_label(previous).to_string()),
+                ("to", status_label(status).to_string()),
+            ],
+        );
+    }
 }
 
 fn current_status() -> &'static str {
-    match STATUS.load(Ordering::Relaxed) {
+    status_label(STATUS.load(Ordering::Relaxed))
+}
+
+fn status_label(status: u8) -> &'static str {
+    match status {
         STATUS_ACTIVE => "active",
         STATUS_PERMISSION_REQUIRED => "permission-required",
         STATUS_ERROR => "error",
