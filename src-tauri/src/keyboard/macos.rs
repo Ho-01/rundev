@@ -159,28 +159,29 @@ pub(super) fn open_permission_settings() -> Result<(), String> {
 }
 
 pub(super) async fn reset_permission(pool: &SqlitePool) -> Result<(), String> {
-    let status = Command::new("/usr/bin/tccutil")
-        .args(["reset", "ListenEvent", "dev.rundev.app"])
-        .status()
-        .map_err(|error| format!("입력 모니터링 권한 초기화를 실행하지 못했습니다: {error}"))?;
-    if !status.success() {
-        crate::diagnostics::record(
-            "keyboard_macos_permission_reset",
-            &[("success", "false".to_string())],
-        );
-        return Err("입력 모니터링 권한을 초기화하지 못했습니다.".to_string());
-    }
-    crate::diagnostics::record(
-        "keyboard_macos_permission_reset",
-        &[("success", "true".to_string())],
-    );
-    sqlx::query(
+    crate::diagnostics::record("keyboard_macos_permission_repair_started", &[]);
+
+    let prompt_reset = sqlx::query(
         "DELETE FROM app_settings
          WHERE key = 'keyboard.macos.permission_prompted'",
     )
     .execute(pool)
-    .await
-    .map_err(|error| format!("입력 모니터링 권한 안내 상태를 초기화하지 못했습니다: {error}"))?;
+    .await;
+    crate::diagnostics::record(
+        "keyboard_macos_permission_prompt_state_reset",
+        &[("success", prompt_reset.is_ok().to_string())],
+    );
+
+    let reset_succeeded = Command::new("/usr/bin/tccutil")
+        .args(["reset", "ListenEvent", "dev.rundev.app"])
+        .status()
+        .is_ok_and(|status| status.success());
+    crate::diagnostics::record(
+        "keyboard_macos_permission_reset",
+        &[("success", reset_succeeded.to_string())],
+    );
+
+    let _ = open_permission_settings();
     Ok(())
 }
 

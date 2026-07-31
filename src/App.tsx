@@ -434,13 +434,6 @@ export function App() {
   }
 
   async function repairKeyboardPermission() {
-    if (
-      !window.confirm(
-        "RunDev의 입력 모니터링 권한을 초기화하고 앱을 재시작할까요? 재시작 후 macOS 설정에서 RunDev를 다시 허용해야 합니다."
-      )
-    ) {
-      return;
-    }
     setPermissionRepairing(true);
     setPermissionRepairError(null);
     localStorage.setItem(KEYBOARD_PERMISSION_REPAIR_PENDING_KEY, "true");
@@ -709,7 +702,7 @@ export function App() {
           <div className="keyboard-permission">
             <span>
               {permissionRepairPending
-                ? "입력 모니터링에서 RunDev를 켠 뒤 앱으로 돌아오세요."
+                ? "기존 RunDev를 −로 삭제하고 /Applications의 RunDev를 다시 추가하세요."
                 : "새 설치 후에는 입력 권한을 다시 연결해야 할 수 있습니다."}
             </span>
             <button
