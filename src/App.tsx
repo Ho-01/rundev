@@ -259,6 +259,7 @@ export function App() {
   const [systemPanelExpanded, setSystemPanelExpanded] = useState(
     () => localStorage.getItem("rundev.systemPanelExpanded") === "true"
   );
+  const updateInstallStartedRef = useRef(false);
   const whipCrackRef = useRef<WhipCrackApi>(null);
   const shellRef = useRef<HTMLElement>(null);
   const freezeRunner = new URLSearchParams(window.location.search).has("freezeRunner");
@@ -464,6 +465,8 @@ export function App() {
   }
 
   async function installAvailableUpdate() {
+    if (updateInstallStartedRef.current) return;
+    updateInstallStartedRef.current = true;
     setUpdateInstalling(true);
     setUpdateError(null);
     try {
@@ -473,6 +476,7 @@ export function App() {
         installError instanceof Error ? installError.message : String(installError)
       );
       setUpdateInstalling(false);
+      updateInstallStartedRef.current = false;
     }
   }
 

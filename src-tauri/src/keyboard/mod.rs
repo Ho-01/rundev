@@ -365,6 +365,11 @@ fn current_status() -> &'static str {
     status_label(STATUS.load(Ordering::Relaxed))
 }
 
+#[cfg(target_os = "macos")]
+pub(super) fn is_active() -> bool {
+    STATUS.load(Ordering::Relaxed) == STATUS_ACTIVE
+}
+
 fn status_label(status: u8) -> &'static str {
     match status {
         STATUS_ACTIVE => "active",

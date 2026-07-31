@@ -37,6 +37,7 @@ pub fn init(app_data_dir: &Path) -> std::io::Result<()> {
             ("version", env!("CARGO_PKG_VERSION").to_string()),
             ("os", std::env::consts::OS.to_string()),
             ("arch", std::env::consts::ARCH.to_string()),
+            ("process_id", std::process::id().to_string()),
         ],
     );
     Ok(())
@@ -74,9 +75,11 @@ pub fn record(event: &str, fields: &[(&str, String)]) {
         "event": event,
         "fields": safe_fields,
     });
-    if serde_json::to_writer(&mut *file, &entry).is_ok() {
-        let _ = file.write_all(b"\n");
-        let _ = file.flush();
+    if let Ok(mut encoded) = serde_json::to_vec(&entry) {
+        encoded.push(b'\n');
+        if file.write_all(&encoded).is_ok() {
+            let _ = file.flush();
+        }
     }
 }
 

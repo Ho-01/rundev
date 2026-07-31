@@ -1,10 +1,12 @@
-use super::{set_status, KeyEvent, STATUS_ACTIVE, STATUS_ERROR, STATUS_PERMISSION_REQUIRED};
+use super::{
+    is_active, set_status, KeyEvent, STATUS_ACTIVE, STATUS_ERROR, STATUS_PERMISSION_REQUIRED,
+};
 use sqlx::SqlitePool;
 use std::{
     ffi::c_void,
     process::Command,
     sync::{
-        atomic::{AtomicBool, AtomicPtr, Ordering},
+        atomic::{AtomicPtr, Ordering},
         OnceLock,
     },
 };
@@ -28,7 +30,6 @@ const CG_KEYBOARD_EVENT_KEYCODE: u32 = 9;
 
 static SENDER: OnceLock<UnboundedSender<KeyEvent>> = OnceLock::new();
 static EVENT_TAP: AtomicPtr<c_void> = AtomicPtr::new(std::ptr::null_mut());
-static FIRST_EVENT_RECORDED: AtomicBool = AtomicBool::new(false);
 
 #[link(name = "ApplicationServices", kind = "framework")]
 unsafe extern "C" {
@@ -93,51 +94,52 @@ pub(super) async fn start(sender: UnboundedSender<KeyEvent>, pool: SqlitePool) {
 
     if let Err(error) = std::thread::Builder::new()
         .name("rundev-keyboard-event-tap".to_string())
-        .spawn(move || {
-            let mut waiting_recorded = false;
-            while !has_permission() {
-                set_status(STATUS_PERMISSION_REQUIRED);
-                if !waiting_recorded {
-                    waiting_recorded = true;
-                    crate::diagnostics::record("keyboard_macos_waiting_for_permission", &[]);
-                }
-                std::thread::sleep(std::time::Duration::from_secs(2));
+        .spawn(move || unsafe {
+            if SENDER.set(sender).is_err() {
+                crate::diagnostics::record("keyboard_macos_sender_registration_failed", &[]);
+                set_status(STATUS_ERROR);
+                return;
             }
-            crate::diagnostics::record("keyboard_macos_permission_granted", &[]);
-            unsafe {
-                if SENDER.set(sender).is_err() {
-                    crate::diagnostics::record("keyboard_macos_sender_registration_failed", &[]);
-                    set_status(STATUS_ERROR);
-                    return;
-                }
-                let mask = 1_u64 << CG_EVENT_KEY_DOWN;
-                let tap = CGEventTapCreate(
+            let mut denied_recorded = false;
+            let tap = loop {
+                let preflight_granted = has_permission();
+                let candidate = CGEventTapCreate(
                     CG_SESSION_EVENT_TAP,
                     CG_HEAD_INSERT_EVENT_TAP,
                     CG_EVENT_TAP_OPTION_LISTEN_ONLY,
-                    mask,
+                    1_u64 << CG_EVENT_KEY_DOWN,
                     keyboard_tap,
                     std::ptr::null_mut(),
                 );
-                if tap.is_null() {
-                    crate::diagnostics::record("keyboard_macos_event_tap_create_failed", &[]);
-                    set_status(STATUS_ERROR);
-                    return;
+                if !candidate.is_null() {
+                    crate::diagnostics::record(
+                        "keyboard_macos_event_tap_created",
+                        &[("preflight_granted", preflight_granted.to_string())],
+                    );
+                    break candidate;
                 }
-                EVENT_TAP.store(tap, Ordering::Relaxed);
-                crate::diagnostics::record("keyboard_macos_event_tap_created", &[]);
-                let source = CFMachPortCreateRunLoopSource(std::ptr::null(), tap, 0);
-                if source.is_null() {
-                    crate::diagnostics::record("keyboard_macos_run_loop_source_create_failed", &[]);
-                    set_status(STATUS_ERROR);
-                    return;
+                set_status(STATUS_PERMISSION_REQUIRED);
+                if !denied_recorded {
+                    denied_recorded = true;
+                    crate::diagnostics::record(
+                        "keyboard_macos_event_tap_create_denied",
+                        &[("preflight_granted", preflight_granted.to_string())],
+                    );
                 }
-                CFRunLoopAddSource(CFRunLoopGetCurrent(), source, kCFRunLoopCommonModes);
-                CGEventTapEnable(tap, true);
-                set_status(STATUS_ACTIVE);
-                crate::diagnostics::record("keyboard_macos_event_tap_enabled", &[]);
-                CFRunLoopRun();
+                std::thread::sleep(std::time::Duration::from_secs(2));
+            };
+            EVENT_TAP.store(tap, Ordering::Relaxed);
+            let source = CFMachPortCreateRunLoopSource(std::ptr::null(), tap, 0);
+            if source.is_null() {
+                crate::diagnostics::record("keyboard_macos_run_loop_source_create_failed", &[]);
+                set_status(STATUS_ERROR);
+                return;
             }
+            CFRunLoopAddSource(CFRunLoopGetCurrent(), source, kCFRunLoopCommonModes);
+            CGEventTapEnable(tap, true);
+            set_status(STATUS_ACTIVE);
+            crate::diagnostics::record("keyboard_macos_event_tap_enabled", &[]);
+            CFRunLoopRun();
         })
     {
         tracing::error!(%error, "Failed to start macOS keyboard event tap");
@@ -186,7 +188,7 @@ pub(super) async fn reset_permission(pool: &SqlitePool) -> Result<(), String> {
 }
 
 pub(super) fn refresh_permission_status() {
-    if !has_permission() {
+    if !has_permission() && !is_active() {
         set_status(STATUS_PERMISSION_REQUIRED);
     }
 }
@@ -209,6 +211,10 @@ unsafe extern "C" fn keyboard_tap(
         event_type,
         CG_EVENT_TAP_DISABLED_BY_TIMEOUT | CG_EVENT_TAP_DISABLED_BY_USER_INPUT
     ) {
+        let tap = EVENT_TAP.load(Ordering::Relaxed);
+        if !tap.is_null() {
+            unsafe { CGEventTapEnable(tap, true) };
+        }
         crate::diagnostics::record(
             "keyboard_macos_event_tap_disabled",
             &[(
@@ -221,9 +227,7 @@ unsafe extern "C" fn keyboard_tap(
                 .to_string(),
             )],
         );
-        let tap = EVENT_TAP.load(Ordering::Relaxed);
         if !tap.is_null() {
-            unsafe { CGEventTapEnable(tap, true) };
             crate::diagnostics::record("keyboard_macos_event_tap_reenabled", &[]);
         }
         return event;
@@ -235,9 +239,6 @@ unsafe extern "C" fn keyboard_tap(
         let keycode =
             unsafe { CGEventGetIntegerValueField(event, CG_KEYBOARD_EVENT_KEYCODE) } as u32;
         if !is_modifier_keycode(keycode) {
-            if !FIRST_EVENT_RECORDED.swap(true, Ordering::Relaxed) {
-                crate::diagnostics::record("keyboard_macos_first_event_received", &[]);
-            }
             if let Some(sender) = SENDER.get() {
                 let _ = sender.send(KeyEvent::Press);
             }

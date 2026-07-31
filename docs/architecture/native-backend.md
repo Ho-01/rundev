@@ -59,6 +59,8 @@ Updater는 GitHub Releases의 `latest.json`을 endpoint로 사용한다. 공개�
 - 앱 교체 후 권한 복구 시 TCC 등록과 `keyboard.macos.permission_prompted` 안내
   상태를 함께 초기화하고 재시작 뒤 권한을 다시 요청
 - macOS event tap 비활성화 이벤트를 감지해 tap을 다시 활성화
+- macOS 권한 preflight 결과와 별개로 listen-only event tap 생성을 직접 시도하고,
+  tap 생성 성공을 실제 입력 감지 가능 상태의 기준으로 사용
 
 ### `activity`
 
