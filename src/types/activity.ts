@@ -116,6 +116,8 @@ export type KeyboardActivityToday = {
 export type FocusActivityUpdate = {
   activeSeconds: number;
   focused: boolean;
+  active: boolean;
+  appName: string | null;
 };
 
 export type RunnerId =

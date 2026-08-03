@@ -27,6 +27,7 @@ import { emptySystemStats, type SystemStats } from "../types/system";
 type DashboardStore = {
   summary: DailySummary | null;
   focus: FocusActivityToday | null;
+  currentActivity: FocusActivityUpdate | null;
   activityHistory: ActivityHistoryDay[];
   character: CharacterState | null;
   aiUsage: AiUsageToday | null;
@@ -53,6 +54,7 @@ type DashboardStore = {
 export const useDashboardStore = create<DashboardStore>((set, get) => ({
   summary: null,
   focus: null,
+  currentActivity: null,
   activityHistory: [],
   character: null,
   aiUsage: null,
@@ -64,6 +66,7 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
   setKeyboardActivity: (keyboard) => set({ keyboard }),
   setFocusActivity: (activity) =>
     set((state) => ({
+      currentActivity: activity,
       summary: state.summary
         ? { ...state.summary, activeSeconds: activity.activeSeconds }
         : state.summary

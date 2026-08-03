@@ -11,6 +11,10 @@ pub(super) fn is_developer_app(identifier: &str) -> bool {
     false
 }
 
+pub(super) fn is_rundev(identifier: &str) -> bool {
+    matches!(identifier.to_ascii_lowercase().as_str(), "rundev.exe" | "dev.rundev.app")
+}
+
 pub(crate) fn display_name(identifier: &str) -> String {
     match identifier.to_ascii_lowercase().as_str() {
         "code.exe" | "com.microsoft.vscode" => "VS Code",
@@ -107,7 +111,7 @@ const MACOS_APPS: &[&str] = &[
 
 #[cfg(test)]
 mod tests {
-    use super::{display_name, is_developer_app};
+    use super::{display_name, is_developer_app, is_rundev};
 
     #[test]
     fn matches_known_apps_case_insensitively() {
@@ -135,5 +139,12 @@ mod tests {
         assert_eq!(display_name("code.exe"), "VS Code");
         assert_eq!(display_name("com.microsoft.VSCode"), "VS Code");
         assert_eq!(display_name("cursor.exe"), "Cursor");
+    }
+
+    #[test]
+    fn identifies_rundev_on_supported_platforms() {
+        assert!(is_rundev("RunDev.exe"));
+        assert!(is_rundev("dev.rundev.app"));
+        assert!(!is_rundev("com.microsoft.VSCode"));
     }
 }

@@ -339,8 +339,13 @@ button { color: inherit; font: inherit; }
 
 .runner-copy { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 4px; }
 .runner-copy strong { font-size: 15px; letter-spacing: -.01em; }
-.runner-copy span { display: flex; align-items: center; color: #99999f; font-size: 11px; }
-.status-dot { width: 6px; height: 6px; margin-right: 6px; border-radius: 50%; background: #8bc34a; box-shadow: 0 0 0 3px rgba(139,195,74,.11); }
+.activity-status { display: flex; min-width: 0; align-items: center; color: #99999f; font-size: 10px; line-height: 1.25; }
+.activity-status-copy { display: flex; min-width: 0; flex-direction: column; gap: 2px; }
+.activity-app-line { display: block; min-width: 0; }
+.activity-message { white-space: nowrap; }
+.status-dot { flex: 0 0 auto; width: 6px; height: 6px; margin-right: 6px; border-radius: 50%; background: #77777d; box-shadow: 0 0 0 3px rgba(119,119,125,.11); }
+.status-dot.development { background: #8bc34a; box-shadow: 0 0 0 3px rgba(139,195,74,.11); }
+.status-dot.away { background: #e69a45; box-shadow: 0 0 0 3px rgba(230,154,69,.12); }
 .plain-button { position: relative; display: grid; place-items: center; width: 30px; height: 30px; padding: 0; color: #9a9a9f; background: transparent; border: 0; border-radius: 6px; }
 .plain-button:hover { color: #fff; background: rgba(255,255,255,.07); }
 .plain-button .update-dot { position: absolute; top: 5px; right: 5px; width: 6px; height: 6px; background: #9bce5a; border-radius: 50%; }

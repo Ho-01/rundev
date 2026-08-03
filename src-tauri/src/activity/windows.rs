@@ -21,12 +21,16 @@ use super::PlatformSnapshot;
 
 pub(super) fn snapshot() -> PlatformSnapshot {
     let app_identifier = foreground_executable();
+    let app_name = app_identifier
+        .as_deref()
+        .map(super::catalog::display_name);
     let locked = app_identifier
         .as_deref()
         .is_some_and(|name| matches!(name, "lockapp.exe" | "logonui.exe"));
 
     PlatformSnapshot {
         app_identifier,
+        app_name,
         idle_for: input_idle_time(),
         locked,
     }

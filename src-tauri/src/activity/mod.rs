@@ -22,6 +22,7 @@ const XP_PER_REWARD: i64 = 10;
 #[derive(Debug)]
 struct PlatformSnapshot {
     app_identifier: Option<String>,
+    app_name: Option<String>,
     idle_for: Duration,
     locked: bool,
 }
@@ -42,6 +43,8 @@ impl PlatformSnapshot {
 pub struct FocusActivityUpdate {
     active_seconds: i64,
     focused: bool,
+    active: bool,
+    app_name: Option<String>,
 }
 
 struct ActiveSession {
@@ -73,6 +76,10 @@ async fn run(pool: SqlitePool, app: AppHandle) {
     loop {
         interval.tick().await;
         let snapshot = platform_snapshot();
+        let rundev_is_foreground = snapshot
+            .app_identifier
+            .as_deref()
+            .is_some_and(catalog::is_rundev);
         let next_identifier = snapshot.eligible_identifier().map(str::to_owned);
         let next_date = Local::now().date_naive().to_string();
 
@@ -123,11 +130,15 @@ async fn run(pool: SqlitePool, app: AppHandle) {
             + session
                 .as_ref()
                 .map_or(0, |active| active.active_seconds - active.persisted_seconds);
-        let update = FocusActivityUpdate {
-            active_seconds: projected,
-            focused: session.is_some(),
-        };
-        let _ = app.emit("focus-activity-updated", update);
+        if !rundev_is_foreground {
+            let update = FocusActivityUpdate {
+                active_seconds: projected,
+                focused: session.is_some(),
+                active: !snapshot.locked && snapshot.idle_for < IDLE_TIMEOUT,
+                app_name: snapshot.app_name,
+            };
+            let _ = app.emit("focus-activity-updated", update);
+        }
     }
 }
 
@@ -261,6 +272,7 @@ fn platform_snapshot() -> PlatformSnapshot {
     #[cfg(not(any(windows, target_os = "macos")))]
     PlatformSnapshot {
         app_identifier: None,
+        app_name: None,
         idle_for: Duration::MAX,
         locked: false,
     }
@@ -278,6 +290,7 @@ mod tests {
     fn snapshot(identifier: Option<&str>, idle_for: Duration, locked: bool) -> PlatformSnapshot {
         PlatformSnapshot {
             app_identifier: identifier.map(str::to_owned),
+            app_name: identifier.map(catalog::display_name),
             idle_for,
             locked,
         }

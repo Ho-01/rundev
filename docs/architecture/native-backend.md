@@ -68,7 +68,8 @@ Updater는 GitHub Releases의 `latest.json`을 endpoint로 사용한다. 공개�
 - 1초 단위 활성 앱·idle 상태 확인과 5분 idle 중단
 - 비개발 앱 전환, 화면 잠금, 날짜 변경 시 현재 세션 종료
 - 실행된 tick만 누적하여 절전 중 경과 시간을 제외
-- 매초 `focus-activity-updated` 이벤트와 10초 단위 SQLite 세션 갱신
+- 매초 `focus-activity-updated` 이벤트로 전면 앱 표시 이름, 사용자 활성 여부,
+  개발 도구 여부를 React에 전달하고 10초 단위로 SQLite 세션 갱신
 - `get_focus_activity_today` command로 마지막 개발 도구와 오늘의 앱별 합계 조회
 - `get_activity_history` command로 최근 20주의 날짜별 개발시간과 잔디 강도 조회
 - 30분 단위 10 XP를 `focus_milestone` 원장 이벤트로 멱등 지급

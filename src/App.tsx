@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type MouseEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import {
   Clock3,
   Cpu,
@@ -41,6 +41,7 @@ import {
   type UpdateStatus
 } from "./services/updater";
 import { SystemStatusStrip } from "./components/SystemStatusStrip";
+import { buildActivityStatus } from "./components/activityStatus";
 import {
   WhipCrackOverlay,
   type WhipCrackApi
@@ -267,6 +268,7 @@ export function App() {
   const {
     summary,
     focus,
+    currentActivity,
     activityHistory,
     character,
     aiUsage,
@@ -588,6 +590,10 @@ export function App() {
     claudeUsage?.status !== "disconnected" ||
     cursorUsage?.status !== "disconnected";
   const activeHistoryDays = activityHistory.filter((day) => day.activeSeconds > 0).length;
+  const activityStatus = useMemo(
+    () => buildActivityStatus(currentActivity),
+    [currentActivity?.active, currentActivity?.focused, currentActivity?.appName]
+  );
 
   if (showLevelShowcase) {
     return <LevelShowcase />;
@@ -628,7 +634,26 @@ export function App() {
         </button>
         <div className="runner-copy">
           <strong>RunDev</strong>
-          <span><i className="status-dot" /> 개발 활동 대기 중</span>
+          <div
+            className="activity-status"
+            aria-label={
+              activityStatus.appName
+                ? `${activityStatus.appName}에서 ${activityStatus.message}`
+                : activityStatus.message
+            }
+          >
+            <i className={`status-dot ${activityStatus.tone}`} />
+            <div className="activity-status-copy">
+              <span className="activity-app-line">
+                {activityStatus.appName
+                  ? `${activityStatus.appName}에서`
+                  : activityStatus.message}
+              </span>
+              {activityStatus.appName ? (
+                <span className="activity-message">{activityStatus.message}</span>
+              ) : null}
+            </div>
+          </div>
           {whipSaveError ? <em className="whip-save-error">저장 실패</em> : null}
         </div>
         <div className="header-actions">

@@ -22,7 +22,9 @@ unsafe extern "C" {
 }
 
 pub(super) fn snapshot() -> PlatformSnapshot {
-    let app_identifier = foreground_bundle_identifier();
+    let (app_identifier, app_name) = foreground_application()
+        .map(|application| (application.0, application.1))
+        .unwrap_or((None, None));
     let locked = screen_is_locked()
         || app_identifier
             .as_deref()
@@ -30,6 +32,7 @@ pub(super) fn snapshot() -> PlatformSnapshot {
 
     PlatformSnapshot {
         app_identifier,
+        app_name,
         idle_for: input_idle_time(),
         locked,
     }
@@ -61,12 +64,14 @@ fn screen_is_locked() -> bool {
     }
 }
 
-fn foreground_bundle_identifier() -> Option<String> {
+fn foreground_application() -> Option<(Option<String>, Option<String>)> {
     let workspace = NSWorkspace::sharedWorkspace();
-    workspace
-        .frontmostApplication()?
+    let application = workspace.frontmostApplication()?;
+    let identifier = application
         .bundleIdentifier()
-        .map(|identifier| identifier.to_string().to_ascii_lowercase())
+        .map(|value| value.to_string().to_ascii_lowercase());
+    let name = application.localizedName().map(|value| value.to_string());
+    Some((identifier, name))
 }
 
 fn input_idle_time() -> Duration {
