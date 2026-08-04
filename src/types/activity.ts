@@ -29,6 +29,20 @@ export type CharacterState = {
   xpForNextLevel: number;
 };
 
+export type XpCouponPreview = {
+  couponId: string;
+  multiplier: number;
+  durationMinutes: number;
+  redeemBefore: string;
+};
+
+export type XpBoostStatus = {
+  active: boolean;
+  multiplier: number | null;
+  startsAt: string | null;
+  endsAt: string | null;
+};
+
 export type AiUsageToday = {
   provider: string;
   totalTokens: number | null;

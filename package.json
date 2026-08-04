@@ -1,7 +1,7 @@
 {
   "name": "rundev",
   "private": true,
-  "version": "0.5.0",
+  "version": "0.5.1",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -13,6 +13,7 @@
     "version:set": "node scripts/version.mjs set",
     "version:check": "node scripts/version.mjs check",
     "version:check-tag": "node scripts/version.mjs tag",
+    "coupon": "node scripts/coupon.mjs",
     "tray:frames": "node scripts/build-tray-animation.mjs",
     "runners:ui": "node scripts/build-runner-ui-assets.mjs",
     "docs:assets": "node scripts/build-runner-ui-assets.mjs && node scripts/generate-readme-assets.mjs",

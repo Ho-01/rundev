@@ -450,6 +450,10 @@ button { color: inherit; font: inherit; }
 
 .runner-copy { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 4px; }
 .runner-copy strong { font-size: 15px; letter-spacing: -.01em; }
+.runner-title-row { display: flex; min-width: 0; align-items: center; gap: 7px; }
+.xp-boost-badge { display: flex; min-width: 0; align-items: center; gap: 3px; padding: 2px 5px; color: #f3c969; background: rgba(243,201,105,.11); border: 1px solid rgba(243,201,105,.25); border-radius: 999px; font-size: 7px; line-height: 1; white-space: nowrap; }
+.xp-boost-badge b { font-size: 8px; }
+.xp-boost-badge span { overflow: hidden; color: #c7ad75; text-overflow: ellipsis; }
 .activity-status { display: flex; min-width: 0; align-items: center; color: #99999f; font-size: 10px; line-height: 1.25; }
 .activity-status-copy { display: flex; min-width: 0; flex-direction: column; gap: 2px; }
 .activity-app-line { display: block; min-width: 0; }
@@ -716,14 +720,18 @@ button { color: inherit; font: inherit; }
 .account-dialog { width: 100%; padding: 16px; background: #29292c; border: 1px solid rgba(255,255,255,.13); border-radius: 10px; box-shadow: 0 16px 40px rgba(0,0,0,.38); }
 .account-dialog h2 { margin: 0 0 13px; font-size: 14px; }
 .app-info-dialog { text-align: center; }
-.app-info-mark { display: grid; place-items: center; width: 38px; height: 38px; margin: 0 auto 9px; color: #9bce5a; background: rgba(155,206,90,.12); border: 1px solid rgba(155,206,90,.3); border-radius: 11px; }
 .app-info-dialog > p { text-align: left; }
 .app-info-dialog dl { text-align: left; }
+.app-info-dialog .dialog-actions { flex-wrap: wrap; }
 .keyboard-repair { display: flex; align-items: center; gap: 10px; margin-top: 10px; padding: 9px; text-align: left; background: rgba(255,255,255,.035); border: 1px solid rgba(255,255,255,.08); border-radius: 8px; }
 .keyboard-repair > div { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 2px; }
 .keyboard-repair strong { color: #d7d7da; font-size: 10px; }
 .keyboard-repair span { color: #85858b; font-size: 8px; line-height: 1.35; }
 .keyboard-repair button { flex: 0 0 auto; padding: 5px 7px; color: #d7d7da; background: #303033; border: 1px solid rgba(255,255,255,.1); border-radius: 6px; font-size: 8px; font-weight: 700; }
+.coupon-dialog { text-align: center; }
+.coupon-dialog > p, .coupon-dialog dl { text-align: left; }
+.coupon-input { box-sizing: border-box; width: 100%; margin: 2px 0 12px; padding: 9px 10px; color: #ececef; background: #202023; border: 1px solid rgba(255,255,255,.13); border-radius: 7px; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 10px; }
+.coupon-input:focus { border-color: rgba(243,201,105,.52); outline: none; box-shadow: 0 0 0 2px rgba(243,201,105,.08); }
 .account-dialog dl { margin: 0; }
 .account-dialog dl div { display: flex; justify-content: space-between; gap: 12px; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,.07); font-size: 10px; }
 .account-dialog dt { color: #88888e; }

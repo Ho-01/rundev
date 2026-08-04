@@ -12,7 +12,6 @@ use std::{
 };
 use tauri::{AppHandle, Emitter};
 use tokio::sync::mpsc;
-use uuid::Uuid;
 
 const PRESSES_PER_REWARD: i64 = 2_000;
 const XP_PER_REWARD: i64 = 10;
@@ -290,30 +289,14 @@ async fn award_keyboard_xp(
     occurred_at: &str,
 ) -> Result<(), sqlx::Error> {
     let source_event_id = format!("keyboard:{local_date}:{milestone}");
-    let inserted = sqlx::query(
-        "INSERT OR IGNORE INTO xp_events
-            (id, occurred_at, event_type, amount, source_event_id)
-         VALUES (?, ?, 'keyboard_milestone', ?, ?)",
+    crate::xp_boost::award_xp(
+        transaction,
+        "keyboard_milestone",
+        XP_PER_REWARD,
+        &source_event_id,
+        occurred_at,
     )
-    .bind(Uuid::new_v4().to_string())
-    .bind(occurred_at)
-    .bind(XP_PER_REWARD)
-    .bind(source_event_id)
-    .execute(&mut **transaction)
     .await?;
-
-    if inserted.rows_affected() == 1 {
-        sqlx::query(
-            "UPDATE character_state
-             SET total_xp = total_xp + ?,
-                 level = ((total_xp + ?) / 100) + 1
-             WHERE id = 1",
-        )
-        .bind(XP_PER_REWARD)
-        .bind(XP_PER_REWARD)
-        .execute(&mut **transaction)
-        .await?;
-    }
     Ok(())
 }
 

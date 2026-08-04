@@ -19,6 +19,7 @@
 ## 기능
 
 - [Codex 사용량 연동](features/codex-integration.md)
+- [경험치 쿠폰](features/xp-coupons.md)
 - [Claude Code 사용량 연동](features/claude-integration.md)
 - [Cursor 사용량 연동](features/cursor-integration.md)
 - [AI 공급자 아이콘 출처](assets/provider-icons.md)

@@ -7,6 +7,7 @@ mod host_metrics;
 mod keyboard;
 mod tray;
 mod whip;
+mod xp_boost;
 
 use database::AppState;
 use tauri::Manager;
@@ -118,7 +119,10 @@ pub fn run() {
             commands::get_system_stats,
             commands::set_system_panel_expanded,
             commands::get_whip_stats,
-            commands::record_whip
+            commands::record_whip,
+            commands::preview_xp_coupon,
+            commands::redeem_xp_coupon,
+            commands::get_xp_boost_status
         ])
         .run(tauri::generate_context!())
         .expect("error while running RunDev");

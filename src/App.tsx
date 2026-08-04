@@ -13,7 +13,8 @@ import {
   Settings2,
   Sprout,
   SquareTerminal,
-  Workflow
+  Workflow,
+  Zap
 } from "lucide-react";
 import { useDashboardStore } from "./store/dashboard";
 import {
@@ -24,6 +25,9 @@ import {
   previewCursorAccount,
   recordWhip,
   getWhipStats,
+  getXpBoostStatus,
+  previewXpCoupon,
+  redeemXpCoupon,
   resetKeyboardPermissionAndRelaunch,
   WHIP_COOLDOWN_MS,
   subscribeFocusActivity,
@@ -51,7 +55,9 @@ import type {
   ClaudeConnectionPreview,
   CodexAccountPreview,
   CursorAccountPreview,
-  WhipStats
+  WhipStats,
+  XpBoostStatus,
+  XpCouponPreview
 } from "./types/activity";
 import { runnerFramesById, runnerOptions } from "./assets/runners";
 import openAiIcon from "./assets/providers/openai.svg";
@@ -73,6 +79,21 @@ function formatDuration(seconds: number) {
   if (hours === 0) return `${minutes}분`;
   if (minutes === 0) return `${hours}시간`;
   return `${hours}시간 ${minutes}분`;
+}
+
+function formatBoostRemaining(milliseconds: number) {
+  const totalMinutes = Math.max(0, Math.ceil(milliseconds / 60_000));
+  if (totalMinutes >= 24 * 60) {
+    const days = Math.floor(totalMinutes / (24 * 60));
+    const hours = Math.ceil((totalMinutes % (24 * 60)) / 60);
+    return hours > 0 ? `${days}일 ${hours}시간` : `${days}일`;
+  }
+  if (totalMinutes >= 60) {
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+    return minutes > 0 ? `${hours}시간 ${minutes}분` : `${hours}시간`;
+  }
+  return `${totalMinutes}분`;
 }
 
 function formatTokens(tokens: number) {
@@ -242,6 +263,13 @@ export function App() {
   const [headerFrame, setHeaderFrame] = useState(0);
   const [runnerDialogOpen, setRunnerDialogOpen] = useState(false);
   const [infoDialogOpen, setInfoDialogOpen] = useState(false);
+  const [couponDialogOpen, setCouponDialogOpen] = useState(false);
+  const [couponCode, setCouponCode] = useState("");
+  const [couponPreview, setCouponPreview] = useState<XpCouponPreview | null>(null);
+  const [couponError, setCouponError] = useState<string | null>(null);
+  const [couponLoading, setCouponLoading] = useState(false);
+  const [xpBoost, setXpBoost] = useState<XpBoostStatus | null>(null);
+  const [boostClock, setBoostClock] = useState(Date.now());
   const [updateStatus, setUpdateStatus] = useState<UpdateStatus>(() =>
     getCachedUpdateStatus(packageJson.version)
   );
@@ -520,6 +548,51 @@ export function App() {
   }, [infoDialogOpen]);
 
   useEffect(() => {
+    void getXpBoostStatus().then(setXpBoost).catch(() => {});
+    const timer = window.setInterval(() => setBoostClock(Date.now()), 30_000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    if (!xpBoost?.endsAt || new Date(xpBoost.endsAt).getTime() > boostClock) return;
+    void getXpBoostStatus()
+      .then(setXpBoost)
+      .catch(() => setXpBoost({ active: false, multiplier: null, startsAt: null, endsAt: null }));
+  }, [boostClock, xpBoost]);
+
+  async function inspectCoupon() {
+    const normalized = couponCode.trim();
+    if (!normalized) return;
+    setCouponLoading(true);
+    setCouponError(null);
+    try {
+      setCouponPreview(await previewXpCoupon(normalized));
+    } catch (couponFailure) {
+      setCouponError(couponFailure instanceof Error ? couponFailure.message : String(couponFailure));
+    } finally {
+      setCouponLoading(false);
+    }
+  }
+
+  async function applyCoupon() {
+    setCouponLoading(true);
+    setCouponError(null);
+    try {
+      const next = await redeemXpCoupon(couponCode.trim());
+      setXpBoost(next);
+      setBoostClock(Date.now());
+      setCouponDialogOpen(false);
+      setCouponPreview(null);
+      setCouponCode("");
+      await refresh();
+    } catch (couponFailure) {
+      setCouponError(couponFailure instanceof Error ? couponFailure.message : String(couponFailure));
+    } finally {
+      setCouponLoading(false);
+    }
+  }
+
+  useEffect(() => {
     let unlisten: (() => void) | undefined;
     void subscribeKeyboardActivity(setKeyboardActivity).then((dispose) => {
       unlisten = dispose;
@@ -636,7 +709,16 @@ export function App() {
           <span className="whip-count">오늘 {whipStats?.whipCount ?? 0}</span>
         </button>
         <div className="runner-copy">
-          <strong>RunDev</strong>
+          <div className="runner-title-row">
+            <strong>RunDev</strong>
+            {xpBoost?.active && xpBoost.multiplier && xpBoost.endsAt ? (
+              <div className="xp-boost-badge" title={`경험치 ${xpBoost.multiplier}배 적용 중`}>
+                <Zap size={10} fill="currentColor" />
+                <b>XP ×{xpBoost.multiplier}</b>
+                <span>{formatBoostRemaining(new Date(xpBoost.endsAt).getTime() - boostClock)} 남음</span>
+              </div>
+            ) : null}
+          </div>
           <div
             className="activity-status"
             aria-label={
@@ -1071,7 +1153,6 @@ export function App() {
             aria-modal="true"
             aria-labelledby="app-info-title"
           >
-            <div className="app-info-mark"><Info size={20} /></div>
             <h2 id="app-info-title">RunDev 정보</h2>
             <p>개발 활동을 기록하고 성장으로 보여주는 로컬 우선 트레이 앱입니다.</p>
             <dl>
@@ -1110,6 +1191,16 @@ export function App() {
             {permissionRepairError && <p className="error-message">{permissionRepairError}</p>}
             {updateError && <p className="error-message">{updateError}</p>}
             <div className="dialog-actions">
+              <button
+                type="button"
+                onClick={() => {
+                  setInfoDialogOpen(false);
+                  setCouponError(null);
+                  setCouponDialogOpen(true);
+                }}
+              >
+                쿠폰 입력
+              </button>
               <button type="button" onClick={() => void showDiagnosticsFolder()}>
                 진단 로그 폴더
               </button>
@@ -1129,6 +1220,64 @@ export function App() {
                   onClick={() => void installAvailableUpdate()}
                 >
                   {updateInstalling ? "설치 중" : "다운로드 및 재시작"}
+                </button>
+              )}
+            </div>
+          </section>
+        </div>
+      )}
+      {couponDialogOpen && (
+        <div className="dialog-backdrop" role="presentation">
+          <section className="account-dialog coupon-dialog" role="dialog" aria-modal="true" aria-labelledby="coupon-title">
+            <h2 id="coupon-title">경험치 쿠폰</h2>
+            {!couponPreview ? (
+              <>
+                <p>쿠폰 번호를 입력하면 적용 배수와 시간을 먼저 확인할 수 있어요.</p>
+                <input
+                  className="coupon-input"
+                  value={couponCode}
+                  autoFocus
+                  spellCheck={false}
+                  placeholder="RDC1.…"
+                  onChange={(event) => {
+                    setCouponCode(event.target.value);
+                    setCouponError(null);
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") void inspectCoupon();
+                  }}
+                />
+              </>
+            ) : (
+              <>
+                <p>이 쿠폰을 지금 사용할까요?</p>
+                <dl>
+                  <div><dt>경험치</dt><dd>{couponPreview.multiplier}배</dd></div>
+                  <div><dt>적용 시간</dt><dd>{formatBoostRemaining(couponPreview.durationMinutes * 60_000)}</dd></div>
+                  <div><dt>등록 기한</dt><dd>{new Date(couponPreview.redeemBefore).toLocaleDateString("ko-KR")}</dd></div>
+                </dl>
+                <p>이미 부스트가 예약되어 있다면 기존 종료 시점 뒤에 이어서 적용됩니다.</p>
+              </>
+            )}
+            {couponError && <p className="error-message">{couponError}</p>}
+            <div className="dialog-actions">
+              <button
+                type="button"
+                onClick={() => {
+                  setCouponDialogOpen(false);
+                  setCouponPreview(null);
+                  setCouponError(null);
+                }}
+              >
+                취소
+              </button>
+              {couponPreview ? (
+                <button type="button" className="confirm-button" disabled={couponLoading} onClick={() => void applyCoupon()}>
+                  {couponLoading ? "적용 중" : "부스트 적용"}
+                </button>
+              ) : (
+                <button type="button" className="confirm-button" disabled={couponLoading || !couponCode.trim()} onClick={() => void inspectCoupon()}>
+                  {couponLoading ? "확인 중" : "쿠폰 확인"}
                 </button>
               )}
             </div>

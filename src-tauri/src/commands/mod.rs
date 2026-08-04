@@ -1,5 +1,6 @@
 use crate::{
     activity, adapters, database::AppState, diagnostics, host_metrics, keyboard, tray, whip,
+    xp_boost,
 };
 use chrono::{DateTime, Datelike, Duration, Local, NaiveDate, Utc};
 use serde::Serialize;
@@ -77,6 +78,26 @@ pub struct CodexAccountPreview {
 pub struct ClaudeConnectionPreview {
     settings_path: String,
     has_conflicts: bool,
+}
+
+#[tauri::command]
+pub fn preview_xp_coupon(code: String) -> Result<xp_boost::CouponPreview, String> {
+    xp_boost::preview(&code)
+}
+
+#[tauri::command]
+pub async fn redeem_xp_coupon(
+    code: String,
+    state: State<'_, AppState>,
+) -> Result<xp_boost::XpBoostStatus, String> {
+    xp_boost::redeem(&state.pool, &code).await
+}
+
+#[tauri::command]
+pub async fn get_xp_boost_status(
+    state: State<'_, AppState>,
+) -> Result<xp_boost::XpBoostStatus, String> {
+    xp_boost::status(&state.pool).await
 }
 
 #[derive(Serialize)]

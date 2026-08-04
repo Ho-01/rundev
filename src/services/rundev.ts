@@ -17,7 +17,9 @@ import type {
   KeyboardActivityToday,
   RunnerId,
   RunnerSelection,
-  WhipStats
+  WhipStats,
+  XpBoostStatus,
+  XpCouponPreview
 } from "../types/activity";
 
 const WHIP_COOLDOWN_MS = 100;
@@ -426,6 +428,37 @@ export async function recordWhip() {
     return previewWhipStats();
   }
   return invoke<WhipStats>("record_whip");
+}
+
+export async function previewXpCoupon(code: string) {
+  if (!isTauri()) {
+    return {
+      couponId: "preview-coupon",
+      multiplier: 2,
+      durationMinutes: 120,
+      redeemBefore: new Date(Date.now() + 86_400_000).toISOString()
+    } satisfies XpCouponPreview;
+  }
+  return invoke<XpCouponPreview>("preview_xp_coupon", { code });
+}
+
+export async function redeemXpCoupon(code: string) {
+  if (!isTauri()) {
+    return {
+      active: true,
+      multiplier: 2,
+      startsAt: new Date().toISOString(),
+      endsAt: new Date(Date.now() + 7_200_000).toISOString()
+    } satisfies XpBoostStatus;
+  }
+  return invoke<XpBoostStatus>("redeem_xp_coupon", { code });
+}
+
+export async function getXpBoostStatus() {
+  if (!isTauri()) {
+    return { active: false, multiplier: null, startsAt: null, endsAt: null } satisfies XpBoostStatus;
+  }
+  return invoke<XpBoostStatus>("get_xp_boost_status");
 }
 
 export { WHIP_COOLDOWN_MS };

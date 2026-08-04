@@ -216,30 +216,14 @@ async fn sync_focus_xp(pool: &SqlitePool, local_date: &str) -> Result<(), sqlx::
 
     for milestone in 1..=earned_milestones {
         let source_event_id = format!("focus:{local_date}:{milestone}");
-        let inserted = sqlx::query(
-            "INSERT OR IGNORE INTO xp_events
-                (id, occurred_at, event_type, amount, source_event_id)
-             VALUES (?, ?, 'focus_milestone', ?, ?)",
+        crate::xp_boost::award_xp(
+            &mut transaction,
+            "focus_milestone",
+            XP_PER_REWARD,
+            &source_event_id,
+            &now,
         )
-        .bind(Uuid::new_v4().to_string())
-        .bind(&now)
-        .bind(XP_PER_REWARD)
-        .bind(source_event_id)
-        .execute(&mut *transaction)
         .await?;
-
-        if inserted.rows_affected() == 1 {
-            sqlx::query(
-                "UPDATE character_state
-                 SET total_xp = total_xp + ?,
-                     level = ((total_xp + ?) / 100) + 1
-                 WHERE id = 1",
-            )
-            .bind(XP_PER_REWARD)
-            .bind(XP_PER_REWARD)
-            .execute(&mut *transaction)
-            .await?;
-        }
     }
 
     transaction.commit().await
