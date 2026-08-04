@@ -57,6 +57,15 @@ export type AiUsageToday = {
   latestAvailableTokens: number | null;
 };
 
+export type AiWeeklyXp = {
+  weekStartedOn: string;
+  earnedXp: number;
+  maxXp: number;
+  codexXp: number;
+  claudeXp: number;
+  cursorXp: number;
+};
+
 export type CodexAccountPreview = {
   accountLabel: string;
   authType: string;

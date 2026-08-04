@@ -5,6 +5,7 @@ import { relaunch } from "@tauri-apps/plugin-process";
 import type {
   ActivityHistoryDay,
   AiUsageToday,
+  AiWeeklyXp,
   CharacterState,
   ClaudeConnectionPreview,
   ClaudeUsageToday,
@@ -78,6 +79,15 @@ const previewAiUsage: AiUsageToday = {
   environment: null,
   latestAvailableDate: null,
   latestAvailableTokens: null
+};
+
+const previewAiWeeklyXp: AiWeeklyXp = {
+  weekStartedOn: new Date().toISOString().slice(0, 10),
+  earnedXp: 140,
+  maxXp: 210,
+  codexXp: 50,
+  claudeXp: 60,
+  cursorXp: 30
 };
 
 const previewClaudeUsage: ClaudeUsageToday = {
@@ -173,6 +183,7 @@ function getPreviewDashboard() {
       aiUsage: {
         ...previewAiUsage,
         totalTokens: 128_420,
+        weekTokens: 512_400,
         source: "codex-account",
         lastSyncedAt: "2026-07-28T16:49:00+09:00",
         status: "connected" as const,
@@ -181,6 +192,7 @@ function getPreviewDashboard() {
       claudeUsage: {
         ...previewClaudeUsage,
         totalTokens: 86_310,
+        weekTokens: 1_240_000,
         inputTokens: 31_200,
         outputTokens: 18_110,
         cachedTokens: 37_000,
@@ -199,6 +211,7 @@ function getPreviewDashboard() {
         apiPercent: 12.4,
         todayMicrousd: 2_850_000,
         totalTokens: 241_820,
+        weekTokens: 720_000,
         cycleEndsAt: "2026-08-04T00:00:00Z",
         lastSyncedAt: "2026-07-29T16:51:00+09:00"
       },
@@ -209,6 +222,7 @@ function getPreviewDashboard() {
         xpEarned: 40,
         nextRewardAt: 10_000
       },
+      aiWeeklyXp: previewAiWeeklyXp,
       runner: previewRunner()
     };
   }
@@ -223,6 +237,7 @@ function getPreviewDashboard() {
         status: "syncing" as const,
         accountLabel: "Codex 계정"
       },
+      aiWeeklyXp: { ...previewAiWeeklyXp, earnedXp: 0, codexXp: 0, claudeXp: 0, cursorXp: 0 },
       claudeUsage: {
         ...previewClaudeUsage,
         status: "waiting" as const
@@ -238,6 +253,7 @@ function getPreviewDashboard() {
     activityHistory: previewActivityHistory(),
     character: previewCharacter,
     aiUsage: previewAiUsage,
+    aiWeeklyXp: { ...previewAiWeeklyXp, earnedXp: 0, codexXp: 0, claudeXp: 0, cursorXp: 0 },
     claudeUsage: previewClaudeUsage,
     cursorUsage: previewCursorUsage,
     keyboard: previewKeyboard,
@@ -472,17 +488,21 @@ export async function getDashboard() {
     return getPreviewDashboard();
   }
 
-  const [summary, focus, activityHistory, character, aiUsage, claudeUsage, cursorUsage, keyboard, runner] =
+  const [focus, activityHistory, aiUsage, claudeUsage, cursorUsage, keyboard, runner] =
     await Promise.all([
-    invoke<DailySummary>("get_daily_summary"),
     invoke<FocusActivityToday>("get_focus_activity_today"),
     invoke<ActivityHistoryDay[]>("get_activity_history"),
-    invoke<CharacterState>("get_character_state"),
     invoke<AiUsageToday>("get_ai_usage_today"),
     invoke<ClaudeUsageToday>("get_claude_usage_today"),
     invoke<CursorUsage>("get_cursor_usage"),
     invoke<KeyboardActivityToday>("get_keyboard_activity_today"),
     invoke<RunnerSelection>("get_runner_selection")
+  ]);
+
+  const aiWeeklyXp = await invoke<AiWeeklyXp>("sync_ai_weekly_xp");
+  const [summary, character] = await Promise.all([
+    invoke<DailySummary>("get_daily_summary"),
+    invoke<CharacterState>("get_character_state")
   ]);
 
   return {
@@ -491,6 +511,7 @@ export async function getDashboard() {
     activityHistory,
     character,
     aiUsage,
+    aiWeeklyXp,
     claudeUsage,
     cursorUsage,
     keyboard,

@@ -1,5 +1,6 @@
 mod activity;
 mod adapters;
+mod ai_xp;
 mod commands;
 mod database;
 mod diagnostics;
@@ -122,7 +123,8 @@ pub fn run() {
             commands::record_whip,
             commands::preview_xp_coupon,
             commands::redeem_xp_coupon,
-            commands::get_xp_boost_status
+            commands::get_xp_boost_status,
+            commands::sync_ai_weekly_xp
         ])
         .run(tauri::generate_context!())
         .expect("error while running RunDev");

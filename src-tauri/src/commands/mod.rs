@@ -1,5 +1,5 @@
 use crate::{
-    activity, adapters, database::AppState, diagnostics, host_metrics, keyboard, tray, whip,
+    activity, adapters, ai_xp, database::AppState, diagnostics, host_metrics, keyboard, tray, whip,
     xp_boost,
 };
 use chrono::{DateTime, Datelike, Duration, Local, NaiveDate, Utc};
@@ -98,6 +98,11 @@ pub async fn get_xp_boost_status(
     state: State<'_, AppState>,
 ) -> Result<xp_boost::XpBoostStatus, String> {
     xp_boost::status(&state.pool).await
+}
+
+#[tauri::command]
+pub async fn sync_ai_weekly_xp(state: State<'_, AppState>) -> Result<ai_xp::AiWeeklyXp, String> {
+    ai_xp::sync(&state.pool).await
 }
 
 #[derive(Serialize)]

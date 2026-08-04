@@ -17,7 +17,12 @@ describe("App", () => {
     expect(await screen.findByText("2,000회마다")).toBeInTheDocument();
     expect(await screen.findAllByText(/^오늘 \d+회 달성$/)).toHaveLength(2);
     expect(await screen.findByText("Claude Code")).toBeInTheDocument();
-    expect(await screen.findByText("Cursor")).toBeInTheDocument();
+    expect(await screen.findByText("AI 사용량")).toBeInTheDocument();
+    expect((await screen.findAllByText("Cursor")).length).toBeGreaterThanOrEqual(2);
+    expect(screen.getByRole("progressbar", { name: "이번 주 AI 토큰 사용 XP" })).toHaveAttribute(
+      "aria-valuemax",
+      "210"
+    );
     fireEvent.click(screen.getByRole("button", { name: "장치 상세 펼치기" }));
     expect(screen.getByRole("button", { name: "장치 상세 접기" })).toHaveAttribute(
       "aria-expanded",

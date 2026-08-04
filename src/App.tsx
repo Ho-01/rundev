@@ -55,6 +55,7 @@ import type {
   ClaudeConnectionPreview,
   CodexAccountPreview,
   CursorAccountPreview,
+  AiWeeklyXp,
   WhipStats,
   XpBoostStatus,
   XpCouponPreview
@@ -156,6 +157,53 @@ function ProviderInlineDetails({
       </dl>
       {error && <p className="provider-inline-error">{error}</p>}
       <div className="provider-inline-actions">{children}</div>
+    </div>
+  );
+}
+
+function AiWeeklyXpProgress({ progress }: { progress: AiWeeklyXp | null }) {
+  const maxXp = progress?.maxXp ?? 210;
+  const providers = [
+    { id: "codex", label: "Codex", xp: progress?.codexXp ?? 0 },
+    { id: "claude", label: "Claude", xp: progress?.claudeXp ?? 0 },
+    { id: "cursor", label: "Cursor", xp: progress?.cursorXp ?? 0 }
+  ];
+
+  return (
+    <div className="ai-weekly-xp">
+      <div className="ai-weekly-xp-heading">
+        <div>
+          <strong>이번 주 AI 토큰 사용 XP</strong>
+          <span className="reward-rule">
+            <BadgeCheck size={11} />
+            사용량 마일스톤마다 <b>+10 XP</b>
+          </span>
+        </div>
+        <b>{progress?.earnedXp ?? 0} / {maxXp} XP</b>
+      </div>
+      <div
+        className="ai-weekly-xp-track"
+        role="progressbar"
+        aria-label="이번 주 AI 토큰 사용 XP"
+        aria-valuemin={0}
+        aria-valuemax={maxXp}
+        aria-valuenow={progress?.earnedXp ?? 0}
+      >
+        {providers.map((provider) => (
+          <span
+            key={provider.id}
+            className={`ai-weekly-xp-segment ${provider.id}`}
+            style={{ width: `${(provider.xp / maxXp) * 100}%` }}
+          />
+        ))}
+      </div>
+      <div className="ai-weekly-xp-legend">
+        {providers.map((provider) => (
+          <span key={provider.id} className={provider.id}>
+            <i />{provider.label} <b>{provider.xp} XP</b>
+          </span>
+        ))}
+      </div>
     </div>
   );
 }
@@ -302,6 +350,7 @@ export function App() {
     activityHistory,
     character,
     aiUsage,
+    aiWeeklyXp,
     claudeUsage,
     cursorUsage,
     keyboard,
@@ -865,17 +914,15 @@ export function App() {
             </span>
             <strong>Codex</strong>
             <div className="provider-summary-value">
-              <span>오늘의 토큰 사용량</span>
+              <span>이번 주 토큰 사용량</span>
               <b className={aiUsage?.status === "error" ? "needs-attention" : ""}>
                 {aiUsage?.status === "disconnected"
                   ? "연동하기"
                   : aiUsage?.status === "error"
                   ? "확인 필요"
-                  : aiUsage?.status === "delayed"
-                  ? "집계 지연"
-                  : aiUsage?.totalTokens == null
+                  : aiUsage?.weekTokens == null
                   ? "—"
-                  : formatCompactTokens(aiUsage.totalTokens)}
+                  : formatCompactTokens(aiUsage.weekTokens)}
               </b>
             </div>
           </summary>
@@ -1098,6 +1145,7 @@ export function App() {
             )}
           </ProviderInlineDetails>
         </details>
+        <AiWeeklyXpProgress progress={aiWeeklyXp} />
       </section>
 
       <div className="divider" />

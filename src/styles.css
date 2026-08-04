@@ -608,6 +608,32 @@ button { color: inherit; font: inherit; }
 .keyboard-permission button { flex: 0 0 auto; padding: 4px 7px; color: #171717; background: #e8e8e8; border: 0; border-radius: 5px; font-size: 9px; font-weight: 700; }
 
 .provider-icon { display: grid; flex: 0 0 auto; place-items: center; width: 30px; height: 30px; margin-right: 10px; color: #c9c9cc; background: #303033; border-radius: 7px; }
+.ai-weekly-xp {
+  margin: 8px 5px 3px;
+  padding: 9px 10px 8px;
+  background: rgba(255,255,255,.035);
+  border: 1px solid rgba(255,255,255,.06);
+  border-radius: 8px;
+}
+.ai-weekly-xp-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.ai-weekly-xp-heading > div { display: flex; min-width: 0; flex-direction: column; gap: 2px; }
+.ai-weekly-xp-heading strong { color: #dedee0; font-size: 10px; font-weight: 600; }
+.ai-weekly-xp-heading .reward-rule { margin-top: 1px; color: #8e8e94; font-size: 9px; }
+.ai-weekly-xp-heading .reward-rule svg { color: #9bce5a; }
+.ai-weekly-xp-heading .reward-rule b { color: #b7d88d; font-weight: 600; }
+.ai-weekly-xp-heading > b { color: #d9d9dc; font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ai-weekly-xp-track { display: flex; width: 100%; height: 7px; margin-top: 7px; overflow: hidden; background: #202023; border-radius: 999px; }
+.ai-weekly-xp-segment { display: block; height: 100%; transition: width .2s ease; }
+.ai-weekly-xp-segment.codex { background: #82bd67; }
+.ai-weekly-xp-segment.claude { background: #d98658; }
+.ai-weekly-xp-segment.cursor { background: #788fda; }
+.ai-weekly-xp-legend { display: flex; align-items: center; gap: 9px; margin-top: 6px; color: #77777d; font-size: 8px; }
+.ai-weekly-xp-legend span { display: inline-flex; align-items: center; gap: 3px; white-space: nowrap; }
+.ai-weekly-xp-legend i { width: 5px; height: 5px; border-radius: 50%; }
+.ai-weekly-xp-legend .codex i { background: #82bd67; }
+.ai-weekly-xp-legend .claude i { background: #d98658; }
+.ai-weekly-xp-legend .cursor i { background: #788fda; }
+.ai-weekly-xp-legend b { color: #b5b5b9; font-weight: 500; font-variant-numeric: tabular-nums; }
 .provider-icon img { width: 18px; height: 18px; object-fit: contain; }
 .provider-icon .openai-icon { filter: invert(1); }
 .provider-details { position: relative; }
