@@ -38,17 +38,47 @@ jobs:
       release_id: ${{ steps.create.outputs.result }}
 
     steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Build release notes from changelog
+        shell: bash
+        run: node scripts/release-notes.mjs "${GITHUB_REF_NAME}" > release-notes.md
+
       - name: Create public GitHub release
         id: create
         uses: actions/github-script@v7
         with:
           script: |
+            const fs = require("fs");
             const tag = context.ref.replace("refs/tags/", "");
+            const changes = fs.readFileSync("release-notes.md", "utf8").trim();
+            const body = [
+              "## 변경 사항",
+              "",
+              changes,
+              "",
+              "## 설치 파일",
+              "",
+              "- Windows: `RunDev_X.Y.Z_x64-setup.exe`",
+              "- Apple Silicon macOS: `RunDev_X.Y.Z_aarch64.dmg`",
+              "- Intel macOS: `RunDev_X.Y.Z_x64.dmg`",
+              "- 자동 업데이트: `latest.json`과 각 플랫폼의 `.sig` 파일",
+              "",
+              "> macOS 코드 서명 및 notarization 전 단계라 운영체제의 보안 경고가 표시될 수 있습니다."
+            ].join("\n").replaceAll("X.Y.Z", tag.replace(/^v/, ""));
             try {
               const existing = await github.rest.repos.getReleaseByTag({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 tag
+              });
+              await github.rest.repos.updateRelease({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                release_id: existing.data.id,
+                name: `RunDev ${tag}`,
+                body
               });
               return existing.data.id;
             } catch (error) {
@@ -59,7 +89,7 @@ jobs:
               repo: context.repo.repo,
               tag_name: tag,
               name: `RunDev ${tag}`,
-              body: "Windows NSIS 설치 프로그램과 Apple Silicon/Intel용 macOS DMG입니다. Updater 서명 아티팩트(.sig, latest.json)가 포함됩니다. macOS 코드 서명 및 notarization 전 단계라 운영체제의 보안 경고가 표시될 수 있습니다.",
+              body,
               draft: false,
               prerelease: false
             });

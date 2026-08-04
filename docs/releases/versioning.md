@@ -50,6 +50,9 @@ npm.cmd run version:check
 5. `git tag -a vX.Y.Z -m "RunDev vX.Y.Z"`를 생성하고 푸시한다.
 6. 태그 워크플로의 Windows installer와 Apple Silicon/Intel macOS DMG를 확인한다.
 
+릴리스 본문은 태그 버전에 해당하는 `CHANGELOG.md` 섹션에서 자동 생성된다.
+버전 섹션이 없거나 비어 있으면 릴리스 생성을 실패시킨다.
+
 ## 빌드 종류
 
 - `main` macOS build: 최신 개발 상태를 확인하는 임시 artifact
