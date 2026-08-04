@@ -12,7 +12,10 @@ pub(super) fn is_developer_app(identifier: &str) -> bool {
 }
 
 pub(super) fn is_rundev(identifier: &str) -> bool {
-    matches!(identifier.to_ascii_lowercase().as_str(), "rundev.exe" | "dev.rundev.app")
+    matches!(
+        identifier.to_ascii_lowercase().as_str(),
+        "rundev.exe" | "dev.rundev.app"
+    )
 }
 
 pub(crate) fn display_name(identifier: &str) -> String {
