@@ -7,6 +7,7 @@ React는 다음 역할만 담당한다.
 - 트레이 팝오버 렌더링
 - 오늘 활동, AI 사용량, 캐릭터 상태 표시
 - 개발자 캐릭터 채찍질 연출과 오늘 횟수 표시
+- G 키 기반 핑 모드와 방향별 액션 선택 연출
 - 사용자 설정 입력
 - command 결과의 로딩 및 오류 상태 관리
 
@@ -21,7 +22,9 @@ src/
 ├─ styles.css
 ├─ components/
 │  ├─ SystemStatusStrip.tsx
-│  └─ WhipCrackOverlay.tsx
+│  ├─ WhipCrackOverlay.tsx
+│  ├─ PingModeOverlay.tsx
+│  └─ pingMode.ts
 ├─ services/
 │  └─ rundev.ts
 ├─ store/
@@ -63,6 +66,7 @@ flowchart LR
 - 장치 상태는 기본 52px 요약 레일에서 대표값만 보여주고, 상단 화살표로 224px 상세
   카드 패널을 펼친다. 펼침 선택은 localStorage에만 기억한다.
 - 초록색은 상태와 진행률 강조에만 제한적으로 사용한다.
+- 핑 원판은 방향 슬롯과 실행 액션을 분리하여 이후 사용자별 액션 배치를 지원한다.
 - 기본 창에는 타이틀바와 네이티브 window control을 표시하지 않는다.
 
 ## 컴포넌트 추가 기준

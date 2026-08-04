@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Clock3,
   Cpu,
@@ -42,6 +42,7 @@ import {
 } from "./services/updater";
 import { SystemStatusStrip } from "./components/SystemStatusStrip";
 import { buildActivityStatus } from "./components/activityStatus";
+import { PingModeOverlay } from "./components/PingModeOverlay";
 import {
   WhipCrackOverlay,
   type WhipCrackApi
@@ -262,6 +263,7 @@ export function App() {
   );
   const updateInstallStartedRef = useRef(false);
   const whipCrackRef = useRef<WhipCrackApi>(null);
+  const runnerRef = useRef<HTMLButtonElement>(null);
   const shellRef = useRef<HTMLElement>(null);
   const freezeRunner = new URLSearchParams(window.location.search).has("freezeRunner");
   const showLevelShowcase = new URLSearchParams(window.location.search).has("levelShowcase");
@@ -320,7 +322,7 @@ export function App() {
     );
   }
 
-  async function handleRunnerWhip(event: MouseEvent<HTMLButtonElement>) {
+  const performWhip = useCallback(async () => {
     const now = Date.now();
     if (now - lastWhipAt < WHIP_COOLDOWN_MS) return;
     setLastWhipAt(now);
@@ -329,10 +331,9 @@ export function App() {
     setWhipHitClass(nextVariant === "a" ? "hit-a" : "hit-b");
     setWhipSaveError(false);
 
-    if (event.detail > 0) {
-      spawnWhipFx(event.clientX, event.clientY, nextVariant);
-    } else {
-      const rect = event.currentTarget.getBoundingClientRect();
+    const runnerElement = runnerRef.current;
+    if (runnerElement) {
+      const rect = runnerElement.getBoundingClientRect();
       spawnWhipFx(
         rect.left + rect.width / 2,
         rect.top + rect.height / 2,
@@ -345,7 +346,7 @@ export function App() {
     } catch {
       setWhipSaveError(true);
     }
-  }
+  }, [lastWhipAt, whipVariant]);
 
   async function openCodexConnection() {
     setPreviewLoading(true);
@@ -616,9 +617,11 @@ export function App() {
         width={systemPanelExpanded ? 512 : 340}
         height={480}
       />
+      <PingModeOverlay rootRef={shellRef} onWhip={performWhip} />
       <div className="popover-main">
       <header className="runner-header">
         <button
+          ref={runnerRef}
           type="button"
           className={`runner${whipHitClass ? ` ${whipHitClass}` : ""}`}
           aria-label="개발자 캐릭터 채찍질하기"
@@ -627,7 +630,7 @@ export function App() {
               ? "저장 실패"
               : `오늘 ${whipStats?.whipCount ?? 0}`
           }
-          onClick={(event) => void handleRunnerWhip(event)}
+          onClick={() => void performWhip()}
         >
           <img src={runnerFrames[headerFrame]} alt="" aria-hidden="true" />
           <span className="whip-count">오늘 {whipStats?.whipCount ?? 0}</span>
