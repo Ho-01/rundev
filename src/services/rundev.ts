@@ -514,7 +514,17 @@ export async function getActivityStats(period: "day" | "week"): Promise<Activity
       xpEarned,
       keyboardPresses: period === "week" ? 48_230 : 8_421,
       xpSources,
-      hourly
+      hourly,
+      apps: period === "week"
+        ? [
+            { appName: "VS Code", activeSeconds: 18_420 },
+            { appName: "Windows Terminal", activeSeconds: 9_780 },
+            { appName: "Cursor", activeSeconds: 5_640 }
+          ]
+        : [
+            { appName: "VS Code", activeSeconds: 4_320 },
+            { appName: "Windows Terminal", activeSeconds: 2_160 }
+          ]
     };
   }
   return invoke<ActivityStats>("get_activity_stats", { period });

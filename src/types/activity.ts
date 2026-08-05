@@ -154,6 +154,7 @@ export type ActivityStats = {
     amount: number;
   }>;
   hourly: Array<{ date: string; hour: number; activeSeconds: number; xpEarned: number }>;
+  apps: FocusAppUsage[];
 };
 
 export type FocusActivityUpdate = {

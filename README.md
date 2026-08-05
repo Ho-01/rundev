@@ -20,10 +20,11 @@ SQLite 데이터나 계정 정보는 문서 이미지 생성에 사용하지 않
 
 ## 개발자 레벨
 
-<img src="docs/assets/readme/level-progression.png" width="320" alt="RunDev 개발자 레벨 등급 미리보기">
+<img src="docs/assets/readme/tier-emblems.png" width="920" alt="RunDev 개발자 티어별 엠블럼과 레벨 장식 단계">
 
 활동 XP 100마다 레벨이 오르며, 레벨 구간에 따라 배지 색상과 개발자 등급이
-변합니다.
+변합니다. 각 티어에 진입하면 기본 엠블럼을 받고, 해당 티어 레벨 구간의 1/3에서
+외곽 판 한 겹, 2/3에서 두 번째 외곽 판과 하단 셰브론이 추가됩니다.
 
 | 레벨 | 등급 |
 | --- | --- |

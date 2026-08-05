@@ -79,8 +79,14 @@ try {
       name: "runner-picker",
       query: "?preview=disconnected&runner=coding-fish&freezeRunner=1",
       action: async () => page.getByRole("button", { name: "개발자 변경" }).click()
+    },
+    {
+      name: "tier-emblems",
+      query: "?emblemShowcase=1",
+      viewport: { width: 920, height: 1040 }
     }
   ]) {
+    await page.setViewportSize(scenario.viewport ?? { width: 320, height: 480 });
     await page.goto(`http://127.0.0.1:${address.port}/${scenario.query}`, {
       waitUntil: "networkidle"
     });

@@ -1,4 +1,7 @@
-use std::sync::atomic::{AtomicU8, Ordering};
+use std::sync::{
+    atomic::{AtomicU8, Ordering},
+    Mutex, OnceLock,
+};
 use tauri::{
     menu::{Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
@@ -8,6 +11,7 @@ use tauri::{
 use crate::{adapters, database::AppState};
 
 static SELECTED_RUNNER: AtomicU8 = AtomicU8::new(0);
+static COMPACT_MAIN_X: OnceLock<Mutex<Option<i32>>> = OnceLock::new();
 
 const CAT_FRAMES: [&[u8]; 4] = [
     include_bytes!("../../icons/tray/coding/01.png").as_slice(),
@@ -155,9 +159,18 @@ pub(crate) fn set_system_panel_expanded(
     } else {
         0
     };
-    let mut x = current_position
+    let inferred_main_x = current_position
         .x
-        .saturating_add(i32::try_from(current_left_inset).unwrap_or(i32::MAX))
+        .saturating_add(i32::try_from(current_left_inset).unwrap_or(i32::MAX));
+    let anchor = COMPACT_MAIN_X.get_or_init(|| Mutex::new(None));
+    let main_x = {
+        let mut saved = anchor.lock().map_err(|error| error.to_string())?;
+        if expanded && saved.is_none() {
+            *saved = Some(inferred_main_x);
+        }
+        saved.unwrap_or(inferred_main_x)
+    };
+    let mut x = main_x
         .saturating_sub(i32::try_from(target_left_inset).unwrap_or(i32::MAX));
     let mut y = current_position.y;
 
@@ -187,7 +200,11 @@ pub(crate) fn set_system_panel_expanded(
         .map_err(|error| error.to_string())?;
     window
         .set_position(PhysicalPosition::new(x, y))
-        .map_err(|error| error.to_string())
+        .map_err(|error| error.to_string())?;
+    if !expanded {
+        *anchor.lock().map_err(|error| error.to_string())? = None;
+    }
+    Ok(())
 }
 
 fn toggle_main_window(app: &tauri::AppHandle, tray_rect: Rect) {

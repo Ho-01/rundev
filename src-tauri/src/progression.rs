@@ -32,6 +32,14 @@ pub struct ActivityStats {
     keyboard_presses: i64,
     xp_sources: Vec<XpSource>,
     hourly: Vec<HourlyActivity>,
+    apps: Vec<AppUsage>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AppUsage {
+    app_name: String,
+    active_seconds: i64,
 }
 
 #[derive(Debug, Serialize)]
@@ -188,6 +196,29 @@ pub async fn stats(pool: &SqlitePool, period: &str) -> Result<ActivityStats, Str
     let keyboard_presses: i64 = sqlx::query_scalar(
         "SELECT COALESCE(SUM(press_count), 0) FROM keyboard_daily_stats WHERE local_date BETWEEN ? AND ?",
     ).bind(&start_text).bind(&end_text).fetch_one(pool).await.map_err(|error| error.to_string())?;
+    let app_rows: Vec<(String, i64)> = sqlx::query_as(
+        "SELECT source, COALESCE(SUM(active_seconds), 0)
+         FROM activity_sessions
+         WHERE activity_type = 'development'
+           AND date(started_at, 'localtime') BETWEEN ? AND ?
+         GROUP BY source",
+    )
+    .bind(&start_text)
+    .bind(&end_text)
+    .fetch_all(pool)
+    .await
+    .map_err(|error| error.to_string())?;
+    let mut app_totals = HashMap::<String, i64>::new();
+    for (source, active_seconds) in app_rows {
+        let identifier = source.strip_prefix("foreground:").unwrap_or(&source);
+        let app_name = crate::activity::catalog::display_name(identifier);
+        *app_totals.entry(app_name).or_default() += active_seconds;
+    }
+    let mut apps: Vec<_> = app_totals
+        .into_iter()
+        .map(|(app_name, active_seconds)| AppUsage { app_name, active_seconds })
+        .collect();
+    apps.sort_by(|left, right| right.active_seconds.cmp(&left.active_seconds).then_with(|| left.app_name.cmp(&right.app_name)));
     let mut activity_by_hour = HashMap::<(String, i64), i64>::new();
     for (started_at, mut remaining) in activity_sessions {
         let Ok(parsed) = DateTime::parse_from_rfc3339(&started_at) else {
@@ -233,6 +264,7 @@ pub async fn stats(pool: &SqlitePool, period: &str) -> Result<ActivityStats, Str
             .map(|(id, amount)| XpSource { id, amount })
             .collect(),
         hourly,
+        apps,
     })
 }
 

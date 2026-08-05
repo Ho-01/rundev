@@ -5,6 +5,8 @@ import {
   Cpu,
   HardDrive,
   MemoryStick,
+  Pin,
+  PinOff,
   Thermometer,
   Wifi
 } from "lucide-react";
@@ -14,7 +16,9 @@ import type { SystemStats } from "../types/system";
 type Props = {
   stats: SystemStats;
   expanded: boolean;
+  pinned: boolean;
   onToggle: () => void;
+  onPinnedChange: (pinned: boolean) => void;
 };
 
 const icons = {
@@ -75,14 +79,13 @@ function DetailCard({
   );
 }
 
-export function SystemStatusStrip({ stats, expanded, onToggle }: Props) {
+export function SystemStatusStrip({ stats, expanded, pinned, onToggle, onPinnedChange }: Props) {
   const items = buildStripItems(stats);
+  if (!expanded && !pinned) return null;
 
   return (
-    <aside
-      className={`system-strip ${expanded ? "expanded" : "compact"}`}
-      aria-label="장치 상태"
-    >
+    <aside className={`system-strip ${expanded ? "expanded" : "compact"}`} aria-label="장치 상태">
+      <div className="system-strip-actions">
       <button
         type="button"
         className="system-strip-toggle"
@@ -90,15 +93,23 @@ export function SystemStatusStrip({ stats, expanded, onToggle }: Props) {
         aria-expanded={expanded}
         onClick={onToggle}
       >
-        {expanded ? (
-          <ChevronLeft size={15} aria-hidden="true" />
-        ) : (
-          <ChevronRight size={15} aria-hidden="true" />
-        )}
+        {expanded ? <ChevronLeft size={15} aria-hidden="true" /> : <ChevronRight size={15} aria-hidden="true" />}
       </button>
+      {expanded && (
+        <button
+          type="button"
+          className={`system-strip-pin${pinned ? " active" : ""}`}
+          aria-label={pinned ? "장치 요약 고정 해제" : "장치 요약 고정하기"}
+          aria-pressed={pinned}
+          onClick={() => onPinnedChange(!pinned)}
+        >
+          {pinned ? <PinOff size={13} aria-hidden="true" /> : <Pin size={13} aria-hidden="true" />}
+          {pinned ? "요약 고정됨" : "요약 고정"}
+        </button>
+      )}
+      </div>
 
-      {expanded ? (
-        <div className="system-detail-list">
+      {expanded ? <div className="system-detail-list">
           <DetailCard
             icon={Cpu}
             title="CPU"
@@ -173,29 +184,16 @@ export function SystemStatusStrip({ stats, expanded, onToggle }: Props) {
               ["업로드", stats.networkUpBps == null ? "—" : formatRate(stats.networkUpBps)]
             ]}
           />
-        </div>
-      ) : (
-        <div className="system-strip-items">
-          {items.map((item) => {
-            const Icon = icons[item.id as keyof typeof icons] ?? Cpu;
-            return (
-              <div
-                key={item.id}
-                className={`system-strip-tile${item.muted ? " muted" : ""}`}
-                aria-label={item.detail}
-                title={item.detail}
-              >
-                <Icon size={17} strokeWidth={2.1} aria-hidden="true" />
-                <strong>
-                  {item.display}
-                  {item.unit ? <span>{item.unit}</span> : null}
-                </strong>
-                <em>{item.label}</em>
-              </div>
-            );
-          })}
-        </div>
-      )}
+      </div> : <div className="system-strip-items">
+        {items.map((item) => {
+          const Icon = icons[item.id as keyof typeof icons] ?? Cpu;
+          return <div key={item.id} className={`system-strip-tile${item.muted ? " muted" : ""}`} aria-label={item.detail} title={item.detail}>
+            <Icon size={17} strokeWidth={2.1} aria-hidden="true" />
+            <strong>{item.display}{item.unit ? <span>{item.unit}</span> : null}</strong>
+            <em>{item.label}</em>
+          </div>;
+        })}
+      </div>}
     </aside>
   );
 }

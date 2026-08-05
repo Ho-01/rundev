@@ -2,3 +2,4 @@ src-tauri/migrations/0006_whip_daily_stats.sql text eol=lf
 src-tauri/migrations/0007_cursor_usage_snapshots.sql text eol=lf
 src-tauri/migrations/0008_cursor_usage_snapshot_dedupe.sql text eol=lf
 src-tauri/migrations/0009_cursor_request_usage.sql text eol=lf
+src-tauri/migrations/*.sql text eol=lf

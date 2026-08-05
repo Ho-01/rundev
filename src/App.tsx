@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import {
   Clock3,
   Cpu,
@@ -12,6 +12,7 @@ import {
   Hammer,
   Info,
   Keyboard,
+  MonitorCog,
   Network,
   RotateCcw,
   Settings2,
@@ -85,6 +86,7 @@ import packageJson from "../package.json";
 import {
   getLevelTier,
   levelTiers,
+  type LevelTier,
   type LevelTierId
 } from "./domain/level";
 
@@ -290,6 +292,86 @@ function LevelStatus({
   );
 }
 
+function tierAdornmentLevel(tier: LevelTier, level: number) {
+  const tierSpan = Math.max(1, (tier.maxLevel ?? tier.minLevel + 49) - tier.minLevel);
+  const tierProgress = Math.min(1, Math.max(0, (level - tier.minLevel) / tierSpan));
+  return tierProgress >= 2 / 3 ? 2 : tierProgress >= 1 / 3 ? 1 : 0;
+}
+
+function TierEmblem({ tier, level }: { tier: LevelTier; level: number }) {
+  return <span className="growth-tier-mark" aria-hidden="true" data-level={level}>
+    <i className="tier-plate plate-2" />
+    <i className="tier-plate plate-1" />
+    <span className="growth-tier-emblem"><TierIcon tierId={tier.id} size={17} /></span>
+    <span className="tier-chevron"><i /><i /></span>
+  </span>;
+}
+
+function GrowthSummary({
+  level,
+  xpIntoLevel,
+  xpForNextLevel,
+  nextGoal,
+  goalKind,
+  onOpenTraits
+}: {
+  level: number;
+  xpIntoLevel: number;
+  xpForNextLevel: number;
+  nextGoal: string;
+  goalKind: "focus" | "keyboard";
+  onOpenTraits: () => void;
+}) {
+  const tier = getLevelTier(level);
+  const progress = xpForNextLevel > 0 ? xpIntoLevel / xpForNextLevel * 100 : 100;
+  const remainingXp = Math.max(0, xpForNextLevel - xpIntoLevel);
+  const adornmentLevel = tierAdornmentLevel(tier, level);
+
+  return <section className={`growth-summary tier-${tier.id} adornment-${adornmentLevel}`} aria-label="레벨 성장">
+    <button type="button" className="growth-level" onClick={onOpenTraits} aria-label={`레벨 ${level} · ${tier.name} · 특성 열기`}>
+      <TierEmblem tier={tier} level={level} />
+      <span className="growth-level-copy">
+        <span><span className="growth-tier-title"><strong>{tier.name}</strong><b>Lv. {level}</b></span><small>특성 보기 ›</small></span>
+        <span><b>{xpIntoLevel} / {xpForNextLevel} XP</b><small>다음 레벨까지 {remainingXp} XP</small></span>
+        <Meter value={progress} />
+      </span>
+    </button>
+    <div className="growth-next-goal">
+      <i>{goalKind === "keyboard" ? <Keyboard size={12} aria-hidden="true" /> : <Target size={12} aria-hidden="true" />}</i>
+      <span><small>다음 목표</small>{nextGoal}</span>
+      <b>+10 XP</b>
+    </div>
+  </section>;
+}
+
+function EmblemShowcase() {
+  return <main className="emblem-showcase">
+    <header>
+      <span>RunDev progression system</span>
+      <h1>개발자 티어 엠블럼</h1>
+      <p>티어마다 실루엣과 아이콘이 달라지고, 같은 티어에서도 레벨 구간에 따라 장식이 성장합니다.</p>
+    </header>
+    <div className="emblem-showcase-rule">
+      <span><b>기본</b> 티어 진입</span><i />
+      <span><b>장식 I</b> 구간 1/3</span><i />
+      <span><b>장식 II</b> 구간 2/3</span>
+    </div>
+    <section className="emblem-showcase-list">
+      {levelTiers.map((tier) => {
+        const span = Math.max(1, (tier.maxLevel ?? tier.minLevel + 49) - tier.minLevel);
+        const levels = [tier.minLevel, tier.minLevel + Math.ceil(span / 3), tier.minLevel + Math.ceil(span * 2 / 3)];
+        return <article key={tier.id} className={`growth-summary emblem-showcase-row tier-${tier.id}`}>
+          <div className="emblem-showcase-name"><strong>{tier.name}</strong><span>Lv. {tier.minLevel}{tier.maxLevel ? `–${tier.maxLevel}` : "+"}</span></div>
+          {levels.map((level, index) => <div key={level} className={`emblem-sample adornment-${index}`}>
+            <TierEmblem tier={tier} level={level} />
+            <span>Lv. {level}</span>
+          </div>)}
+        </article>;
+      })}
+    </section>
+  </main>;
+}
+
 const traitCopy: Record<TraitId, { name: string; description: string }> = {
   "focus-ready": { name: "몰입 준비", description: "집중시간 XP 획득량 증가" },
   "hot-keyboard": { name: "뜨거운 키보드", description: "키보드 XP 획득량 증가" },
@@ -309,7 +391,14 @@ function StatsPeriod({ title, stats }: { title: string; stats: ActivityStats | n
   } as const;
   const xpSources = stats?.xpSources.filter((source) => source.amount > 0) ?? [];
   const sourceTotal = Math.max(1, xpSources.reduce((sum, source) => sum + source.amount, 0));
-  const heatmap = <div className={`hourly-heatmap ${stats?.period ?? "day"}`}>
+  const busiestSlot = stats?.hourly.reduce((busiest, slot) => slot.activeSeconds > busiest.activeSeconds ? slot : busiest, stats.hourly[0]);
+  const heatmapLabel = busiestSlot?.activeSeconds
+    ? `${title} 시간대별 활동. 가장 활발한 시간은 ${busiestSlot.date} ${busiestSlot.hour}시, ${formatDuration(busiestSlot.activeSeconds)}`
+    : `${title} 시간대별 활동 없음`;
+  const sourceLabel = xpSources.length
+    ? `${title} XP 구성. ${xpSources.map((source) => `${sourceCopy[source.id]} ${source.amount} XP`).join(", ")}`
+    : `${title} 획득 XP 없음`;
+  const heatmap = <div className={`hourly-heatmap ${stats?.period ?? "day"}`} role="img" aria-label={heatmapLabel}>
     {stats?.hourly.map((slot) => <i key={`${slot.date}-${slot.hour}`} style={{ opacity: slot.activeSeconds === 0 ? .14 : .3 + .7 * slot.activeSeconds / maxSeconds }} title={`${slot.date} ${slot.hour}:00 · ${formatDuration(slot.activeSeconds)}`} />)}
   </div>;
   return <section className="stats-period">
@@ -321,7 +410,7 @@ function StatsPeriod({ title, stats }: { title: string; stats: ActivityStats | n
     </div>
     <div className="xp-composition">
       <div className="xp-composition-heading"><span>XP 구성</span><b>{stats?.xpEarned ?? 0} XP</b></div>
-      <div className="xp-composition-track" aria-label={`${title} XP 출처별 구성`}>
+      <div className="xp-composition-track" role="img" aria-label={sourceLabel}>
         {xpSources.map((source) => <i key={source.id} className={source.id} style={{ width: `${source.amount / sourceTotal * 100}%` }} />)}
       </div>
       <div className="xp-composition-legend">
@@ -329,7 +418,7 @@ function StatsPeriod({ title, stats }: { title: string; stats: ActivityStats | n
       </div>
     </div>
     {stats?.period === "week" ? <div className="weekly-heatmap-layout">
-      <div className="heatmap-weekdays" aria-label="요일"><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span>토</span><span>일</span></div>
+      <div className="heatmap-weekdays" aria-hidden="true"><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span>토</span><span>일</span></div>
       <div className="weekly-heatmap-content">
         {heatmap}
         <div className="heatmap-hours week-hours"><span>0시</span><span>6시</span><span>12시</span><span>18시</span><span>23시</span></div>
@@ -362,6 +451,16 @@ function ActivityGrass({ activityHistory, activeDays, compact = false }: {
   </div>;
 }
 
+function FocusAppBreakdown({ apps, title }: { apps: ActivityStats["apps"] | undefined; title: string }) {
+  return <section className="stats-app-breakdown">
+    <h3>{title}</h3>
+    {apps?.length ? apps.map((app) => <div key={app.appName}>
+      <span>{app.appName}</span>
+      <strong>{formatDuration(app.activeSeconds)}</strong>
+    </div>) : <p>오늘 기록된 개발 도구가 없습니다.</p>}
+  </section>;
+}
+
 function StatsPanel({ dailyStats, weeklyStats, activityHistory, activeHistoryDays, onClose }: {
   dailyStats: ActivityStats | null;
   weeklyStats: ActivityStats | null;
@@ -369,11 +468,31 @@ function StatsPanel({ dailyStats, weeklyStats, activityHistory, activeHistoryDay
   activeHistoryDays: number;
   onClose: () => void;
 }) {
+  const [activeTab, setActiveTab] = useState<"today" | "week" | "history">("today");
+  const tabs = [
+    { id: "today" as const, label: "오늘" },
+    { id: "week" as const, label: "이번 주" },
+    { id: "history" as const, label: "20주" }
+  ];
+  function moveTab(event: KeyboardEvent<HTMLButtonElement>, index: number) {
+    let nextIndex = index;
+    if (event.key === "ArrowRight") nextIndex = (index + 1) % tabs.length;
+    else if (event.key === "ArrowLeft") nextIndex = (index - 1 + tabs.length) % tabs.length;
+    else if (event.key === "Home") nextIndex = 0;
+    else if (event.key === "End") nextIndex = tabs.length - 1;
+    else return;
+    event.preventDefault();
+    setActiveTab(tabs[nextIndex].id);
+    event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>("[role=tab]")[nextIndex]?.focus();
+  }
   return <aside className="stats-panel" aria-label="활동 통계">
     <header><strong>활동 통계</strong><button type="button" onClick={onClose} aria-label="통계 접기"><X size={14}/></button></header>
-    <StatsPeriod title="오늘" stats={dailyStats} />
-    <StatsPeriod title="이번 주" stats={weeklyStats} />
-    <ActivityGrass activityHistory={activityHistory} activeDays={activeHistoryDays} compact />
+    <div className="stats-tabs" role="tablist" aria-label="통계 기간">
+      {tabs.map((tab, index) => <button key={tab.id} id={`stats-tab-${tab.id}`} type="button" role="tab" aria-selected={activeTab === tab.id} aria-controls={`stats-panel-${tab.id}`} tabIndex={activeTab === tab.id ? 0 : -1} onClick={() => setActiveTab(tab.id)} onKeyDown={(event) => moveTab(event, index)}>{tab.label}</button>)}
+    </div>
+    {activeTab === "today" && <div className="stats-tab-panel" id="stats-panel-today" role="tabpanel" aria-labelledby="stats-tab-today"><StatsPeriod title="오늘" stats={dailyStats} /><FocusAppBreakdown apps={dailyStats?.apps} title="오늘 사용한 개발 도구" /></div>}
+    {activeTab === "week" && <div className="stats-tab-panel" id="stats-panel-week" role="tabpanel" aria-labelledby="stats-tab-week"><StatsPeriod title="이번 주" stats={weeklyStats} /><FocusAppBreakdown apps={weeklyStats?.apps} title="이번 주 사용한 개발 도구" /></div>}
+    {activeTab === "history" && <div className="stats-tab-panel" id="stats-panel-history" role="tabpanel" aria-labelledby="stats-tab-history"><ActivityGrass activityHistory={activityHistory} activeDays={activeHistoryDays} compact /></div>}
   </aside>;
 }
 
@@ -488,6 +607,9 @@ export function App() {
   const [systemPanelExpanded, setSystemPanelExpanded] = useState(
     () => localStorage.getItem("rundev.systemPanelExpanded") === "true"
   );
+  const [systemSummaryPinned, setSystemSummaryPinned] = useState(
+    () => localStorage.getItem("rundev.systemSummaryPinned") === "true"
+  );
   const [statsExpanded, setStatsExpanded] = useState(false);
   const [dailyStats, setDailyStats] = useState<ActivityStats | null>(null);
   const [weeklyStats, setWeeklyStats] = useState<ActivityStats | null>(null);
@@ -504,6 +626,7 @@ export function App() {
   const freezeRunner = new URLSearchParams(window.location.search).has("freezeRunner");
   const showXpPreview = new URLSearchParams(window.location.search).has("showXpFx");
   const showLevelShowcase = new URLSearchParams(window.location.search).has("levelShowcase");
+  const showEmblemShowcase = new URLSearchParams(window.location.search).has("emblemShowcase");
   const {
     summary,
     focus,
@@ -885,6 +1008,13 @@ export function App() {
     (keyboard?.nextRewardAt ?? 2_000) - (keyboard?.pressCount ?? 0)
   );
   const keyboardRewardCount = Math.floor((keyboard?.pressCount ?? 0) / keyboardRewardInterval);
+  const keyboardGoalAvailable = keyboard?.status === "active" && !keyboard.permissionRequired;
+  const nextGoalKind = keyboardGoalAvailable && keyboardProgress >= focusRewardProgress
+    ? "keyboard"
+    : "focus";
+  const nextGoal = nextGoalKind === "keyboard"
+    ? `키보드 ${formatTokens(keyboardRemaining)}회 더 입력하기`
+    : `${formatRemainingMinutes(focusRewardRemaining)} 더 집중하기`;
   const hasUsageDetails =
     aiUsage?.status !== "disconnected" ||
     claudeUsage?.status !== "disconnected" ||
@@ -899,6 +1029,9 @@ export function App() {
   if (showLevelShowcase) {
     return <LevelShowcase />;
   }
+  if (showEmblemShowcase) {
+    return <EmblemShowcase />;
+  }
 
   function toggleSystemPanel() {
     const expanded = !systemPanelExpanded;
@@ -907,6 +1040,11 @@ export function App() {
     localStorage.setItem("rundev.systemPanelExpanded", String(expanded));
     const previousSide = statsExpanded ? "left" : systemPanelExpanded ? "right" : undefined;
     void resizeSystemPanel(expanded, "right", previousSide);
+  }
+
+  function changeSystemSummaryPinned(pinned: boolean) {
+    setSystemSummaryPinned(pinned);
+    localStorage.setItem("rundev.systemSummaryPinned", String(pinned));
   }
 
   async function toggleStatsPanel() {
@@ -962,56 +1100,32 @@ export function App() {
             <img src={runnerFrames[headerFrame]} alt="" aria-hidden="true" />
             <span className="whip-count">오늘 {whipStats?.whipCount ?? 0}</span>
           </button>
-          <button type="button" className="runner-level-badge" aria-label={`레벨 ${character?.level ?? 1} · 특성 열기`} onClick={() => void openTraits()}>
-            LV {character?.level ?? 1}
-          </button>
-          {(traitProgress?.availablePoints ?? 0) > 0 && <button type="button" className="runner-trait-points" aria-label={`사용 가능한 특성 포인트 ${traitProgress?.availablePoints}개`} onClick={() => void openTraits()}>
-            ◆ {traitProgress?.availablePoints}
-          </button>}
           {xpGainFx != null && <span className="runner-xp-gain" aria-live="polite">+{xpGainFx} XP</span>}
         </div>
-        <div className="runner-copy">
-          <div className="runner-title-row">
-            <strong>RunDev</strong>
-            {xpBoost?.active && xpBoost.multiplier && xpBoost.endsAt ? (
-              <div className="xp-boost-badge" title={`경험치 ${xpBoost.multiplier}배 적용 중`}>
-                <Zap size={10} fill="currentColor" />
-                <b>XP ×{xpBoost.multiplier}</b>
-                <span>{formatBoostRemaining(new Date(xpBoost.endsAt).getTime() - boostClock)} 남음</span>
+        <div className="runner-header-content">
+          <div className="runner-header-top">
+            <div className="runner-copy">
+              <div className="runner-title-row">
+                <strong>RunDev</strong>
+                {xpBoost?.active && xpBoost.multiplier && xpBoost.endsAt ? (
+                  <div className="xp-boost-badge" title={`경험치 ${xpBoost.multiplier}배 적용 중`}>
+                    <Zap size={10} fill="currentColor" />
+                    <b>XP ×{xpBoost.multiplier}</b>
+                    <span>{formatBoostRemaining(new Date(xpBoost.endsAt).getTime() - boostClock)} 남음</span>
+                  </div>
+                ) : null}
               </div>
-            ) : null}
-          </div>
-          <div
-            className="activity-status"
-            aria-label={
-              activityStatus.appName
-                ? `${activityStatus.appName}에서 ${activityStatus.message}`
-                : activityStatus.message
-            }
-          >
-            <i className={`status-dot ${activityStatus.tone}`} />
-            <div className="activity-status-copy">
-              <span className="activity-app-line">
-                {activityStatus.appName
-                  ? `${activityStatus.appName}에서`
-                  : activityStatus.message}
-              </span>
-              {activityStatus.appName ? (
-                <span className="activity-message">{activityStatus.message}</span>
-              ) : null}
             </div>
-          </div>
-          {whipSaveError ? <em className="whip-save-error">저장 실패</em> : null}
-        </div>
           <div className="header-actions">
-            <button type="button" className="plain-button" aria-label="활동 통계" onClick={() => void toggleStatsPanel()}><BarChart3 size={17}/></button>
+            <button type="button" className="plain-button" aria-label="활동 통계" onClick={() => void toggleStatsPanel()}><BarChart3 size={16}/></button>
+          <button type="button" className="plain-button" aria-label="장치 상태" aria-expanded={systemPanelExpanded} onClick={toggleSystemPanel}><MonitorCog size={16}/></button>
           <button
             className="plain-button"
             type="button"
             aria-label="RunDev 정보"
             onClick={() => setInfoDialogOpen(true)}
           >
-            <Info size={17} />
+            <Info size={16} />
             {updateStatus.available && <i className="update-dot" aria-hidden="true" />}
           </button>
           <button
@@ -1020,14 +1134,34 @@ export function App() {
             aria-label="개발자 변경"
             onClick={() => setRunnerDialogOpen(true)}
           >
-            <Settings2 size={17} />
+            <Settings2 size={16} />
           </button>
+        </div>
+          </div>
+          <div className="header-activity-row">
+            <div className="activity-status">
+              <i className={`status-dot ${activityStatus.tone}`} />
+              <span>{activityStatus.appName ? `${activityStatus.appName}에서 ${activityStatus.message}` : activityStatus.message}</span>
+            </div>
+            {whipSaveError ? <em className="whip-save-error">저장 실패</em> : null}
+          </div>
         </div>
       </header>
 
       <div className="divider" />
 
-      <section className="info-section">
+      <GrowthSummary
+        level={character?.level ?? 1}
+        xpIntoLevel={character?.xpIntoLevel ?? 0}
+        xpForNextLevel={character?.xpForNextLevel ?? 100}
+        nextGoal={nextGoal}
+        goalKind={nextGoalKind}
+        onOpenTraits={() => void openTraits()}
+      />
+
+      <div className="divider" />
+
+      <section className="info-section activity-section">
         <SectionTitle>개발 활동</SectionTitle>
         <div className="primary-stat">
           <div className="primary-label">
@@ -1035,6 +1169,20 @@ export function App() {
             <span>개발 도구 노려본 시간</span>
           </div>
           <strong>{formatDuration(summary?.activeSeconds ?? 0)}</strong>
+        </div>
+        <div className="activity-metrics">
+          <div className="activity-metric">
+            <span><Clock3 size={13} />개발 시간</span>
+            <strong>{formatDuration(summary?.activeSeconds ?? 0)}</strong>
+            <Meter value={focusRewardProgress} />
+            <small>+10 XP까지 {formatRemainingMinutes(focusRewardRemaining)}</small>
+          </div>
+          <div className="activity-metric">
+            <span><Keyboard size={13} />키 입력</span>
+            <strong>{formatTokens(keyboard?.pressCount ?? 0)}회</strong>
+            <Meter value={keyboardProgress} />
+            <small>+10 XP까지 {formatTokens(keyboardRemaining)}회</small>
+          </div>
         </div>
         <details className="focus-apps">
           <summary>
@@ -1377,29 +1525,15 @@ export function App() {
         <AiWeeklyXpProgress progress={aiWeeklyXp} />
       </section>
 
-      <div className="divider" />
-
-      <section className="info-section compact">
-        <SectionTitle>개발자 상태</SectionTitle>
-        <LevelStatus
-          level={character?.level ?? 1}
-          xpIntoLevel={character?.xpIntoLevel ?? 0}
-          xpForNextLevel={character?.xpForNextLevel ?? 100}
-          onOpenTraits={() => void openTraits()}
-        />
-        <button type="button" className="activity-history-summary" onClick={() => void toggleStatsPanel()}>
-          <span>최근 20주 활동</span>
-          <strong>{activeHistoryDays}일 활동 <span aria-hidden="true">›</span></strong>
-        </button>
-      </section>
-
       {loading && <div className="loading-line" />}
       {error && <p className="error-message">{error}</p>}
       </div>
       <SystemStatusStrip
         stats={systemStats}
         expanded={systemPanelExpanded}
+        pinned={systemSummaryPinned && !statsExpanded}
         onToggle={toggleSystemPanel}
+        onPinnedChange={changeSystemSummaryPinned}
       />
       {traitDialogOpen && traitProgress && <TraitDialog progress={traitProgress} onUpgrade={(id) => void improveTrait(id)} onClose={() => setTraitDialogOpen(false)} />}
       {infoDialogOpen && (
