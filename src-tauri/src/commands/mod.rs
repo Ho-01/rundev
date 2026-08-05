@@ -1,6 +1,6 @@
 use crate::{
-    activity, adapters, ai_xp, database::AppState, diagnostics, host_metrics, keyboard, tray, whip,
-    xp_boost,
+    activity, adapters, ai_xp, database::AppState, diagnostics, host_metrics, keyboard,
+    progression, tray, whip, xp_boost,
 };
 use chrono::{DateTime, Datelike, Duration, Local, NaiveDate, Utc};
 use serde::Serialize;
@@ -105,6 +105,29 @@ pub async fn sync_ai_weekly_xp(state: State<'_, AppState>) -> Result<ai_xp::AiWe
     ai_xp::sync(&state.pool).await
 }
 
+#[tauri::command]
+pub async fn get_trait_progress(
+    state: State<'_, AppState>,
+) -> Result<progression::TraitProgress, String> {
+    progression::traits(&state.pool).await
+}
+
+#[tauri::command]
+pub async fn upgrade_trait(
+    trait_id: String,
+    state: State<'_, AppState>,
+) -> Result<progression::TraitProgress, String> {
+    progression::upgrade(&state.pool, &trait_id).await
+}
+
+#[tauri::command]
+pub async fn get_activity_stats(
+    period: String,
+    state: State<'_, AppState>,
+) -> Result<progression::ActivityStats, String> {
+    progression::stats(&state.pool, &period).await
+}
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ClaudeUsageToday {
@@ -203,8 +226,18 @@ pub fn get_system_stats(app: AppHandle) -> host_metrics::SystemStats {
 }
 
 #[tauri::command]
-pub fn set_system_panel_expanded(app: AppHandle, expanded: bool) -> Result<(), String> {
-    tray::set_system_panel_expanded(&app, expanded)
+pub fn set_system_panel_expanded(
+    app: AppHandle,
+    expanded: bool,
+    expansion_side: Option<String>,
+    previous_expansion_side: Option<String>,
+) -> Result<(), String> {
+    tray::set_system_panel_expanded(
+        &app,
+        expanded,
+        expansion_side.as_deref(),
+        previous_expansion_side.as_deref(),
+    )
 }
 
 #[tauri::command]

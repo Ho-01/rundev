@@ -5,16 +5,23 @@ import {
   Crown,
   Bug,
   BadgeCheck,
+  BarChart3,
+  Boxes,
   Code2,
+  Flame,
   Hammer,
   Info,
   Keyboard,
   Network,
+  RotateCcw,
   Settings2,
   Sprout,
   SquareTerminal,
+  Target,
   Workflow,
   Zap
+  ,Plus
+  ,X
 } from "lucide-react";
 import { useDashboardStore } from "./store/dashboard";
 import {
@@ -26,8 +33,11 @@ import {
   recordWhip,
   getWhipStats,
   getXpBoostStatus,
+  getActivityStats,
+  getTraitProgress,
   previewXpCoupon,
   redeemXpCoupon,
+  upgradeTrait,
   resetKeyboardPermissionAndRelaunch,
   WHIP_COOLDOWN_MS,
   subscribeFocusActivity,
@@ -59,6 +69,10 @@ import type {
   WhipStats,
   XpBoostStatus,
   XpCouponPreview
+  ,ActivityStats
+  ,ActivityHistoryDay
+  ,TraitId
+  ,TraitProgress
 } from "./types/activity";
 import { runnerFramesById, runnerOptions } from "./assets/runners";
 import openAiIcon from "./assets/providers/openai.svg";
@@ -245,17 +259,19 @@ function TierIcon({ tierId, size = 13 }: { tierId: LevelTierId; size?: number })
 function LevelStatus({
   level,
   xpIntoLevel,
-  xpForNextLevel
+  xpForNextLevel,
+  onOpenTraits
 }: {
   level: number;
   xpIntoLevel: number;
   xpForNextLevel: number;
+  onOpenTraits?: () => void;
 }) {
   const tier = getLevelTier(level);
   const progress = (xpIntoLevel / xpForNextLevel) * 100;
 
   return (
-    <div className={`level-row tier-${tier.id}`}>
+    <div className={`level-row tier-${tier.id}${onOpenTraits ? " trait-launcher" : ""}`} onClick={onOpenTraits}>
       <div className="level-badge" aria-label={`${tier.name} 엠블럼`}>
         <TierIcon tierId={tier.id} size={21} />
       </div>
@@ -272,6 +288,141 @@ function LevelStatus({
       </div>
     </div>
   );
+}
+
+const traitCopy: Record<TraitId, { name: string; description: string }> = {
+  "focus-ready": { name: "몰입 준비", description: "집중시간 XP 획득량 증가" },
+  "hot-keyboard": { name: "뜨거운 키보드", description: "키보드 XP 획득량 증가" },
+  reload: { name: "재장전", description: "키보드 보상 요구 횟수 감소" },
+  "context-runner": { name: "컨텍스트 러너", description: "AI 보상 요구 토큰량 감소" }
+};
+
+function StatsPeriod({ title, stats }: { title: string; stats: ActivityStats | null }) {
+  const maxSeconds = Math.max(1, ...(stats?.hourly.map((slot) => slot.activeSeconds) ?? [1]));
+  const sourceCopy = {
+    focus: "집중",
+    keyboard: "키보드",
+    ai: "AI",
+    boost: "쿠폰",
+    trait: "특성",
+    other: "기타"
+  } as const;
+  const xpSources = stats?.xpSources.filter((source) => source.amount > 0) ?? [];
+  const sourceTotal = Math.max(1, xpSources.reduce((sum, source) => sum + source.amount, 0));
+  const heatmap = <div className={`hourly-heatmap ${stats?.period ?? "day"}`}>
+    {stats?.hourly.map((slot) => <i key={`${slot.date}-${slot.hour}`} style={{ opacity: slot.activeSeconds === 0 ? .14 : .3 + .7 * slot.activeSeconds / maxSeconds }} title={`${slot.date} ${slot.hour}:00 · ${formatDuration(slot.activeSeconds)}`} />)}
+  </div>;
+  return <section className="stats-period">
+    <h3>{title}</h3>
+    <div className="stats-totals">
+      <div><span>집중시간</span><b>{formatDuration(stats?.activeSeconds ?? 0)}</b></div>
+      <div><span>획득 XP</span><b>{stats?.xpEarned ?? 0} XP</b></div>
+      <div><span>키보드</span><b>{formatCompactTokens(stats?.keyboardPresses ?? 0)}</b></div>
+    </div>
+    <div className="xp-composition">
+      <div className="xp-composition-heading"><span>XP 구성</span><b>{stats?.xpEarned ?? 0} XP</b></div>
+      <div className="xp-composition-track" aria-label={`${title} XP 출처별 구성`}>
+        {xpSources.map((source) => <i key={source.id} className={source.id} style={{ width: `${source.amount / sourceTotal * 100}%` }} />)}
+      </div>
+      <div className="xp-composition-legend">
+        {xpSources.map((source) => <span key={source.id} className={source.id}><i />{sourceCopy[source.id]} <b>{source.amount}</b></span>)}
+      </div>
+    </div>
+    {stats?.period === "week" ? <div className="weekly-heatmap-layout">
+      <div className="heatmap-weekdays" aria-label="요일"><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span>토</span><span>일</span></div>
+      <div className="weekly-heatmap-content">
+        {heatmap}
+        <div className="heatmap-hours week-hours"><span>0시</span><span>6시</span><span>12시</span><span>18시</span><span>23시</span></div>
+      </div>
+    </div> : <>
+      {heatmap}
+      <div className="heatmap-hours"><span>0시</span><span>12시</span><span>23시</span></div>
+    </>}
+  </section>;
+}
+
+function ActivityGrass({ activityHistory, activeDays, compact = false }: {
+  activityHistory: ActivityHistoryDay[];
+  activeDays: number;
+  compact?: boolean;
+}) {
+  return <div className={`activity-history${compact ? " compact-grass" : ""}`}>
+    <div className="activity-history-heading">
+      <span>최근 20주 활동</span>
+      <strong>{activeDays}일</strong>
+    </div>
+    <div className="activity-grass" role="img" aria-label={`최근 20주 중 ${activeDays}일 개발 활동`}>
+      {activityHistory.map((day) => <i key={day.date} className={`activity-cell intensity-${day.intensity}`} title={`${day.date} · ${formatDuration(day.activeSeconds)}`} />)}
+    </div>
+    <div className="activity-legend" aria-hidden="true">
+      <span>적음</span>
+      {[0, 1, 2, 3, 4].map((intensity) => <i key={intensity} className={`activity-cell intensity-${intensity}`} />)}
+      <span>많음</span>
+    </div>
+  </div>;
+}
+
+function StatsPanel({ dailyStats, weeklyStats, activityHistory, activeHistoryDays, onClose }: {
+  dailyStats: ActivityStats | null;
+  weeklyStats: ActivityStats | null;
+  activityHistory: ActivityHistoryDay[];
+  activeHistoryDays: number;
+  onClose: () => void;
+}) {
+  return <aside className="stats-panel" aria-label="활동 통계">
+    <header><strong>활동 통계</strong><button type="button" onClick={onClose} aria-label="통계 접기"><X size={14}/></button></header>
+    <StatsPeriod title="오늘" stats={dailyStats} />
+    <StatsPeriod title="이번 주" stats={weeklyStats} />
+    <ActivityGrass activityHistory={activityHistory} activeDays={activeHistoryDays} compact />
+  </aside>;
+}
+
+function TraitDialog({ progress, onUpgrade, onClose }: { progress: TraitProgress; onUpgrade: (id: TraitId) => void; onClose: () => void }) {
+  const iconFor = (id: TraitId) => {
+    if (id === "focus-ready") return <Target size={18} />;
+    if (id === "hot-keyboard") return <Flame size={18} />;
+    if (id === "reload") return <RotateCcw size={18} />;
+    return <Boxes size={18} />;
+  };
+  const actualEffect = (id: TraitId, percent: number, nextPercent: number) => {
+    if (id === "reload") {
+      const current = Math.floor(2_000 * (1 - percent / 100));
+      const next = Math.floor(2_000 * (1 - nextPercent / 100));
+      return `${formatTokens(current)}회 → ${formatTokens(next)}회`;
+    }
+    if (id === "context-runner") {
+      const current = Math.floor(100_000 * (1 - percent / 100));
+      const next = Math.floor(100_000 * (1 - nextPercent / 100));
+      return `${formatCompactTokens(current)}/${formatCompactTokens(current * 2)}→${formatCompactTokens(next)}/${formatCompactTokens(next * 2)}`;
+    }
+    const current = 10 * (1 + percent / 100);
+    const next = 10 * (1 + nextPercent / 100);
+    return `${current.toFixed(2)} → ${next.toFixed(2)} XP`;
+  };
+  const actualLabel = (id: TraitId) => {
+    if (id === "reload") return "보상 간격";
+    if (id === "context-runner") return "Codex·Cursor / Claude";
+    return "보상 환산";
+  };
+  return <div className="dialog-backdrop trait-backdrop" role="presentation" onMouseDown={onClose}>
+    <section className="account-dialog trait-dialog" role="dialog" aria-modal="true" aria-label="개발자 특성" onMouseDown={(event) => event.stopPropagation()}>
+      <header className="trait-dialog-heading"><div><strong>개발자 특성</strong><span>나만의 개발 스타일을 강화하세요</span></div><div className="trait-points"><span>사용 가능</span><b>◆ {progress.availablePoints}</b></div></header>
+      <div className="trait-board">{progress.traits.map((trait) => {
+        const atMax = trait.level >= trait.maxLevel;
+        const nextEffect = Math.min(trait.maxLevel, trait.level + 1) * 0.5;
+        return <article key={trait.id} className={`trait-card ${trait.id}${progress.availablePoints > 0 && !atMax ? " upgrade-ready" : ""}`}>
+          <header><i>{iconFor(trait.id)}</i><span>Lv. {trait.level}<small>/ {trait.maxLevel}</small></span></header>
+          <strong>{traitCopy[trait.id].name}</strong>
+          <p>{traitCopy[trait.id].description}</p>
+          <div className="trait-level-track"><i style={{ width: `${trait.level / trait.maxLevel * 100}%` }} /></div>
+          <div className="trait-effect"><b>{trait.effectPercent.toFixed(1)}%</b><span>{atMax ? "MAX" : `다음 ${nextEffect.toFixed(1)}%`}</span></div>
+          <div className="trait-actual"><span>{actualLabel(trait.id)}</span><b>{atMax ? "최대 효과" : actualEffect(trait.id, trait.effectPercent, nextEffect)}</b></div>
+          <button type="button" disabled={progress.availablePoints < 1 || atMax} onClick={() => onUpgrade(trait.id)} aria-label={`${traitCopy[trait.id].name} 강화`}>{atMax ? "최대 레벨" : <><Plus size={12}/> 강화</>}</button>
+        </article>;
+      })}</div>
+      <div className="dialog-actions"><button type="button" onClick={onClose}>닫기</button></div>
+    </section>
+  </div>;
 }
 
 function LevelShowcase() {
@@ -337,11 +488,21 @@ export function App() {
   const [systemPanelExpanded, setSystemPanelExpanded] = useState(
     () => localStorage.getItem("rundev.systemPanelExpanded") === "true"
   );
+  const [statsExpanded, setStatsExpanded] = useState(false);
+  const [dailyStats, setDailyStats] = useState<ActivityStats | null>(null);
+  const [weeklyStats, setWeeklyStats] = useState<ActivityStats | null>(null);
+  const [traitProgress, setTraitProgress] = useState<TraitProgress | null>(null);
+  const [traitDialogOpen, setTraitDialogOpen] = useState(false);
+  const [xpGainFx, setXpGainFx] = useState<number | null>(() =>
+    new URLSearchParams(window.location.search).has("showXpFx") ? 10 : null
+  );
   const updateInstallStartedRef = useRef(false);
+  const previousTotalXpRef = useRef<number | null>(null);
   const whipCrackRef = useRef<WhipCrackApi>(null);
   const runnerRef = useRef<HTMLButtonElement>(null);
   const shellRef = useRef<HTMLElement>(null);
   const freezeRunner = new URLSearchParams(window.location.search).has("freezeRunner");
+  const showXpPreview = new URLSearchParams(window.location.search).has("showXpFx");
   const showLevelShowcase = new URLSearchParams(window.location.search).has("levelShowcase");
   const {
     summary,
@@ -603,6 +764,21 @@ export function App() {
   }, []);
 
   useEffect(() => {
+    void getTraitProgress().then(setTraitProgress).catch(() => {});
+  }, [character?.level]);
+
+  useEffect(() => {
+    const totalXp = character?.totalXp;
+    if (totalXp == null) return;
+    const previous = previousTotalXpRef.current;
+    previousTotalXpRef.current = totalXp;
+    if (previous == null || totalXp <= previous) return;
+    setXpGainFx(totalXp - previous);
+    const timer = window.setTimeout(() => setXpGainFx(null), 900);
+    return () => window.clearTimeout(timer);
+  }, [character?.totalXp]);
+
+  useEffect(() => {
     if (!xpBoost?.endsAt || new Date(xpBoost.endsAt).getTime() > boostClock) return;
     void getXpBoostStatus()
       .then(setXpBoost)
@@ -698,16 +874,17 @@ export function App() {
     return () => window.clearInterval(timer);
   }, [freezeRunner, runnerFrames.length]);
 
-  const focusRewardProgress = ((summary?.activeSeconds ?? 0) % 1_800) / 18;
+  const focusRewardProgress = ((summary?.activeSeconds ?? 0) % 1_200) / 12;
   const focusRewardRemaining =
-    1_800 - ((summary?.activeSeconds ?? 0) % 1_800);
-  const focusRewardCount = Math.floor((summary?.activeSeconds ?? 0) / 1_800);
-  const keyboardProgress = ((keyboard?.pressCount ?? 0) % 2_000) / 20;
+    1_200 - ((summary?.activeSeconds ?? 0) % 1_200);
+  const focusRewardCount = Math.floor((summary?.activeSeconds ?? 0) / 1_200);
+  const keyboardRewardInterval = keyboard?.pressesPerReward ?? 2_000;
+  const keyboardProgress = ((keyboard?.pressCount ?? 0) % keyboardRewardInterval) / keyboardRewardInterval * 100;
   const keyboardRemaining = Math.max(
     0,
     (keyboard?.nextRewardAt ?? 2_000) - (keyboard?.pressCount ?? 0)
   );
-  const keyboardRewardCount = Math.floor((keyboard?.pressCount ?? 0) / 2_000);
+  const keyboardRewardCount = Math.floor((keyboard?.pressCount ?? 0) / keyboardRewardInterval);
   const hasUsageDetails =
     aiUsage?.status !== "disconnected" ||
     claudeUsage?.status !== "disconnected" ||
@@ -717,6 +894,7 @@ export function App() {
     () => buildActivityStatus(currentActivity),
     [currentActivity?.active, currentActivity?.focused, currentActivity?.appName]
   );
+  const currentTier = getLevelTier(character?.level ?? 1);
 
   if (showLevelShowcase) {
     return <LevelShowcase />;
@@ -724,39 +902,74 @@ export function App() {
 
   function toggleSystemPanel() {
     const expanded = !systemPanelExpanded;
+    if (expanded) setStatsExpanded(false);
     setSystemPanelExpanded(expanded);
     localStorage.setItem("rundev.systemPanelExpanded", String(expanded));
-    void resizeSystemPanel(expanded);
+    const previousSide = statsExpanded ? "left" : systemPanelExpanded ? "right" : undefined;
+    void resizeSystemPanel(expanded, "right", previousSide);
+  }
+
+  async function toggleStatsPanel() {
+    const expanded = !statsExpanded;
+    setStatsExpanded(expanded);
+    if (expanded) {
+      setSystemPanelExpanded(false);
+      const [daily, weekly] = await Promise.all([
+        getActivityStats("day"),
+        getActivityStats("week")
+      ]);
+      setDailyStats(daily);
+      setWeeklyStats(weekly);
+    }
+    const previousSide = systemPanelExpanded ? "right" : statsExpanded ? "left" : undefined;
+    void resizeSystemPanel(expanded, "left", previousSide);
+  }
+
+  async function openTraits() {
+    setTraitProgress(await getTraitProgress());
+    setTraitDialogOpen(true);
+  }
+
+  async function improveTrait(id: TraitId) {
+    setTraitProgress(await upgradeTrait(id));
+    await refresh();
   }
 
   return (
     <main
       ref={shellRef}
-      className={`popover-shell${hasUsageDetails ? " dense" : ""}`}
+      className={`popover-shell${hasUsageDetails ? " dense" : ""}${showXpPreview ? " preview-xp-fx" : ""}`}
     >
       <WhipCrackOverlay
         ref={whipCrackRef}
-        width={systemPanelExpanded ? 512 : 340}
+        width={systemPanelExpanded || statsExpanded ? 512 : 340}
         height={480}
       />
       <PingModeOverlay rootRef={shellRef} onWhip={performWhip} />
+      {statsExpanded && <StatsPanel dailyStats={dailyStats} weeklyStats={weeklyStats} activityHistory={activityHistory} activeHistoryDays={activeHistoryDays} onClose={() => void toggleStatsPanel()} />}
       <div className="popover-main">
       <header className="runner-header">
-        <button
-          ref={runnerRef}
-          type="button"
-          className={`runner${whipHitClass ? ` ${whipHitClass}` : ""}`}
-          aria-label="개발자 캐릭터 채찍질하기"
-          title={
-            whipSaveError
-              ? "저장 실패"
-              : `오늘 ${whipStats?.whipCount ?? 0}`
-          }
-          onClick={() => void performWhip()}
-        >
-          <img src={runnerFrames[headerFrame]} alt="" aria-hidden="true" />
-          <span className="whip-count">오늘 {whipStats?.whipCount ?? 0}</span>
-        </button>
+        <div className={`runner-stage tier-${currentTier.id}`}>
+          <button
+            ref={runnerRef}
+            type="button"
+            className={`runner${whipHitClass ? ` ${whipHitClass}` : ""}`}
+            aria-label="개발자 캐릭터 채찍질하기"
+            title={whipSaveError ? "저장 실패" : `오늘 ${whipStats?.whipCount ?? 0}`}
+            onClick={() => void performWhip()}
+          >
+            <i className="runner-tier-glow" aria-hidden="true" />
+            <img src={runnerFrames[headerFrame]} alt="" aria-hidden="true" />
+            <span className="whip-count">오늘 {whipStats?.whipCount ?? 0}</span>
+          </button>
+          <button type="button" className="runner-level-badge" aria-label={`레벨 ${character?.level ?? 1} · 특성 열기`} onClick={() => void openTraits()}>
+            LV {character?.level ?? 1}
+          </button>
+          {(traitProgress?.availablePoints ?? 0) > 0 && <button type="button" className="runner-trait-points" aria-label={`사용 가능한 특성 포인트 ${traitProgress?.availablePoints}개`} onClick={() => void openTraits()}>
+            ◆ {traitProgress?.availablePoints}
+          </button>}
+          {xpGainFx != null && <span className="runner-xp-gain" aria-live="polite">+{xpGainFx} XP</span>}
+        </div>
         <div className="runner-copy">
           <div className="runner-title-row">
             <strong>RunDev</strong>
@@ -790,7 +1003,8 @@ export function App() {
           </div>
           {whipSaveError ? <em className="whip-save-error">저장 실패</em> : null}
         </div>
-        <div className="header-actions">
+          <div className="header-actions">
+            <button type="button" className="plain-button" aria-label="활동 통계" onClick={() => void toggleStatsPanel()}><BarChart3 size={17}/></button>
           <button
             className="plain-button"
             type="button"
@@ -844,7 +1058,7 @@ export function App() {
         <div className="reward-cycle-summary">
           <span className="reward-rule">
             <BadgeCheck size={11} />
-            30분마다 <b>+10 XP</b>
+            20분마다 <b>+10 XP</b>
           </span>
           <strong>오늘 {focusRewardCount}회 달성</strong>
         </div>
@@ -889,7 +1103,7 @@ export function App() {
             <div className="reward-cycle-summary keyboard-reward-summary">
               <span className="reward-rule">
                 <BadgeCheck size={11} />
-                2,000회마다 <b>+10 XP</b>
+                {formatTokens(keyboardRewardInterval)}회마다 <b>+10 XP</b>
               </span>
               <strong>오늘 {keyboardRewardCount}회 달성</strong>
             </div>
@@ -914,16 +1128,21 @@ export function App() {
             </span>
             <strong>Codex</strong>
             <div className="provider-summary-value">
-              <span>이번 주 토큰 사용량</span>
-              <b className={aiUsage?.status === "error" ? "needs-attention" : ""}>
+              <div className="provider-summary-today">
+                <span>오늘</span>
+                <b className={aiUsage?.status === "error" ? "needs-attention" : ""}>
                 {aiUsage?.status === "disconnected"
                   ? "연동하기"
                   : aiUsage?.status === "error"
                   ? "확인 필요"
-                  : aiUsage?.weekTokens == null
+                  : aiUsage?.totalTokens == null
                   ? "—"
-                  : formatCompactTokens(aiUsage.weekTokens)}
-              </b>
+                  : formatCompactTokens(aiUsage.totalTokens)}
+                </b>
+              </div>
+              <span className="provider-summary-week">
+                이번 주 {aiUsage?.weekTokens == null ? "—" : formatCompactTokens(aiUsage.weekTokens)}
+              </span>
             </div>
           </summary>
           <ProviderInlineDetails
@@ -980,16 +1199,21 @@ export function App() {
             </span>
             <strong>Claude Code</strong>
             <div className="provider-summary-value">
-              <span>오늘의 토큰 사용량</span>
-              <b className={claudeUsage?.status === "error" ? "needs-attention" : ""}>
-                {claudeUsage?.status === "disconnected"
-                  ? "연동하기"
-                  : claudeUsage?.status === "waiting"
-                  ? "대기 중"
-                  : claudeUsage?.status === "error"
-                  ? "확인 필요"
-                  : formatCompactTokens(claudeUsage?.totalTokens ?? 0)}
-              </b>
+              <div className="provider-summary-today">
+                <span>오늘</span>
+                <b className={claudeUsage?.status === "error" ? "needs-attention" : ""}>
+                  {claudeUsage?.status === "disconnected"
+                    ? "연동하기"
+                    : claudeUsage?.status === "waiting"
+                    ? "대기 중"
+                    : claudeUsage?.status === "error"
+                    ? "확인 필요"
+                    : formatCompactTokens(claudeUsage?.totalTokens ?? 0)}
+                </b>
+              </div>
+              <span className="provider-summary-week">
+                이번 주 {claudeUsage?.status === "disconnected" ? "—" : formatCompactTokens(claudeUsage?.weekTokens ?? 0)}
+              </span>
             </div>
           </summary>
           <ProviderInlineDetails
@@ -1052,28 +1276,33 @@ export function App() {
             </span>
             <strong>Cursor</strong>
             <div className="provider-summary-value">
-              <span>오늘의 토큰 사용량</span>
-              <b
-                className={
-                  cursorUsage?.status === "reauthRequired" ||
-                  cursorUsage?.status === "unsupportedSchema" ||
-                  cursorUsage?.status === "error"
-                    ? "needs-attention"
-                    : ""
-                }
-              >
-                {cursorUsage?.status === "disconnected"
-                  ? "연동하기"
-                  : cursorUsage?.status === "syncing"
-                  ? "동기화 중"
-                  : cursorUsage?.status === "rateLimited"
-                  ? "잠시 후"
-                  : cursorUsage?.status === "reauthRequired" ||
+              <div className="provider-summary-today">
+                <span>오늘</span>
+                <b
+                  className={
+                    cursorUsage?.status === "reauthRequired" ||
                     cursorUsage?.status === "unsupportedSchema" ||
                     cursorUsage?.status === "error"
-                  ? "확인 필요"
-                  : formatCompactTokens(cursorUsage?.totalTokens ?? 0)}
-              </b>
+                      ? "needs-attention"
+                      : ""
+                  }
+                >
+                  {cursorUsage?.status === "disconnected"
+                    ? "연동하기"
+                    : cursorUsage?.status === "syncing"
+                    ? "동기화 중"
+                    : cursorUsage?.status === "rateLimited"
+                    ? "잠시 후"
+                    : cursorUsage?.status === "reauthRequired" ||
+                      cursorUsage?.status === "unsupportedSchema" ||
+                      cursorUsage?.status === "error"
+                    ? "확인 필요"
+                    : formatCompactTokens(cursorUsage?.totalTokens ?? 0)}
+                </b>
+              </div>
+              <span className="provider-summary-week">
+                이번 주 {cursorUsage?.status === "disconnected" ? "—" : formatCompactTokens(cursorUsage?.weekTokens ?? 0)}
+              </span>
             </div>
           </summary>
           <ProviderInlineDetails
@@ -1156,33 +1385,12 @@ export function App() {
           level={character?.level ?? 1}
           xpIntoLevel={character?.xpIntoLevel ?? 0}
           xpForNextLevel={character?.xpForNextLevel ?? 100}
+          onOpenTraits={() => void openTraits()}
         />
-        <div className="activity-history">
-          <div className="activity-history-heading">
-            <span>최근 20주 활동</span>
-            <strong>{activeHistoryDays}일</strong>
-          </div>
-          <div
-            className="activity-grass"
-            role="img"
-            aria-label={`최근 20주 중 ${activeHistoryDays}일 개발 활동`}
-          >
-            {activityHistory.map((day) => (
-              <i
-                key={day.date}
-                className={`activity-cell intensity-${day.intensity}`}
-                title={`${day.date} · ${formatDuration(day.activeSeconds)}`}
-              />
-            ))}
-          </div>
-          <div className="activity-legend" aria-hidden="true">
-            <span>적음</span>
-            {[0, 1, 2, 3, 4].map((intensity) => (
-              <i key={intensity} className={`activity-cell intensity-${intensity}`} />
-            ))}
-            <span>많음</span>
-          </div>
-        </div>
+        <button type="button" className="activity-history-summary" onClick={() => void toggleStatsPanel()}>
+          <span>최근 20주 활동</span>
+          <strong>{activeHistoryDays}일 활동 <span aria-hidden="true">›</span></strong>
+        </button>
       </section>
 
       {loading && <div className="loading-line" />}
@@ -1193,6 +1401,7 @@ export function App() {
         expanded={systemPanelExpanded}
         onToggle={toggleSystemPanel}
       />
+      {traitDialogOpen && traitProgress && <TraitDialog progress={traitProgress} onUpgrade={(id) => void improveTrait(id)} onClose={() => setTraitDialogOpen(false)} />}
       {infoDialogOpen && (
         <div className="dialog-backdrop" role="presentation">
           <section

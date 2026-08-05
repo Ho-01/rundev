@@ -132,8 +132,28 @@ export type KeyboardActivityToday = {
   rewardedMilestones: number;
   xpEarned: number;
   nextRewardAt: number;
+  pressesPerReward: number;
   status: "starting" | "active" | "permission-required" | "error" | "unavailable";
   permissionRequired: boolean;
+};
+
+export type TraitId = "focus-ready" | "hot-keyboard" | "reload" | "context-runner";
+export type TraitProgress = {
+  availablePoints: number;
+  earnedPoints: number;
+  spentPoints: number;
+  traits: Array<{ id: TraitId; level: number; maxLevel: number; effectPercent: number }>;
+};
+export type ActivityStats = {
+  period: "day" | "week";
+  activeSeconds: number;
+  xpEarned: number;
+  keyboardPresses: number;
+  xpSources: Array<{
+    id: "focus" | "keyboard" | "ai" | "boost" | "trait" | "other";
+    amount: number;
+  }>;
+  hourly: Array<{ date: string; hour: number; activeSeconds: number; xpEarned: number }>;
 };
 
 export type FocusActivityUpdate = {

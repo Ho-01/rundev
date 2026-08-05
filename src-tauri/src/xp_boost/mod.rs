@@ -165,7 +165,43 @@ pub async fn award_xp(
         .execute(&mut **transaction)
         .await?;
     }
-    let total = amount + bonus;
+    let trait_id = match event_type {
+        "focus_milestone" => Some("focus-ready"),
+        "keyboard_milestone" => Some("hot-keyboard"),
+        _ => None,
+    };
+    let mut trait_bonus = 0;
+    if let Some(trait_id) = trait_id {
+        let level = crate::progression::trait_level_in(transaction, trait_id).await?;
+        if level > 0 {
+            let previous: i64 = sqlx::query_scalar(
+                "SELECT COALESCE((SELECT basis_point_xp FROM trait_bonus_accumulators WHERE trait_id = ?), 0)",
+            ).bind(trait_id).fetch_one(&mut **transaction).await?;
+            let accumulated = previous + amount * level * 50;
+            trait_bonus = accumulated / 10_000;
+            sqlx::query(
+                "INSERT INTO trait_bonus_accumulators (trait_id, basis_point_xp) VALUES (?, ?)
+                 ON CONFLICT(trait_id) DO UPDATE SET basis_point_xp = excluded.basis_point_xp",
+            )
+            .bind(trait_id)
+            .bind(accumulated % 10_000)
+            .execute(&mut **transaction)
+            .await?;
+            if trait_bonus > 0 {
+                sqlx::query(
+                    "INSERT INTO xp_events (id, occurred_at, event_type, amount, source_event_id)
+                     VALUES (?, ?, 'trait_bonus', ?, ?)",
+                )
+                .bind(Uuid::new_v4().to_string())
+                .bind(occurred_at)
+                .bind(trait_bonus)
+                .bind(format!("trait:{trait_id}:{source_event_id}"))
+                .execute(&mut **transaction)
+                .await?;
+            }
+        }
+    }
+    let total = amount + bonus + trait_bonus;
     sqlx::query(
         "UPDATE character_state
          SET total_xp = total_xp + ?, level = ((total_xp + ?) / 100) + 1

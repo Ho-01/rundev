@@ -9,11 +9,13 @@ describe("App", () => {
     render(<App />);
     expect(document.querySelector(".whip-crack-canvas")).toHaveAttribute("width", "340");
     expect(await screen.findByText("RunDev")).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /레벨 1 · 특성 열기/ })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "사용 가능한 특성 포인트 2개" })).toBeInTheDocument();
     expect(await screen.findByText("새싹 개발자")).toBeInTheDocument();
     expect(await screen.findByText("개발 활동")).toBeInTheDocument();
     expect(await screen.findByText("개발 도구 노려본 시간")).toBeInTheDocument();
     expect(await screen.findByText("마지막으로 본 도구")).toBeInTheDocument();
-    expect(await screen.findByText("30분마다")).toBeInTheDocument();
+    expect(await screen.findByText("20분마다")).toBeInTheDocument();
     expect(await screen.findByText("2,000회마다")).toBeInTheDocument();
     expect(await screen.findAllByText(/^오늘 \d+회 달성$/)).toHaveLength(2);
     expect(await screen.findByText("Claude Code")).toBeInTheDocument();
@@ -50,6 +52,16 @@ describe("App", () => {
     expect(screen.getByText("주황 고양이")).toBeInTheDocument();
     expect(screen.getByText("주황 새우")).toBeInTheDocument();
     expect(screen.getByText("핑크 버튜버")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "활동 통계" }));
+    expect(await screen.findByRole("complementary", { name: "활동 통계" })).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: /최근 20주 중/ })).toBeInTheDocument();
+    expect(screen.getAllByText("XP 구성")).toHaveLength(2);
+    expect(screen.getByLabelText("오늘 XP 출처별 구성")).toBeInTheDocument();
+    expect(screen.getByLabelText("이번 주 XP 출처별 구성")).toBeInTheDocument();
+    expect(screen.getByLabelText("요일")).toHaveTextContent("월화수목금토일");
+    fireEvent.click(screen.getByRole("button", { name: "통계 접기" }));
+    fireEvent.click(document.querySelector(".trait-launcher")!);
+    expect(await screen.findByRole("dialog", { name: "개발자 특성" })).toBeInTheDocument();
   });
 
   it("offers permission recovery directly from the keyboard card", async () => {
@@ -65,6 +77,7 @@ describe("App", () => {
           rewardedMilestones: 0,
           xpEarned: 0,
           nextRewardAt: 2_000,
+          pressesPerReward: 2_000,
           status: "permission-required",
           permissionRequired: true
         }

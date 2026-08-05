@@ -6,6 +6,7 @@ mod database;
 mod diagnostics;
 mod host_metrics;
 mod keyboard;
+mod progression;
 mod tray;
 mod whip;
 mod xp_boost;
@@ -124,7 +125,10 @@ pub fn run() {
             commands::preview_xp_coupon,
             commands::redeem_xp_coupon,
             commands::get_xp_boost_status,
-            commands::sync_ai_weekly_xp
+            commands::sync_ai_weekly_xp,
+            commands::get_trait_progress,
+            commands::upgrade_trait,
+            commands::get_activity_stats
         ])
         .run(tauri::generate_context!())
         .expect("error while running RunDev");

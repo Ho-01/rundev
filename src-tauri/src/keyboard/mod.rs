@@ -40,6 +40,7 @@ pub struct KeyboardActivityToday {
     rewarded_milestones: i64,
     xp_earned: i64,
     next_reward_at: i64,
+    presses_per_reward: i64,
     status: &'static str,
     permission_required: bool,
 }
@@ -75,10 +76,13 @@ pub async fn today(pool: &SqlitePool) -> Result<KeyboardActivityToday, sqlx::Err
     .fetch_optional(pool)
     .await?;
     let (press_count, rewarded_milestones) = row.unwrap_or((0, 0));
+    let reload_level = crate::progression::trait_level(pool, "reload").await?;
+    let presses_per_reward = adjusted_presses_per_reward(reload_level);
     Ok(activity_snapshot(
         local_date,
         press_count,
         rewarded_milestones,
+        presses_per_reward,
     ))
 }
 
@@ -114,6 +118,9 @@ async fn process_events(
     let mut pressed = HashSet::new();
     let mut pending = 0_i64;
     let initial = today(&pool).await.ok();
+    let mut presses_per_reward = initial
+        .as_ref()
+        .map_or(PRESSES_PER_REWARD, |value| value.presses_per_reward);
     let mut persisted = initial.as_ref().map_or(0, |value| value.press_count);
     let mut pending_date = Local::now().date_naive().to_string();
     let mut last_emitted = persisted;
@@ -170,11 +177,12 @@ async fn process_events(
                 let projected = persisted + pending;
                 if projected != last_emitted {
                     last_emitted = projected;
-                    let milestones = projected / PRESSES_PER_REWARD;
+                    let milestones = projected / presses_per_reward;
                     let activity = activity_snapshot(
                         pending_date.clone(),
                         projected,
                         milestones,
+                        presses_per_reward,
                     );
                     let _ = app.emit("keyboard-activity-updated", activity);
                 }
@@ -189,6 +197,9 @@ async fn process_events(
                     tracing::warn!(%error, "Keyboard count persistence failed");
                 } else {
                     persisted += count;
+                    if let Ok(level) = crate::progression::trait_level(&pool, "reload").await {
+                        presses_per_reward = adjusted_presses_per_reward(level);
+                    }
                     if !first_persist_recorded {
                         first_persist_recorded = true;
                         crate::diagnostics::record(
@@ -230,7 +241,9 @@ async fn apply_count_for_date(
     .fetch_one(&mut *transaction)
     .await?;
 
-    let earned_milestones = press_count / PRESSES_PER_REWARD;
+    let reload_level = crate::progression::trait_level_in(&mut transaction, "reload").await?;
+    let presses_per_reward = adjusted_presses_per_reward(reload_level);
+    let earned_milestones = press_count / presses_per_reward;
     for milestone in (rewarded_milestones + 1)..=earned_milestones {
         award_keyboard_xp(&mut transaction, local_date, milestone, &now).await?;
     }
@@ -269,6 +282,7 @@ fn activity_snapshot(
     local_date: String,
     press_count: i64,
     rewarded_milestones: i64,
+    presses_per_reward: i64,
 ) -> KeyboardActivityToday {
     let status = current_status();
     KeyboardActivityToday {
@@ -276,7 +290,8 @@ fn activity_snapshot(
         press_count,
         rewarded_milestones,
         xp_earned: rewarded_milestones * XP_PER_REWARD,
-        next_reward_at: (press_count / PRESSES_PER_REWARD + 1) * PRESSES_PER_REWARD,
+        next_reward_at: (press_count / presses_per_reward + 1) * presses_per_reward,
+        presses_per_reward,
         status,
         permission_required: status == "permission-required",
     }
@@ -342,6 +357,10 @@ pub(crate) fn set_status(status: u8) {
             ],
         );
     }
+}
+
+fn adjusted_presses_per_reward(level: i64) -> i64 {
+    (PRESSES_PER_REWARD * (10_000 - level * 50) / 10_000).max(1)
 }
 
 fn current_status() -> &'static str {

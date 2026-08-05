@@ -16,6 +16,9 @@ import type {
   FocusActivityToday,
   FocusActivityUpdate,
   KeyboardActivityToday,
+  ActivityStats,
+  TraitId,
+  TraitProgress,
   RunnerId,
   RunnerSelection,
   WhipStats,
@@ -131,6 +134,7 @@ const previewKeyboard: KeyboardActivityToday = {
   rewardedMilestones: 0,
   xpEarned: 0,
   nextRewardAt: 2_000,
+  pressesPerReward: 2_000,
   status: "active",
   permissionRequired: false
 };
@@ -175,7 +179,7 @@ function getPreviewDashboard() {
       ),
       character: {
         ...previewCharacter,
-        level: 4,
+        level: 15,
         totalXp: 372,
         currentForm: "focused",
         xpIntoLevel: 72
@@ -404,9 +408,17 @@ export async function getSystemStats() {
   return invoke<SystemStats>("get_system_stats");
 }
 
-export async function setSystemPanelExpanded(expanded: boolean) {
+export async function setSystemPanelExpanded(
+  expanded: boolean,
+  expansionSide: "left" | "right" = "right",
+  previousExpansionSide?: "left" | "right"
+) {
   if (!isTauri()) return;
-  await invoke("set_system_panel_expanded", { expanded });
+  await invoke("set_system_panel_expanded", {
+    expanded,
+    expansionSide,
+    previousExpansionSide
+  });
 }
 
 export async function subscribeSystemStats(
@@ -444,6 +456,68 @@ export async function recordWhip() {
     return previewWhipStats();
   }
   return invoke<WhipStats>("record_whip");
+}
+
+export async function getTraitProgress(): Promise<TraitProgress> {
+  if (!isTauri()) {
+    return {
+      availablePoints: 2,
+      earnedPoints: 3,
+      spentPoints: 1,
+      traits: [
+        { id: "focus-ready", level: 1, maxLevel: 20, effectPercent: 0.5 },
+        { id: "hot-keyboard", level: 0, maxLevel: 20, effectPercent: 0 },
+        { id: "reload", level: 0, maxLevel: 20, effectPercent: 0 },
+        { id: "context-runner", level: 0, maxLevel: 20, effectPercent: 0 }
+      ]
+    };
+  }
+  return invoke<TraitProgress>("get_trait_progress");
+}
+
+export async function upgradeTrait(traitId: TraitId): Promise<TraitProgress> {
+  if (!isTauri()) return getTraitProgress();
+  return invoke<TraitProgress>("upgrade_trait", { traitId });
+}
+
+export async function getActivityStats(period: "day" | "week"): Promise<ActivityStats> {
+  if (!isTauri()) {
+    const now = new Date();
+    const days = period === "week" ? 7 : 1;
+    const hourly = Array.from({ length: days * 24 }, (_, index) => {
+      const day = Math.floor(index / 24);
+      const date = new Date(now);
+      date.setDate(now.getDate() - (days - 1 - day));
+      const hour = index % 24;
+      const activeSeconds = hour >= 9 && hour <= 23 ? ((hour * 17 + day * 29) % 55) * 60 : 0;
+      return { date: date.toLocaleDateString("en-CA"), hour, activeSeconds, xpEarned: Math.floor(activeSeconds / 1200) * 10 };
+    });
+    const xpEarned = hourly.reduce((sum, slot) => sum + slot.xpEarned, 0);
+    const sourceRatios = period === "week"
+      ? ([
+          ["focus", .46], ["keyboard", .2], ["ai", .23], ["boost", .1], ["trait", .01]
+        ] as const)
+      : ([
+          ["focus", .31], ["keyboard", .31], ["ai", .23], ["boost", .14], ["trait", .01]
+        ] as const);
+    let allocatedXp = 0;
+    const xpSources = sourceRatios.map(([id, ratio], index) => {
+      const amount = index === sourceRatios.length - 1
+        ? xpEarned - allocatedXp
+        : Math.floor(xpEarned * ratio);
+      allocatedXp += amount;
+      return { id, amount };
+    });
+    return {
+      period,
+      activeSeconds: hourly.reduce((sum, slot) => sum + slot.activeSeconds, 0),
+      xpEarned,
+      keyboardPresses: period === "week" ? 48_230 : 8_421,
+      xpSources,
+      hourly
+    };
+  }
+  return invoke<ActivityStats>("get_activity_stats", { period });
 }
 
 export async function previewXpCoupon(code: string) {

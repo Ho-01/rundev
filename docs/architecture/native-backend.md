@@ -219,3 +219,10 @@ Tauri command로 오늘 합계와 연결 상태만 조회한다.
 통해 `xp_events` 원장에 반영하며, 주간 총 21회(기본 210 XP)를 넘지 않는다.
 React는 계산이나 DB 접근을 하지 않고 동기화 command가 반환한 프로바이더별 기본 XP를
 누적 그래프로 표시한다.
+
+## 활동 통계와 특성
+
+`progression` 서비스는 기존 로컬 원장에서 일간·주간 시간대 통계를 계산하고 캐릭터
+레벨에서 획득 가능한 특성 포인트를 산출한다. 특성 레벨은 `character_traits`, 1 XP보다
+작은 보너스 잔여분은 `trait_bonus_accumulators`에 저장한다. 실제 추가 XP는 기존
+`xp_events` 원장과 `character_state`를 함께 갱신한다.

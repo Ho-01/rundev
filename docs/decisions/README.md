@@ -34,6 +34,7 @@ ADR은 이미 내려진 중요한 기술 결정을 기록한다. 결정이 바�
 | [0018](0018-local-diagnostic-logs.md) | 제한된 로컬 진단 로그 | Accepted |
 | [0019](0019-signed-local-xp-coupons.md) | 서명된 로컬 XP 쿠폰 | Accepted |
 | [0020](0020-weekly-ai-usage-xp.md) | 프로바이더 통합 주간 AI 사용 XP | Accepted |
+| [0021](0021-traits-and-activity-statistics.md) | 로컬 활동 통계와 특성 성장 | Accepted |
 
 ## 새 ADR 작성 형식
 

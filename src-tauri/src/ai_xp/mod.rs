@@ -53,6 +53,9 @@ pub async fn sync(pool: &SqlitePool) -> Result<AiWeeklyXp, String> {
     let week = week_started_on.to_string();
     let date = today.to_string();
     let usage = weekly_usage(pool, &week, &date).await?;
+    let context_runner_level = crate::progression::trait_level(pool, "context-runner")
+        .await
+        .map_err(|error| error.to_string())?;
     let mut transaction = pool.begin().await.map_err(|error| error.to_string())?;
 
     let existing_total: i64 = sqlx::query_scalar(
@@ -78,7 +81,9 @@ pub async fn sync(pool: &SqlitePool) -> Result<AiWeeklyXp, String> {
             rule,
             tokens,
             existing,
-            target: (tokens / rule.tokens_per_milestone).min(WEEKLY_MILESTONE_LIMIT),
+            target: (tokens
+                / adjusted_token_milestone(rule.tokens_per_milestone, context_runner_level))
+            .min(WEEKLY_MILESTONE_LIMIT),
         });
     }
 
@@ -91,6 +96,10 @@ pub async fn sync(pool: &SqlitePool) -> Result<AiWeeklyXp, String> {
         .await
         .map_err(|error| error.to_string())?;
     view(pool, &week).await
+}
+
+fn adjusted_token_milestone(base: i64, level: i64) -> i64 {
+    (base * (10_000 - level * 50) / 10_000).max(1)
 }
 
 async fn award_milestone(

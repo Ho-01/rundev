@@ -124,6 +124,8 @@ pub(crate) fn show_main_window(app: &tauri::AppHandle) {
 pub(crate) fn set_system_panel_expanded(
     app: &tauri::AppHandle,
     expanded: bool,
+    expansion_side: Option<&str>,
+    previous_expansion_side: Option<&str>,
 ) -> Result<(), String> {
     const COMPACT_WIDTH: f64 = 340.0;
     const EXPANDED_WIDTH: f64 = 512.0;
@@ -142,10 +144,21 @@ pub(crate) fn set_system_panel_expanded(
     }) * scale)
         .round() as u32;
     let target_height = (HEIGHT * scale).round() as u32;
-    let mut x = current_position.x
-        + (i32::try_from(current_size.width).unwrap_or(i32::MAX)
-            - i32::try_from(target_width).unwrap_or(i32::MAX))
-            / 2;
+    let compact_width = (COMPACT_WIDTH * scale).round() as u32;
+    let current_left_inset = if previous_expansion_side == Some("left") {
+        current_size.width.saturating_sub(compact_width)
+    } else {
+        0
+    };
+    let target_left_inset = if expanded && expansion_side == Some("left") {
+        target_width.saturating_sub(compact_width)
+    } else {
+        0
+    };
+    let mut x = current_position
+        .x
+        .saturating_add(i32::try_from(current_left_inset).unwrap_or(i32::MAX))
+        .saturating_sub(i32::try_from(target_left_inset).unwrap_or(i32::MAX));
     let mut y = current_position.y;
 
     if let Ok(Some(monitor)) = window.current_monitor() {

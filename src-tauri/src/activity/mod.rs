@@ -16,7 +16,7 @@ use uuid::Uuid;
 const IDLE_TIMEOUT: Duration = Duration::from_secs(5 * 60);
 const SAMPLE_INTERVAL: Duration = Duration::from_secs(1);
 const DATABASE_FLUSH_INTERVAL: i64 = 10;
-const FOCUS_SECONDS_PER_REWARD: i64 = 30 * 60;
+const FOCUS_SECONDS_PER_REWARD: i64 = 20 * 60;
 const XP_PER_REWARD: i64 = 10;
 
 #[derive(Debug)]
@@ -342,7 +342,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn awards_ten_xp_once_per_thirty_focus_minutes() {
+    async fn awards_ten_xp_once_per_twenty_focus_minutes() {
         let pool = SqlitePoolOptions::new()
             .max_connections(1)
             .connect("sqlite::memory:")
@@ -369,7 +369,7 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(xp, 20);
-        assert_eq!(total_xp, 20);
+        assert_eq!(xp, 30);
+        assert_eq!(total_xp, 30);
     }
 }
