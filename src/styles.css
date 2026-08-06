@@ -13,6 +13,19 @@ html, body, #root { width: 100%; min-height: 100%; margin: 0; }
 body { overflow: hidden; background: #1c1c1e; }
 button { color: inherit; font: inherit; }
 
+body.character-body { background: transparent; }
+.character-body #root { height: 100%; }
+.character-window { position: relative; display: grid; width: 100%; height: 100%; place-items: center; cursor: grab; user-select: none; }
+.character-window:active { cursor: grabbing; }
+.character-window > img { width: 100%; height: 100%; object-fit: contain; pointer-events: none; }
+.character-window.typing-a > img { animation: character-key-a 90ms ease-out; }
+.character-window.typing-b > img { animation: character-key-b 90ms ease-out; }
+@keyframes character-key-a { 50% { transform: translateY(-2px) rotate(-1.5deg); } }
+@keyframes character-key-b { 50% { transform: translateY(-2px) rotate(1.5deg); } }
+.character-window > button { position: absolute; top: 1px; right: 1px; display: grid; width: 16px; height: 16px; padding: 0; place-items: center; color: rgba(255,255,255,.8); background: rgba(20,20,22,.72); border: 1px solid rgba(255,255,255,.14); border-radius: 999px; opacity: 0; cursor: pointer; transition: opacity .15s ease, background .15s ease; }
+.character-window:hover > button, .character-window > button:focus-visible { opacity: 1; }
+.character-window > button:hover { background: rgba(40,40,44,.9); }
+
 .popover-shell {
   position: relative;
   display: flex;
@@ -455,6 +468,16 @@ button { color: inherit; font: inherit; }
   object-fit: contain;
   image-rendering: auto;
 }
+.character-window-setting { display: flex; width: 100%; margin-top: 12px; padding: 10px; align-items: center; justify-content: space-between; text-align: left; color: #d7d7da; background: #242426; border: 1px solid #3c3c40; border-radius: 9px; cursor: pointer; }
+.character-window-setting > span { display: flex; min-width: 0; flex-direction: column; gap: 3px; }
+.character-window-setting strong { font-size: 11px; font-weight: 600; }
+.character-window-setting small { color: #85858b; font-size: 8px; }
+.character-window-setting > i { position: relative; flex: 0 0 30px; width: 30px; height: 17px; margin-left: 10px; background: #4a4a4f; border-radius: 999px; transition: background .15s ease; }
+.character-window-setting > i > b { position: absolute; top: 2px; left: 2px; width: 13px; height: 13px; background: #d5d5d8; border-radius: 50%; transition: transform .15s ease, background .15s ease; }
+.character-window-setting[aria-checked="true"] { border-color: rgba(143,184,76,.5); background: #282d24; }
+.character-window-setting[aria-checked="true"] > i { background: #8fb84c; }
+.character-window-setting[aria-checked="true"] > i > b { background: #fff; transform: translateX(13px); }
+.character-window-setting:focus-visible { outline: 2px solid rgba(143,184,76,.65); outline-offset: 2px; }
 
 .runner-face {
   position: absolute;

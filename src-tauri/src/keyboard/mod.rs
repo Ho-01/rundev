@@ -152,6 +152,7 @@ async fn process_events(
                             crate::diagnostics::record("keyboard_first_event_processed", &[]);
                         }
                         pending += 1;
+                        let _ = app.emit("keyboard-typing-pulse", ());
                     }
                     Some(KeyEvent::Up(key)) => {
                         pressed.remove(&key);
@@ -163,6 +164,7 @@ async fn process_events(
                             crate::diagnostics::record("keyboard_first_event_processed", &[]);
                         }
                         pending += 1;
+                        let _ = app.emit("keyboard-typing-pulse", ());
                     }
                     Some(KeyEvent::Down(_)) => {}
                     None => {

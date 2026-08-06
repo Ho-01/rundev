@@ -5,6 +5,7 @@
 React는 다음 역할만 담당한다.
 
 - 트레이 팝오버 렌더링
+- 투명 캐릭터 창 렌더링과 드래그 시작 요청
 - 오늘 활동, AI 사용량, 캐릭터 상태 표시
 - 개발자 캐릭터 채찍질 연출과 오늘 횟수 표시
 - G 키 기반 핑 모드와 방향별 액션 선택 연출
@@ -22,10 +23,12 @@ src/
 ├─ styles.css
 ├─ components/
 │  ├─ SystemStatusStrip.tsx
+│  ├─ CharacterWindow.tsx
 │  ├─ WhipCrackOverlay.tsx
 │  ├─ PingModeOverlay.tsx
 │  └─ pingMode.ts
 ├─ services/
+│  ├─ characterWindow.ts
 │  └─ rundev.ts
 ├─ store/
 │  └─ dashboard.ts
@@ -50,12 +53,15 @@ flowchart LR
   반환한다.
 - command payload는 TypeScript와 Rust 양쪽에서 camelCase 직렬화 규칙을 맞춘다.
 - 화면 단위 비동기 상태는 Zustand store에 둔다.
+- `main`과 `character` 창은 같은 진입점을 사용하되 window label로 렌더링할 view를
+  분리한다. 캐릭터 창의 표시 여부와 마지막 물리 좌표는 Rust가 SQLite에 저장한다.
 
 ## 디자인 원칙
 
 - RunCat 계열 메뉴바 유틸리티의 작은 정보 패널 밀도를 따른다.
 - 기본 팝오버 크기는 340×480이며, 장치 상세를 펼치면 본문 폭을 유지한 채
   512×480으로 확장한다.
+- 별도 캐릭터 창은 여백이 보존된 master 프레임을 사용하며 48×48 창에 표시한다.
 - 큰 관리자 페이지형 카드보다 구분선, 짧은 행, 얇은 meter를 사용한다.
 - AI provider 첫 화면은 이름과 오늘 토큰만 비교하고, 주간 집계·상태·출처·복구 기능은
   인라인 상세 영역에서 접고 펼친다.

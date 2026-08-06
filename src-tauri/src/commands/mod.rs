@@ -5,7 +5,7 @@ use crate::{
 use chrono::{DateTime, Datelike, Duration, Local, NaiveDate, Utc};
 use serde::Serialize;
 use std::collections::HashMap;
-use tauri::{AppHandle, State};
+use tauri::{AppHandle, Emitter, State};
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -190,7 +190,7 @@ pub struct AiActivityStatus {
     claude_active_sessions: i64,
 }
 
-#[derive(Serialize)]
+#[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RunnerSelection {
     runner_id: String,
@@ -273,6 +273,7 @@ pub async fn get_runner_selection(state: State<'_, AppState>) -> Result<RunnerSe
 #[tauri::command]
 pub async fn set_runner_selection(
     runner_id: String,
+    app: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
     if !is_supported_runner(&runner_id) {
@@ -287,6 +288,7 @@ pub async fn set_runner_selection(
     .await
     .map_err(|error| error.to_string())?;
     tray::set_runner(&runner_id);
+    let _ = app.emit("runner-selection-changed", RunnerSelection { runner_id });
     Ok(())
 }
 

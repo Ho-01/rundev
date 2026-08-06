@@ -1,6 +1,7 @@
 mod activity;
 mod adapters;
 mod ai_xp;
+mod character_window;
 mod commands;
 mod database;
 mod diagnostics;
@@ -46,6 +47,11 @@ pub fn run() {
             )?;
             tray::set_runner(selected_runner.as_deref().unwrap_or("coding-cat"));
             app.manage(AppState { pool: pool.clone() });
+            if let Err(error) =
+                tauri::async_runtime::block_on(character_window::restore(app.handle(), &pool))
+            {
+                tracing::warn!(%error, "Character window state restoration failed");
+            }
             activity::start(pool.clone(), app.handle().clone());
             keyboard::start(pool.clone(), app.handle().clone());
             host_metrics::start(app.handle().clone());
@@ -87,7 +93,7 @@ pub fn run() {
                 api.prevent_close();
                 let _ = window.hide();
             }
-            tauri::WindowEvent::Focused(false) => {
+            tauri::WindowEvent::Focused(false) if window.label() == "main" => {
                 let _ = window.hide();
             }
             _ => {}
@@ -118,6 +124,9 @@ pub fn run() {
             commands::open_diagnostics_folder,
             commands::get_runner_selection,
             commands::set_runner_selection,
+            character_window::get_state,
+            character_window::set_visible,
+            character_window::save_position,
             commands::get_system_stats,
             commands::set_system_panel_expanded,
             commands::get_whip_stats,

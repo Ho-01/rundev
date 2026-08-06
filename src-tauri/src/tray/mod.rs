@@ -8,7 +8,7 @@ use tauri::{
     App, Emitter, Manager, PhysicalPosition, PhysicalSize, Rect,
 };
 
-use crate::{adapters, database::AppState};
+use crate::{adapters, character_window, database::AppState};
 
 static SELECTED_RUNNER: AtomicU8 = AtomicU8::new(0);
 static COMPACT_MAIN_X: OnceLock<Mutex<Option<i32>>> = OnceLock::new();
@@ -67,8 +67,10 @@ fn selected_frames() -> &'static [&'static [u8]; 4] {
 
 pub fn create(app: &App) -> tauri::Result<()> {
     let open = MenuItem::with_id(app, "open", "RunDev 열기", true, None::<&str>)?;
+    let character =
+        MenuItem::with_id(app, "character", "캐릭터 보이기/숨기기", true, None::<&str>)?;
     let quit = MenuItem::with_id(app, "quit", "종료", true, None::<&str>)?;
-    let menu = Menu::with_items(app, &[&open, &quit])?;
+    let menu = Menu::with_items(app, &[&open, &character, &quit])?;
     let icon = tauri::image::Image::from_bytes(selected_frames()[0])?;
 
     TrayIconBuilder::with_id("rundev-tray")
@@ -79,6 +81,14 @@ pub fn create(app: &App) -> tauri::Result<()> {
         .show_menu_on_left_click(false)
         .on_menu_event(|app, event| match event.id.as_ref() {
             "open" => show_main_window(app),
+            "character" => {
+                let app = app.clone();
+                tauri::async_runtime::spawn(async move {
+                    if let Err(error) = character_window::toggle(&app).await {
+                        tracing::warn!(%error, "Character window toggle failed");
+                    }
+                });
+            }
             "quit" => app.exit(0),
             _ => {}
         })

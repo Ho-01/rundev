@@ -6,7 +6,7 @@
 2. single-instance, autostart, notification, process, updater 플러그인을 등록한다.
 3. 앱 데이터 디렉터리를 생성한다.
 4. SQLite pool을 열고 migration을 실행한다.
-5. pool을 Tauri managed state로 등록한다.
+5. pool을 Tauri managed state로 등록하고 캐릭터 창의 표시 여부와 위치를 복원한다.
 6. 집중시간, 키보드 횟수, Claude Code 로컬 OpenTelemetry 수집기를 시작한다.
 7. Codex 사용량 동기화 worker를 시작한다.
 8. 동의된 Cursor 사용량 동기화 worker를 시작한다.
@@ -55,6 +55,8 @@ Updater는 GitHub Releases의 `latest.json`을 endpoint로 사용한다. 공개�
 - 키 값이나 입력 순서를 보존하지 않고 횟수 신호만 일별로 저장
 - 2,000회 단위 XP 원장 기록과 `daily_activity_metrics` 갱신
 - 250ms 단위 `keyboard-activity-updated` 이벤트와 5초 단위 SQLite 합계 저장
+- 키 종류나 내용을 포함하지 않는 일회성 `keyboard-typing-pulse`를 승인된 key-down마다
+  캐릭터 창에 전달하며 pulse 자체는 저장하지 않음
 - macOS Input Monitoring 권한 상태 및 설정 화면 연결
 - 앱 교체 후 권한 복구 시 TCC 등록과 `keyboard.macos.permission_prompted` 안내
   상태를 함께 초기화하고 재시작 뒤 권한을 다시 요청
@@ -80,8 +82,14 @@ Updater는 GitHub Releases의 `latest.json`을 endpoint로 사용한다. 공개�
 - 단일 트레이 인스턴스 생성
 - 좌클릭 팝오버 위치 계산
 - 우클릭 네이티브 메뉴
-- PNG 프레임 애니메이션
-- 향후 `CharacterAnimation` 상태 머신의 소유자가 된다.
+- 네이티브 메뉴에서 캐릭터 창 표시 여부 전환
+- 트레이 아이콘 애니메이션
+
+### `character_window`
+
+- 테두리 없는 투명 `character` 창의 표시·숨김과 마지막 위치 복원
+- 표시 여부와 물리 좌표를 `app_settings`에 저장
+- React에는 상태 조회, 표시 변경, 드래그 완료 후 위치 저장 command만 노출
 
 ### `host_metrics`
 

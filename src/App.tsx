@@ -48,6 +48,11 @@ import {
   subscribeUsageRefreshed
 } from "./services/rundev";
 import {
+  getCharacterWindowState,
+  setCharacterWindowVisible,
+  subscribeCharacterWindowState
+} from "./services/characterWindow";
+import {
   UPDATE_CHECK_INTERVAL_MS,
   checkForAppUpdate,
   downloadAndInstallAppUpdate,
@@ -580,6 +585,7 @@ export function App() {
   const [previewLoading, setPreviewLoading] = useState(false);
   const [headerFrame, setHeaderFrame] = useState(0);
   const [runnerDialogOpen, setRunnerDialogOpen] = useState(false);
+  const [characterWindowVisible, setCharacterWindowVisibleState] = useState(false);
   const [infoDialogOpen, setInfoDialogOpen] = useState(false);
   const [couponDialogOpen, setCouponDialogOpen] = useState(false);
   const [couponCode, setCouponCode] = useState("");
@@ -655,6 +661,20 @@ export function App() {
     setSystemStats
   } = useDashboardStore();
   const runnerFrames = runnerFramesById[runner?.runnerId ?? "coding-cat"];
+
+  useEffect(() => {
+    void getCharacterWindowState().then(({ visible }) => setCharacterWindowVisibleState(visible));
+    let unlisten = () => {};
+    void subscribeCharacterWindowState(({ visible }) => setCharacterWindowVisibleState(visible)).then((next) => {
+      unlisten = next;
+    });
+    return () => unlisten();
+  }, []);
+
+  async function toggleCharacterWindow() {
+    const next = await setCharacterWindowVisible(!characterWindowVisible);
+    setCharacterWindowVisibleState(next.visible);
+  }
 
   function mergeWhipStats(next: WhipStats) {
     setWhipStats((current) => {
@@ -1698,6 +1718,19 @@ export function App() {
                 </button>
               ))}
             </div>
+            <button
+              type="button"
+              className="character-window-setting"
+              role="switch"
+              aria-checked={characterWindowVisible}
+              onClick={() => void toggleCharacterWindow()}
+            >
+              <span>
+                <strong>화면에 캐릭터 띄우기</strong>
+                <small>다른 앱 위에서도 타이핑 리듬을 보여줍니다.</small>
+              </span>
+              <i aria-hidden="true"><b /></i>
+            </button>
             <div className="dialog-actions">
               <button type="button" onClick={() => setRunnerDialogOpen(false)}>닫기</button>
             </div>
