@@ -96,6 +96,37 @@ src-tauri/icons/tray/coding/
 각 프레임은 투명한 32×32 PNG다. 생성 후 실제 Windows 배율 100%, 125%, 150%와
 macOS Retina에서 확인한다.
 
+## macOS resource budget
+
+Use a release build and Activity Monitor's 60-second average when checking CPU. macOS
+reports 100% as one fully occupied logical CPU core, so short animation spikes are less
+important than sustained idle usage.
+
+| Scenario | Target average CPU | Expected behavior |
+| --- | ---: | --- |
+| Both windows hidden | below 1% | no React animation or dashboard refresh; 10-second host sampling |
+| Floating character idle | below 2% | character advances at 170 ms only while visible |
+| Typing animation | below 5% | event-driven animation, no permanent 60 fps loop |
+| Pointer following | below 5% | pointer position sampled at about 30 fps |
+| Main popover open | below 5% | dashboard refresh and 3-second summary sampling |
+| System details open | below 8% | 1-second detailed host sampling |
+
+Record CPU, Energy Impact, memory, and thread count after one minute in every scenario.
+If an idle target regresses, first inspect recurring `requestAnimationFrame`, React timers,
+OS polling intervals, and image decoding. Do not reduce activity/keyboard privacy guarantees
+to improve these numbers.
+
+The desktop app icon is generated from the default coding cat. Regenerate all platform
+variants after changing its source or composition:
+
+```powershell
+npm.cmd run icons:app
+```
+
+- source character: `src/assets/runners/master/coding-cat/01.png`
+- generated composition: `src-tauri/app-icon-source.png`
+- bundle outputs: `src-tauri/icons/`
+
 ## migration
 
 - 파일명은 `NNNN_description.sql` 형식을 사용한다.

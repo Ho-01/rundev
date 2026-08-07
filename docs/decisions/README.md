@@ -35,6 +35,7 @@ ADR은 이미 내려진 중요한 기술 결정을 기록한다. 결정이 바�
 | [0019](0019-signed-local-xp-coupons.md) | 서명된 로컬 XP 쿠폰 | Accepted |
 | [0020](0020-weekly-ai-usage-xp.md) | 프로바이더 통합 주간 AI 사용 XP | Accepted |
 | [0021](0021-traits-and-activity-statistics.md) | 로컬 활동 통계와 특성 성장 | Accepted |
+| [0022](0022-character-pointer-following.md) | 화면 캐릭터의 전역 포인터 따라다니기 | Accepted |
 
 ## 새 ADR 작성 형식
 

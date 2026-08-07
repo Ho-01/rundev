@@ -1,6 +1,10 @@
 use serde::Serialize;
 use sqlx::SqlitePool;
-use tauri::{AppHandle, Emitter, LogicalSize, Manager, PhysicalPosition};
+use std::sync::atomic::{AtomicBool, Ordering};
+use tauri::{
+    menu::{CheckMenuItem, Menu, MenuItem},
+    AppHandle, Emitter, LogicalSize, Manager, PhysicalPosition,
+};
 
 use crate::database::AppState;
 
@@ -9,11 +13,20 @@ const X_KEY: &str = "character.window.x";
 const Y_KEY: &str = "character.window.y";
 const LAYOUT_KEY: &str = "character.window.layout";
 const COMPACT_LAYOUT: &str = "compact-v2";
+const FOLLOW_POINTER_KEY: &str = "character.window.follow_pointer";
+
+static FOLLOW_POINTER: AtomicBool = AtomicBool::new(false);
+static CONTEXT_MENU_OPEN: AtomicBool = AtomicBool::new(false);
+
+pub fn is_pointer_following() -> bool {
+    FOLLOW_POINTER.load(Ordering::Relaxed)
+}
 
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CharacterWindowState {
     pub visible: bool,
+    pub follow_pointer: bool,
 }
 
 pub async fn restore(app: &AppHandle, pool: &SqlitePool) -> Result<(), String> {
@@ -23,6 +36,10 @@ pub async fn restore(app: &AppHandle, pool: &SqlitePool) -> Result<(), String> {
     window
         .set_size(LogicalSize::new(48.0, 48.0))
         .map_err(|error| error.to_string())?;
+    FOLLOW_POINTER.store(
+        setting(pool, FOLLOW_POINTER_KEY).await?.as_deref() == Some("true"),
+        Ordering::Relaxed,
+    );
     let compact_layout = setting(pool, LAYOUT_KEY).await?.as_deref() == Some(COMPACT_LAYOUT);
     let x = (if compact_layout {
         setting(pool, X_KEY).await?
@@ -51,6 +68,7 @@ pub async fn restore(app: &AppHandle, pool: &SqlitePool) -> Result<(), String> {
 pub async fn get_state(state: tauri::State<'_, AppState>) -> Result<CharacterWindowState, String> {
     Ok(CharacterWindowState {
         visible: setting(&state.pool, VISIBLE_KEY).await?.as_deref() == Some("true"),
+        follow_pointer: FOLLOW_POINTER.load(Ordering::Relaxed),
     })
 }
 
@@ -83,9 +101,119 @@ pub async fn set_visible(
     }
     .map_err(|error| error.to_string())?;
     save_setting(&state.pool, VISIBLE_KEY, visible.to_string()).await?;
-    let next = CharacterWindowState { visible };
+    let next = CharacterWindowState {
+        visible,
+        follow_pointer: FOLLOW_POINTER.load(Ordering::Relaxed),
+    };
     let _ = app.emit("character-window-state-changed", &next);
     Ok(next)
+}
+
+pub fn start_pointer_follower(app: AppHandle) {
+    tauri::async_runtime::spawn(async move {
+        let mut last_position = None;
+        loop {
+            if !FOLLOW_POINTER.load(Ordering::Relaxed) || CONTEXT_MENU_OPEN.load(Ordering::Relaxed)
+            {
+                last_position = None;
+                tokio::time::sleep(std::time::Duration::from_millis(250)).await;
+                continue;
+            }
+            let Some(window) = app.get_webview_window("character") else {
+                tokio::time::sleep(std::time::Duration::from_millis(250)).await;
+                continue;
+            };
+            if !window.is_visible().unwrap_or(false) {
+                last_position = None;
+                tokio::time::sleep(std::time::Duration::from_millis(250)).await;
+                continue;
+            }
+            if let Some(position) = pointer_follow_position(&window) {
+                if last_position != Some(position) {
+                    let _ = window.set_position(position);
+                    last_position = Some(position);
+                }
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(33)).await;
+        }
+    });
+}
+
+#[tauri::command]
+pub fn show_context_menu(app: AppHandle) -> Result<(), String> {
+    let window = app
+        .get_webview_window("character")
+        .ok_or_else(|| "character window is unavailable".to_string())?;
+    let follow = CheckMenuItem::with_id(
+        &app,
+        "character-follow-pointer",
+        "마우스 따라다니기",
+        true,
+        FOLLOW_POINTER.load(Ordering::Relaxed),
+        None::<&str>,
+    )
+    .map_err(|error| error.to_string())?;
+    let hide = MenuItem::with_id(
+        &app,
+        "character-context-hide",
+        "캐릭터 숨기기",
+        true,
+        None::<&str>,
+    )
+    .map_err(|error| error.to_string())?;
+    let menu = Menu::with_items(&app, &[&follow, &hide]).map_err(|error| error.to_string())?;
+    CONTEXT_MENU_OPEN.store(true, Ordering::Relaxed);
+    let result = window.popup_menu(&menu).map_err(|error| error.to_string());
+    CONTEXT_MENU_OPEN.store(false, Ordering::Relaxed);
+    result
+}
+
+pub async fn toggle_pointer_following(app: &AppHandle) -> Result<(), String> {
+    let follow = !FOLLOW_POINTER.load(Ordering::Relaxed);
+    FOLLOW_POINTER.store(follow, Ordering::Relaxed);
+    crate::tray::set_pointer_following(follow);
+    let state = app.state::<AppState>();
+    save_setting(&state.pool, FOLLOW_POINTER_KEY, follow.to_string()).await?;
+    if !follow {
+        save_current_position(app, &state.pool).await?;
+    }
+    let visible = setting(&state.pool, VISIBLE_KEY).await?.as_deref() == Some("true");
+    let _ = app.emit(
+        "character-window-state-changed",
+        CharacterWindowState {
+            visible,
+            follow_pointer: follow,
+        },
+    );
+    Ok(())
+}
+
+#[cfg(windows)]
+fn pointer_follow_position(_window: &tauri::WebviewWindow) -> Option<PhysicalPosition<i32>> {
+    use windows::Win32::{Foundation::POINT, UI::WindowsAndMessaging::GetCursorPos};
+
+    let mut pointer = POINT::default();
+    if unsafe { GetCursorPos(&mut pointer) }.is_err() {
+        return None;
+    }
+    Some(PhysicalPosition::new(pointer.x + 8, pointer.y + 12))
+}
+
+#[cfg(target_os = "macos")]
+fn pointer_follow_position(_window: &tauri::WebviewWindow) -> Option<tauri::LogicalPosition<f64>> {
+    use objc2_core_graphics::CGEvent;
+
+    let event = CGEvent::new(None)?;
+    let pointer = CGEvent::location(Some(&event));
+    Some(tauri::LogicalPosition::new(
+        pointer.x + 8.0,
+        pointer.y + 12.0,
+    ))
+}
+
+#[cfg(not(any(windows, target_os = "macos")))]
+fn pointer_follow_position(_window: &tauri::WebviewWindow) -> Option<PhysicalPosition<i32>> {
+    None
 }
 
 fn position_near_main(app: &AppHandle, window: &tauri::WebviewWindow) {
@@ -137,12 +265,16 @@ pub async fn save_position(
     app: AppHandle,
     state: tauri::State<'_, AppState>,
 ) -> Result<(), String> {
+    save_current_position(&app, &state.pool).await
+}
+
+async fn save_current_position(app: &AppHandle, pool: &SqlitePool) -> Result<(), String> {
     let window = app
         .get_webview_window("character")
         .ok_or_else(|| "character window is unavailable".to_string())?;
     let position = window.outer_position().map_err(|error| error.to_string())?;
-    save_setting(&state.pool, X_KEY, position.x.to_string()).await?;
-    save_setting(&state.pool, Y_KEY, position.y.to_string()).await
+    save_setting(pool, X_KEY, position.x.to_string()).await?;
+    save_setting(pool, Y_KEY, position.y.to_string()).await
 }
 
 pub async fn toggle(app: &AppHandle) -> Result<(), String> {

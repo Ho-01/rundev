@@ -1,17 +1,42 @@
 use serde::Serialize;
 use std::path::Path;
-use std::sync::{Arc, Mutex, RwLock};
+use std::sync::{
+    atomic::{AtomicU8, Ordering},
+    Arc, Mutex, RwLock,
+};
 use std::thread;
 use std::time::{Duration, Instant};
 use sysinfo::{Components, Disks, Networks, RefreshKind, System};
 use tauri::{AppHandle, Emitter, Manager};
 
-const EMIT_INTERVAL: Duration = Duration::from_secs(1);
+const BACKGROUND_INTERVAL: Duration = Duration::from_secs(10);
+const SUMMARY_INTERVAL: Duration = Duration::from_secs(3);
+const DETAIL_INTERVAL: Duration = Duration::from_secs(1);
 const DISK_INTERVAL: Duration = Duration::from_secs(30);
 const BATTERY_INTERVAL: Duration = Duration::from_secs(15);
 const TEMP_INTERVAL: Duration = Duration::from_secs(5);
 const GAP_RESET: Duration = Duration::from_secs(5);
 const EVENT_NAME: &str = "system-stats-updated";
+static SAMPLING_MODE: AtomicU8 = AtomicU8::new(0);
+
+pub fn set_sampling_mode(mode: &str) -> Result<(), String> {
+    let mode = match mode {
+        "background" => 0,
+        "summary" => 1,
+        "detail" => 2,
+        _ => return Err(format!("unsupported host metrics mode: {mode}")),
+    };
+    SAMPLING_MODE.store(mode, Ordering::Relaxed);
+    Ok(())
+}
+
+fn sampling_interval(mode: u8) -> Duration {
+    match mode {
+        2 => DETAIL_INTERVAL,
+        1 => SUMMARY_INTERVAL,
+        _ => BACKGROUND_INTERVAL,
+    }
+}
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -209,6 +234,8 @@ fn run_sampler(
     let mut temperature_celsius = read_temperature_celsius(&components);
     let mut temperature_max_celsius = temperature_celsius;
     let mut cpu_warmed = false;
+    let mut last_mode = SAMPLING_MODE.load(Ordering::Relaxed);
+    let mut next_sample = Instant::now();
 
     // Prime CPU counters without publishing a misleading 0%.
     system.refresh_cpu_usage();
@@ -218,6 +245,15 @@ fn run_sampler(
 
     loop {
         let now = Instant::now();
+        let mode = SAMPLING_MODE.load(Ordering::Relaxed);
+        if mode != last_mode {
+            last_mode = mode;
+            next_sample = now;
+        }
+        if now < next_sample {
+            thread::sleep(Duration::from_millis(250));
+            continue;
+        }
         let elapsed = now.saturating_duration_since(last_tick);
         last_tick = now;
 
@@ -317,7 +353,7 @@ fn run_sampler(
             tracing::debug!(%error, "system stats emit skipped");
         }
 
-        thread::sleep(EMIT_INTERVAL);
+        next_sample = Instant::now() + sampling_interval(mode);
     }
 }
 
@@ -432,8 +468,16 @@ fn mount_matches(mount: &Path, target: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::mount_matches;
+    use super::{mount_matches, sampling_interval};
     use std::path::Path;
+    use std::time::Duration;
+
+    #[test]
+    fn sampling_modes_have_distinct_cost_profiles() {
+        assert_eq!(sampling_interval(0), Duration::from_secs(10));
+        assert_eq!(sampling_interval(1), Duration::from_secs(3));
+        assert_eq!(sampling_interval(2), Duration::from_secs(1));
+    }
 
     #[test]
     fn matches_unix_root() {

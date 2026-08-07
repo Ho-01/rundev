@@ -226,6 +226,11 @@ pub fn get_system_stats(app: AppHandle) -> host_metrics::SystemStats {
 }
 
 #[tauri::command]
+pub fn set_host_metrics_mode(mode: String) -> Result<(), String> {
+    host_metrics::set_sampling_mode(&mode)
+}
+
+#[tauri::command]
 pub fn set_system_panel_expanded(
     app: AppHandle,
     expanded: bool,

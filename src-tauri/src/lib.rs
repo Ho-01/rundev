@@ -32,6 +32,28 @@ pub fn run() {
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
+        .on_menu_event(|app, event| match event.id().as_ref() {
+            "character-follow-pointer" => {
+                let app = app.clone();
+                tauri::async_runtime::spawn(async move {
+                    if let Err(error) = character_window::toggle_pointer_following(&app).await {
+                        tracing::warn!(%error, "Character pointer following toggle failed");
+                    }
+                });
+            }
+            "character-context-hide" => {
+                let app = app.clone();
+                tauri::async_runtime::spawn(async move {
+                    let state = app.state::<AppState>();
+                    if let Err(error) =
+                        character_window::set_visible(false, app.clone(), state).await
+                    {
+                        tracing::warn!(%error, "Character window hide failed");
+                    }
+                });
+            }
+            _ => {}
+        })
         .setup(|app| {
             #[cfg(target_os = "macos")]
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
@@ -52,6 +74,7 @@ pub fn run() {
             {
                 tracing::warn!(%error, "Character window state restoration failed");
             }
+            character_window::start_pointer_follower(app.handle().clone());
             activity::start(pool.clone(), app.handle().clone());
             keyboard::start(pool.clone(), app.handle().clone());
             host_metrics::start(app.handle().clone());
@@ -127,7 +150,9 @@ pub fn run() {
             character_window::get_state,
             character_window::set_visible,
             character_window::save_position,
+            character_window::show_context_menu,
             commands::get_system_stats,
+            commands::set_host_metrics_mode,
             commands::set_system_panel_expanded,
             commands::get_whip_stats,
             commands::record_whip,

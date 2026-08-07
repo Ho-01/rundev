@@ -28,6 +28,24 @@ import type {
 
 const WHIP_COOLDOWN_MS = 100;
 
+export function isMainWindowActive() {
+  if (!isTauri()) return true;
+  return document.visibilityState === "visible" && document.hasFocus();
+}
+
+export function subscribeMainWindowActivity(onChange: (active: boolean) => void) {
+  const notify = () => onChange(isMainWindowActive());
+  window.addEventListener("focus", notify);
+  window.addEventListener("blur", notify);
+  document.addEventListener("visibilitychange", notify);
+  notify();
+  return () => {
+    window.removeEventListener("focus", notify);
+    window.removeEventListener("blur", notify);
+    document.removeEventListener("visibilitychange", notify);
+  };
+}
+
 let previewWhipCount = 0;
 
 function previewWhipStats(): WhipStats {
@@ -406,6 +424,11 @@ export async function getSystemStats() {
     };
   }
   return invoke<SystemStats>("get_system_stats");
+}
+
+export async function setHostMetricsMode(mode: "background" | "summary" | "detail") {
+  if (!isTauri()) return;
+  await invoke("set_host_metrics_mode", { mode });
 }
 
 export async function setSystemPanelExpanded(

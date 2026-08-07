@@ -3,19 +3,19 @@ import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import type { RunnerSelection } from "../types/activity";
 
-export type CharacterWindowState = { visible: boolean };
+export type CharacterWindowState = { visible: boolean; followPointer: boolean };
 
 function isTauri() {
   return "__TAURI_INTERNALS__" in window;
 }
 
 export async function getCharacterWindowState(): Promise<CharacterWindowState> {
-  if (!isTauri()) return { visible: false };
+  if (!isTauri()) return { visible: false, followPointer: false };
   return invoke<CharacterWindowState>("get_state");
 }
 
 export async function setCharacterWindowVisible(visible: boolean): Promise<CharacterWindowState> {
-  if (!isTauri()) return { visible };
+  if (!isTauri()) return { visible, followPointer: false };
   return invoke<CharacterWindowState>("set_visible", { visible });
 }
 
@@ -23,6 +23,11 @@ export async function dragCharacterWindow() {
   if (!isTauri()) return;
   await getCurrentWindow().startDragging();
   await invoke("save_position");
+}
+
+export async function showCharacterContextMenu() {
+  if (!isTauri()) return;
+  await invoke("show_context_menu");
 }
 
 export async function getCharacterRunner(): Promise<RunnerSelection> {

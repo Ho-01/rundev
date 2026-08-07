@@ -1,7 +1,7 @@
 {
   "name": "rundev",
   "private": true,
-  "version": "0.5.5",
+  "version": "0.6.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -15,6 +15,7 @@
     "version:check-tag": "node scripts/version.mjs tag",
     "coupon": "node scripts/coupon.mjs",
     "tray:frames": "node scripts/build-tray-animation.mjs",
+    "icons:app": "node scripts/build-app-icon.mjs && tauri icon src-tauri/app-icon-source.png",
     "runners:ui": "node scripts/build-runner-ui-assets.mjs",
     "docs:assets": "node scripts/build-runner-ui-assets.mjs && node scripts/generate-readme-assets.mjs",
     "docs:assets:refresh": "npm run build && npm run docs:assets",

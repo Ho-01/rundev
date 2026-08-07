@@ -3,7 +3,7 @@ use std::sync::{
     Mutex, OnceLock,
 };
 use tauri::{
-    menu::{Menu, MenuItem},
+    menu::{CheckMenuItem, Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
     App, Emitter, Manager, PhysicalPosition, PhysicalSize, Rect,
 };
@@ -12,6 +12,7 @@ use crate::{adapters, character_window, database::AppState};
 
 static SELECTED_RUNNER: AtomicU8 = AtomicU8::new(0);
 static COMPACT_MAIN_X: OnceLock<Mutex<Option<i32>>> = OnceLock::new();
+static FOLLOW_POINTER_ITEM: OnceLock<CheckMenuItem<tauri::Wry>> = OnceLock::new();
 
 const CAT_FRAMES: [&[u8]; 4] = [
     include_bytes!("../../icons/tray/coding/01.png").as_slice(),
@@ -69,8 +70,17 @@ pub fn create(app: &App) -> tauri::Result<()> {
     let open = MenuItem::with_id(app, "open", "RunDev 열기", true, None::<&str>)?;
     let character =
         MenuItem::with_id(app, "character", "캐릭터 보이기/숨기기", true, None::<&str>)?;
+    let follow_pointer = CheckMenuItem::with_id(
+        app,
+        "tray-follow-pointer",
+        "마우스 따라다니기",
+        true,
+        character_window::is_pointer_following(),
+        None::<&str>,
+    )?;
     let quit = MenuItem::with_id(app, "quit", "종료", true, None::<&str>)?;
-    let menu = Menu::with_items(app, &[&open, &character, &quit])?;
+    let menu = Menu::with_items(app, &[&open, &character, &follow_pointer, &quit])?;
+    let _ = FOLLOW_POINTER_ITEM.set(follow_pointer);
     let icon = tauri::image::Image::from_bytes(selected_frames()[0])?;
 
     TrayIconBuilder::with_id("rundev-tray")
@@ -89,18 +99,40 @@ pub fn create(app: &App) -> tauri::Result<()> {
                     }
                 });
             }
+            "tray-follow-pointer" => {
+                let app = app.clone();
+                tauri::async_runtime::spawn(async move {
+                    if let Err(error) = character_window::toggle_pointer_following(&app).await {
+                        tracing::warn!(%error, "Character pointer following toggle failed");
+                    }
+                });
+            }
             "quit" => app.exit(0),
             _ => {}
         })
         .on_tray_icon_event(|tray, event| {
             if let TrayIconEvent::Click {
-                button: MouseButton::Left,
+                button,
                 button_state: MouseButtonState::Up,
                 rect,
                 ..
             } = event
             {
-                toggle_main_window(tray.app_handle(), rect);
+                match button {
+                    MouseButton::Left => toggle_main_window(tray.app_handle(), rect),
+                    MouseButton::Middle => {
+                        let app = tray.app_handle().clone();
+                        tauri::async_runtime::spawn(async move {
+                            let state = app.state::<AppState>();
+                            if let Err(error) =
+                                character_window::set_visible(false, app.clone(), state).await
+                            {
+                                tracing::warn!(%error, "Character window quick hide failed");
+                            }
+                        });
+                    }
+                    _ => {}
+                }
             }
         })
         .build(app)?;
@@ -109,19 +141,35 @@ pub fn create(app: &App) -> tauri::Result<()> {
     Ok(())
 }
 
+pub(crate) fn set_pointer_following(checked: bool) {
+    if let Some(item) = FOLLOW_POINTER_ITEM.get() {
+        let _ = item.set_checked(checked);
+    }
+}
+
 fn start_animation(app: tauri::AppHandle) {
     tauri::async_runtime::spawn(async move {
         let mut frame_index = 0;
+        let mut cached_runner = u8::MAX;
+        let mut decoded_frames = Vec::new();
         let mut ticker = tokio::time::interval(std::time::Duration::from_millis(170));
         loop {
             ticker.tick().await;
-            let frames = selected_frames();
-            frame_index = (frame_index + 1) % frames.len();
-            if let (Some(tray), Ok(icon)) = (
-                app.tray_by_id("rundev-tray"),
-                tauri::image::Image::from_bytes(frames[frame_index]),
-            ) {
-                let _ = tray.set_icon(Some(icon));
+            let selected_runner = SELECTED_RUNNER.load(Ordering::Relaxed);
+            if selected_runner != cached_runner {
+                decoded_frames = selected_frames()
+                    .iter()
+                    .filter_map(|frame| tauri::image::Image::from_bytes(frame).ok())
+                    .collect();
+                cached_runner = selected_runner;
+                frame_index = 0;
+            }
+            if decoded_frames.is_empty() {
+                continue;
+            }
+            frame_index = (frame_index + 1) % decoded_frames.len();
+            if let Some(tray) = app.tray_by_id("rundev-tray") {
+                let _ = tray.set_icon(Some(decoded_frames[frame_index].clone()));
             }
         }
     });

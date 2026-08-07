@@ -334,6 +334,7 @@ export const WhipCrackOverlay = forwardRef<WhipCrackApi, Props>(
     const simulationRef = useRef<WhipSimulation | null>(null);
     const burstsRef = useRef<CrackBurst[]>([]);
     const animationFrameRef = useRef(0);
+    const renderRef = useRef<(now: number) => void>(() => {});
     const reducedMotionRef = useRef(false);
 
     useImperativeHandle(ref, () => ({
@@ -361,6 +362,9 @@ export const WhipCrackOverlay = forwardRef<WhipCrackApi, Props>(
           context.clearRect(0, 0, width, height);
           drawWhip(context, simulation.bodies, 1);
         }
+        if (animationFrameRef.current === 0) {
+          animationFrameRef.current = requestAnimationFrame((now) => renderRef.current(now));
+        }
       }
     }));
 
@@ -386,6 +390,7 @@ export const WhipCrackOverlay = forwardRef<WhipCrackApi, Props>(
       contextRef.current = context;
 
       const render = (now: number) => {
+        animationFrameRef.current = 0;
         context.clearRect(0, 0, width, height);
         const simulation = simulationRef.current;
 
@@ -409,13 +414,18 @@ export const WhipCrackOverlay = forwardRef<WhipCrackApi, Props>(
           .filter((burst) => burst.life > 0);
         for (const burst of burstsRef.current) drawBurst(context, burst);
 
-        animationFrameRef.current = requestAnimationFrame(render);
+        if (simulationRef.current || burstsRef.current.length > 0) {
+          animationFrameRef.current = requestAnimationFrame(render);
+        }
       };
 
-      animationFrameRef.current = requestAnimationFrame(render);
+      renderRef.current = render;
       return () => {
         contextRef.current = null;
-        cancelAnimationFrame(animationFrameRef.current);
+        if (animationFrameRef.current !== 0) {
+          cancelAnimationFrame(animationFrameRef.current);
+          animationFrameRef.current = 0;
+        }
       };
     }, [height, width]);
 

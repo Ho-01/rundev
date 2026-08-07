@@ -45,7 +45,10 @@ import {
   subscribeKeyboardActivity,
   setSystemPanelExpanded as resizeSystemPanel,
   subscribeSystemStats,
-  subscribeUsageRefreshed
+  subscribeUsageRefreshed,
+  isMainWindowActive,
+  subscribeMainWindowActivity,
+  setHostMetricsMode
 } from "./services/rundev";
 import {
   getCharacterWindowState,
@@ -77,6 +80,7 @@ import type {
   XpCouponPreview
   ,ActivityStats
   ,ActivityHistoryDay
+  ,FocusActivityUpdate
   ,TraitId
   ,TraitProgress
 } from "./types/activity";
@@ -577,6 +581,9 @@ function LevelShowcase() {
 }
 
 export function App() {
+  const [mainWindowActive, setMainWindowActive] = useState(isMainWindowActive);
+  const mainWindowActiveRef = useRef(mainWindowActive);
+  const latestFocusActivityRef = useRef<FocusActivityUpdate | null>(null);
   const [accountPreview, setAccountPreview] = useState<CodexAccountPreview | null>(null);
   const [claudePreview, setClaudePreview] = useState<ClaudeConnectionPreview | null>(null);
   const [cursorConsentOpen, setCursorConsentOpen] = useState(false);
@@ -661,6 +668,24 @@ export function App() {
     setSystemStats
   } = useDashboardStore();
   const runnerFrames = runnerFramesById[runner?.runnerId ?? "coding-cat"];
+
+  useEffect(() => subscribeMainWindowActivity(setMainWindowActive), []);
+
+  useEffect(() => {
+    mainWindowActiveRef.current = mainWindowActive;
+    if (mainWindowActive && latestFocusActivityRef.current) {
+      setFocusActivity(latestFocusActivityRef.current);
+    }
+  }, [mainWindowActive, setFocusActivity]);
+
+  useEffect(() => {
+    const mode = !mainWindowActive
+      ? "background"
+      : systemPanelExpanded || systemSummaryPinned
+        ? "detail"
+        : "summary";
+    void setHostMetricsMode(mode);
+  }, [mainWindowActive, systemPanelExpanded, systemSummaryPinned]);
 
   useEffect(() => {
     void getCharacterWindowState().then(({ visible }) => setCharacterWindowVisibleState(visible));
@@ -865,11 +890,12 @@ export function App() {
   }
 
   useEffect(() => {
+    if (!mainWindowActive) return;
     void refresh();
     void loadWhipStats();
     const timer = window.setInterval(() => void refresh(), 5_000);
     return () => window.clearInterval(timer);
-  }, [refresh]);
+  }, [mainWindowActive, refresh]);
 
   useEffect(() => {
     if (keyboard?.status !== "active" || !permissionRepairPending) return;
@@ -961,22 +987,27 @@ export function App() {
   }
 
   useEffect(() => {
+    if (!mainWindowActive) return;
     let unlisten: (() => void) | undefined;
     void subscribeKeyboardActivity(setKeyboardActivity).then((dispose) => {
       unlisten = dispose;
     });
     return () => unlisten?.();
-  }, [setKeyboardActivity]);
+  }, [mainWindowActive, setKeyboardActivity]);
 
   useEffect(() => {
     let unlisten: (() => void) | undefined;
-    void subscribeFocusActivity(setFocusActivity).then((dispose) => {
+    void subscribeFocusActivity((activity) => {
+      latestFocusActivityRef.current = activity;
+      if (mainWindowActiveRef.current) setFocusActivity(activity);
+    }).then((dispose) => {
       unlisten = dispose;
     });
     return () => unlisten?.();
   }, [setFocusActivity]);
 
   useEffect(() => {
+    if (!mainWindowActive) return;
     let unlisten: (() => void) | undefined;
     let cancelled = false;
     void subscribeSystemStats((stats) => {
@@ -992,13 +1023,14 @@ export function App() {
       cancelled = true;
       unlisten?.();
     };
-  }, [setSystemStats]);
+  }, [mainWindowActive, setSystemStats]);
 
   useEffect(() => {
     void resizeSystemPanel(systemPanelExpanded);
   }, []);
 
   useEffect(() => {
+    if (!mainWindowActive) return;
     let unlisten: (() => void) | undefined;
     void subscribeUsageRefreshed(() => {
       void refresh();
@@ -1006,16 +1038,16 @@ export function App() {
       unlisten = dispose;
     });
     return () => unlisten?.();
-  }, [refresh]);
+  }, [mainWindowActive, refresh]);
 
   useEffect(() => {
-    if (freezeRunner) return;
+    if (freezeRunner || !mainWindowActive) return;
     const timer = window.setInterval(
       () => setHeaderFrame((frame) => (frame + 1) % runnerFrames.length),
       170
     );
     return () => window.clearInterval(timer);
-  }, [freezeRunner, runnerFrames.length]);
+  }, [freezeRunner, mainWindowActive, runnerFrames.length]);
 
   const focusRewardProgress = ((summary?.activeSeconds ?? 0) % 1_200) / 12;
   const focusRewardRemaining =
