@@ -92,6 +92,8 @@ Updater는 GitHub Releases의 `latest.json`을 endpoint로 사용한다. 공개�
 - 테두리 없는 투명 `character` 창의 표시·숨김과 마지막 위치 복원
 - 표시 여부, 수동 위치와 포인터 따라다니기 설정을 `app_settings`에 저장
 - 우클릭 네이티브 메뉴와 전역 포인터 우하단을 따르는 창 이동 루프 소유
+- 모니터 자유 이동은 Rust가 현재 모니터의 work area 안에서 목표 좌표, 방향, 대기 시간을 계산하고 창을 이동한다. 포인터 따라다니기와는 상호 배타적이다.
+- 자유 이동 중 이동 여부와 방향만 event로 React에 전달하며, 수동 드래그와 파일 드롭 중에는 이동 루프를 일시정지한다.
 - 전역 포인터 좌표는 활성화 중 창 배치에만 사용하고 저장·로그·React 전달 금지
 - 파일 드롭 중에는 Rust가 이동 잠금과 48→88 logical px 임시 창 크기의 보간을 소유한다.
   `file_drop` adapter는 드롭된 regular file만 Windows Recycle Bin 또는 macOS Trash로

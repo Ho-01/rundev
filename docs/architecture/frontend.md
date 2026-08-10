@@ -58,6 +58,7 @@ flowchart LR
 - `character` 창은 `characterWindow` service를 통해 Tauri의 파일 드롭 이벤트를 구독한다.
   React는 파일 드롭 준비/먹기 상태와 runner별 PNG 프레임 전환만 관리하며, 파일 이동·
   창 크기·이동 잠금은 Rust command에 위임한다.
+- 모니터 자유 이동 중 React는 Rust가 보낸 이동 여부·방향에 맞춰 runner별 `roam` PNG 프레임과 좌우 반전을 렌더링한다. 좌표와 이동 경로는 React가 소유하지 않는다.
 
 ## 디자인 원칙
 

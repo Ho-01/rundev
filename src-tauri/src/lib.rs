@@ -42,6 +42,14 @@ pub fn run() {
                     }
                 });
             }
+            "character-roam-monitor" => {
+                let app = app.clone();
+                tauri::async_runtime::spawn(async move {
+                    if let Err(error) = character_window::toggle_roaming(app).await {
+                        tracing::warn!(%error, "Character roaming toggle failed");
+                    }
+                });
+            }
             "character-context-hide" => {
                 let app = app.clone();
                 tauri::async_runtime::spawn(async move {
@@ -152,9 +160,12 @@ pub fn run() {
             character_window::set_visible,
             character_window::save_position,
             character_window::show_context_menu,
+            character_window::begin_character_drag,
+            character_window::end_character_drag,
             character_window::begin_character_file_drop,
             character_window::end_character_file_drop,
             character_window::trash_dropped_files,
+            character_window::toggle_roaming,
             commands::get_system_stats,
             commands::set_host_metrics_mode,
             commands::set_system_panel_expanded,

@@ -26,9 +26,13 @@ html.character-body #root { height: 100%; }
 .character-window { position: relative; display: grid; width: 100%; height: 100%; place-items: center; cursor: grab; user-select: none; }
 .character-window:active { cursor: grabbing; }
 .character-window.following-pointer, .character-window.following-pointer:active { cursor: default; }
+.character-window.roaming-mode, .character-window.roaming-mode:active { cursor: default; }
 .character-window > img { width: 100%; height: 100%; object-fit: contain; pointer-events: none; transition: transform 38ms linear; }
 .character-window.file-drop-ready > button,
 .character-window.file-drop-consuming > button { opacity: 0; pointer-events: none; }
+.character-window.roaming-moving { --roam-scale: 1; --roam-size: 1; }
+.character-window.roaming-moving.roaming-direction-flipped { --roam-scale: -1; }
+.character-window.roaming-moving > img { animation: character-roaming-bob .68s steps(4, end) infinite; transform-origin: center center; }
 .character-window.typing-motion-1 > img { transform: translateY(-2px) rotate(-1.5deg); }
 .character-window.typing-motion-2 > img { transform: translateY(0) rotate(0); }
 .character-window.typing-motion-3 > img { transform: translateY(-2px) rotate(1.5deg); }
@@ -440,6 +444,11 @@ html.character-body #root { height: 100%; }
   78% { transform: translate(3px, 0) rotate(3deg); }
 }
 
+@keyframes character-roaming-bob {
+  0%, 100% { transform: translate(-1px, 0) scale(var(--roam-size)) scaleX(var(--roam-scale)); }
+  50% { transform: translate(1px, -2px) scale(var(--roam-size)) scaleX(var(--roam-scale)); }
+}
+
 @keyframes runner-xp-rise {
   0% { opacity: 0; transform: translate(-50%, 6px) scale(.85); }
   22% { opacity: 1; transform: translate(-50%, 0) scale(1); }
@@ -450,7 +459,8 @@ html.character-body #root { height: 100%; }
 @media (prefers-reduced-motion: reduce) {
   .runner.hit-a img,
   .runner.hit-b img,
-  .runner-xp-gain { animation: none; }
+  .runner-xp-gain,
+  .character-window.roaming-moving > img { animation: none; }
 }
 
 .runner-dialog > p { margin: 0 0 14px; color: #a6a6ab; font-size: 12px; line-height: 1.5; }

@@ -13,6 +13,7 @@ use crate::{adapters, character_window, database::AppState};
 static SELECTED_RUNNER: AtomicU8 = AtomicU8::new(0);
 static COMPACT_MAIN_X: OnceLock<Mutex<Option<i32>>> = OnceLock::new();
 static FOLLOW_POINTER_ITEM: OnceLock<CheckMenuItem<tauri::Wry>> = OnceLock::new();
+static ROAMING_ITEM: OnceLock<CheckMenuItem<tauri::Wry>> = OnceLock::new();
 
 const CAT_FRAMES: [&[u8]; 4] = [
     include_bytes!("../../icons/tray/coding/01.png").as_slice(),
@@ -78,9 +79,18 @@ pub fn create(app: &App) -> tauri::Result<()> {
         character_window::is_pointer_following(),
         None::<&str>,
     )?;
+    let roaming = CheckMenuItem::with_id(
+        app,
+        "tray-roam-monitor",
+        "모니터 자유롭게 돌아다니기",
+        !character_window::is_pointer_following(),
+        character_window::is_roaming(),
+        None::<&str>,
+    )?;
     let quit = MenuItem::with_id(app, "quit", "종료", true, None::<&str>)?;
-    let menu = Menu::with_items(app, &[&open, &character, &follow_pointer, &quit])?;
+    let menu = Menu::with_items(app, &[&open, &character, &follow_pointer, &roaming, &quit])?;
     let _ = FOLLOW_POINTER_ITEM.set(follow_pointer);
+    let _ = ROAMING_ITEM.set(roaming);
     let icon = tauri::image::Image::from_bytes(selected_frames()[0])?;
 
     TrayIconBuilder::with_id("rundev-tray")
@@ -104,6 +114,14 @@ pub fn create(app: &App) -> tauri::Result<()> {
                 tauri::async_runtime::spawn(async move {
                     if let Err(error) = character_window::toggle_pointer_following(&app).await {
                         tracing::warn!(%error, "Character pointer following toggle failed");
+                    }
+                });
+            }
+            "tray-roam-monitor" => {
+                let app = app.clone();
+                tauri::async_runtime::spawn(async move {
+                    if let Err(error) = character_window::toggle_roaming(app).await {
+                        tracing::warn!(%error, "Character roaming toggle failed");
                     }
                 });
             }
@@ -144,6 +162,16 @@ pub fn create(app: &App) -> tauri::Result<()> {
 pub(crate) fn set_pointer_following(checked: bool) {
     if let Some(item) = FOLLOW_POINTER_ITEM.get() {
         let _ = item.set_checked(checked);
+    }
+    if let Some(item) = ROAMING_ITEM.get() {
+        let _ = item.set_enabled(!checked);
+    }
+}
+
+pub(crate) fn set_roaming(checked: bool) {
+    if let Some(item) = ROAMING_ITEM.get() {
+        let _ = item.set_checked(checked);
+        let _ = item.set_enabled(!character_window::is_pointer_following());
     }
 }
 
@@ -228,8 +256,7 @@ pub(crate) fn set_system_panel_expanded(
         }
         saved.unwrap_or(inferred_main_x)
     };
-    let mut x = main_x
-        .saturating_sub(i32::try_from(target_left_inset).unwrap_or(i32::MAX));
+    let mut x = main_x.saturating_sub(i32::try_from(target_left_inset).unwrap_or(i32::MAX));
     let mut y = current_position.y;
 
     if let Ok(Some(monitor)) = window.current_monitor() {

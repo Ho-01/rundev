@@ -1,17 +1,21 @@
-import { useEffect, useRef, useState, type PointerEvent } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type PointerEvent } from "react";
 import { X } from "lucide-react";
 import type { DragDropEvent } from "@tauri-apps/api/webview";
 import { desktopRunnerFramesById } from "../assets/runners/desktop";
 import { feedingRunnerFramesById } from "../assets/runners/feeding";
+import { roamingRunnerFramesById } from "../assets/runners/roaming";
 import type { RunnerId } from "../types/activity";
 import {
+  beginCharacterDrag,
   beginCharacterFileDrop,
   dragCharacterWindow,
+  endCharacterDrag,
   endCharacterFileDrop,
   getCharacterWindowState,
   getCharacterRunner,
   setCharacterWindowVisible,
   showCharacterContextMenu,
+  subscribeCharacterMotion,
   subscribeCharacterFileDrop,
   subscribeCharacterWindowState,
   subscribeRunnerSelection,
@@ -19,63 +23,128 @@ import {
   trashDroppedFiles
 } from "../services/characterWindow";
 
+const DRAG_THRESHOLD = 7;
+const DRAG_DELAY_MS = 140;
+const ROAMING_FRAME_INTERVAL_MS = 170;
 const FEED_FRAME_INTERVAL_MS = 200;
 const FEED_SWALLOW_HOLD_MS = 280;
 const FEED_FRAME_SEQUENCE = [1, 2, 1, 2, 3] as const;
 type FeedPhase = "idle" | "ready" | "processing" | "consuming" | "finishing";
+// Master roaming sprites are authored facing right, except the vtuber run cycle.
+const roamingSourceDirectionByRunner: Record<RunnerId, 1 | -1> = {
+  "coding-cat": 1,
+  "coding-fish": 1,
+  "coding-orange-cat": 1,
+  "coding-shrimp": 1,
+  "coding-vtuber": -1
+};
+const roamingVisualScaleByRunner: Record<RunnerId, number> = {
+  "coding-cat": 0.82,
+  "coding-fish": 0.72,
+  "coding-orange-cat": 0.79,
+  "coding-shrimp": 1,
+  "coding-vtuber": 1
+};
 
 export function CharacterWindow() {
   const [runnerId, setRunnerId] = useState<RunnerId>("coding-cat");
   const [frame, setFrame] = useState(0);
   const [typingMotion, setTypingMotion] = useState(0);
   const [followPointer, setFollowPointer] = useState(false);
+  const [roaming, setRoaming] = useState(false);
+  const [moving, setMoving] = useState(false);
+  const [direction, setDirection] = useState(1);
+  const [roamingFrame, setRoamingFrame] = useState(0);
   const [feedPhase, setFeedPhase] = useState<FeedPhase>("idle");
   const [feedFrame, setFeedFrame] = useState(0);
   const lastTypingAt = useRef(Number.NEGATIVE_INFINITY);
   const typingEnergy = useRef(0);
   const rescheduleAnimation = useRef<() => void>(() => {});
+  const dragTimer = useRef<number | null>(null);
+  const dragOrigin = useRef({ x: 0, y: 0 });
+  const dragStarted = useRef(false);
+  const dragPausePromise = useRef<Promise<void> | null>(null);
+  const dragPauseActive = useRef(false);
+  const dragPauseReleaseRequested = useRef(false);
+  const dragPauseSafetyTimer = useRef<number | null>(null);
   const feedPhaseRef = useRef<FeedPhase>("idle");
   const feedBeginPromise = useRef<Promise<void> | null>(null);
   const feedFinishTimer = useRef<number | null>(null);
   const [windowVisible, setWindowVisible] = useState(false);
   const frames = desktopRunnerFramesById[runnerId];
   const feedingFrames = feedingRunnerFramesById[runnerId];
+  const roamingFrames = roamingRunnerFramesById[runnerId];
 
   useEffect(() => {
-    void getCharacterRunner().then(({ runnerId }) => setRunnerId(runnerId));
+    setRoamingFrame(0);
+    if (!windowVisible || feedPhase !== "idle" || !roaming || !moving || roamingFrames.length < 2) return;
+    const timer = window.setInterval(() => {
+      setRoamingFrame((current) => (current + 1) % roamingFrames.length);
+    }, ROAMING_FRAME_INTERVAL_MS);
+    return () => window.clearInterval(timer);
+  }, [feedPhase, moving, roaming, roamingFrames.length, runnerId, windowVisible]);
+
+  useEffect(() => {
+    void getCharacterRunner().then(({ runnerId: selectedRunner }) => setRunnerId(selectedRunner));
     let unlisten = () => {};
-    void subscribeRunnerSelection(({ runnerId }) => setRunnerId(runnerId)).then((next) => {
+    void subscribeRunnerSelection(({ runnerId: selectedRunner }) => setRunnerId(selectedRunner)).then((next) => {
       unlisten = next;
     });
     return () => unlisten();
   }, []);
 
   useEffect(() => {
-    void getCharacterWindowState().then(({ followPointer, visible }) => {
-      setFollowPointer(followPointer);
+    let unlistenState = () => {};
+    let unlistenMotion = () => {};
+    let active = true;
+
+    function applyState({ followPointer: follows, roaming: isRoaming, moving: isMoving, direction: nextDirection, visible }: {
+      followPointer: boolean;
+      roaming: boolean;
+      moving: boolean;
+      direction: number;
+      visible: boolean;
+    }) {
+      setFollowPointer(follows);
+      setRoaming(isRoaming);
+      setMoving(isMoving);
+      setDirection(nextDirection);
       setWindowVisible(visible);
+    }
+
+    void Promise.all([
+      subscribeCharacterWindowState(applyState),
+      subscribeCharacterMotion(({ moving: isMoving, direction: nextDirection }) => {
+        setMoving(isMoving);
+        setDirection(nextDirection);
+      })
+    ]).then(([nextState, nextMotion]) => {
+      if (!active) {
+        nextState();
+        nextMotion();
+        return;
+      }
+      unlistenState = nextState;
+      unlistenMotion = nextMotion;
+      return getCharacterWindowState().then(applyState);
     });
-    let unlisten = () => {};
-    void subscribeCharacterWindowState(({ followPointer, visible }) => {
-      setFollowPointer(followPointer);
-      setWindowVisible(visible);
-    }).then((next) => {
-      unlisten = next;
-    });
-    return () => unlisten();
+
+    return () => {
+      active = false;
+      unlistenState();
+      unlistenMotion();
+    };
   }, []);
 
   useEffect(() => {
     let timer = 0;
 
     function schedule() {
-      if (!windowVisible || feedPhase !== "idle") return;
+      if (!windowVisible || moving || feedPhase !== "idle") return;
       const now = performance.now();
       const sinceTyping = now - lastTypingAt.current;
       const typing = sinceTyping < 420;
-      const delay = typing
-        ? 120 - typingEnergy.current * 75
-        : 170;
+      const delay = typing ? 120 - typingEnergy.current * 75 : 170;
       timer = window.setTimeout(() => {
         const nextNow = performance.now();
         const nextSinceTyping = nextNow - lastTypingAt.current;
@@ -88,7 +157,7 @@ export function CharacterWindow() {
           typingEnergy.current = Math.max(0, typingEnergy.current - delay / 260);
         }
         setFrame((current) => (current + 1) % frames.length);
-        setTypingMotion((current) => nextTyping ? (current + 1) % 4 : 0);
+        setTypingMotion((current) => (nextTyping ? current + 1 : 0) % 4);
         schedule();
       }, delay);
     }
@@ -102,7 +171,7 @@ export function CharacterWindow() {
       window.clearTimeout(timer);
       rescheduleAnimation.current = () => {};
     };
-  }, [feedPhase, frames.length, windowVisible]);
+  }, [feedPhase, frames.length, moving, windowVisible]);
 
   useEffect(() => {
     let unlisten = () => {};
@@ -114,7 +183,7 @@ export function CharacterWindow() {
         1,
         Math.max(startingSession ? 0.55 : typingEnergy.current, typingEnergy.current + 0.16)
       );
-      if (startingSession && feedPhase === "idle") {
+      if (startingSession && !moving && feedPhase === "idle") {
         setFrame((current) => (current + 1) % frames.length);
         setTypingMotion(1);
       }
@@ -123,7 +192,7 @@ export function CharacterWindow() {
       unlisten = next;
     });
     return () => unlisten();
-  }, [feedPhase, frames.length]);
+  }, [feedPhase, frames.length, moving]);
 
   function setFeedState(next: FeedPhase) {
     feedPhaseRef.current = next;
@@ -226,28 +295,135 @@ export function CharacterWindow() {
     };
   }, []);
 
-  function startDrag(event: PointerEvent<HTMLDivElement>) {
-    if (event.button !== 0 || followPointer || feedPhase !== "idle") return;
-    event.preventDefault();
-    void dragCharacterWindow();
+  function clearDragTimer() {
+    if (dragTimer.current !== null) {
+      window.clearTimeout(dragTimer.current);
+      dragTimer.current = null;
+    }
   }
 
-  const feedClass = feedPhase === "idle"
-    ? ""
-    : feedPhase === "ready" || feedPhase === "processing"
+  function clearDragPauseSafetyTimer() {
+    if (dragPauseSafetyTimer.current !== null) {
+      window.clearTimeout(dragPauseSafetyTimer.current);
+      dragPauseSafetyTimer.current = null;
+    }
+  }
+
+  function requestEndRoamingDrag() {
+    dragPauseReleaseRequested.current = true;
+    const pending = dragPausePromise.current;
+    if (!pending) return;
+    void pending.then(() => {
+      if (!dragPauseReleaseRequested.current) return;
+      dragPauseReleaseRequested.current = false;
+      dragPauseActive.current = false;
+      dragPausePromise.current = null;
+      clearDragPauseSafetyTimer();
+      return endCharacterDrag();
+    }).catch(() => {
+      dragPauseReleaseRequested.current = false;
+      dragPauseActive.current = false;
+      dragPausePromise.current = null;
+      clearDragPauseSafetyTimer();
+    });
+  }
+
+  function startWindowDrag() {
+    if (!roaming) {
+      void dragCharacterWindow();
+      return;
+    }
+
+    dragPauseReleaseRequested.current = false;
+    const pending = beginCharacterDrag();
+    dragPausePromise.current = pending;
+    void pending.then(() => {
+      if (!dragStarted.current || dragPauseReleaseRequested.current) {
+        dragPauseReleaseRequested.current = false;
+        dragPausePromise.current = null;
+        return endCharacterDrag();
+      }
+      dragPauseActive.current = true;
+      clearDragPauseSafetyTimer();
+      dragPauseSafetyTimer.current = window.setTimeout(() => {
+        requestEndRoamingDrag();
+      }, 15_000);
+      return dragCharacterWindow();
+    }).catch(() => {
+      requestEndRoamingDrag();
+    });
+  }
+
+  function startDrag(event: PointerEvent<HTMLDivElement>) {
+    if (event.button !== 0 || followPointer || feedPhase !== "idle") return;
+    dragOrigin.current = { x: event.clientX, y: event.clientY };
+    dragStarted.current = false;
+    clearDragTimer();
+    dragTimer.current = window.setTimeout(() => {
+      dragTimer.current = null;
+      dragStarted.current = true;
+      startWindowDrag();
+    }, DRAG_DELAY_MS);
+  }
+
+  function continueDrag(event: PointerEvent<HTMLDivElement>) {
+    if (dragStarted.current || dragTimer.current === null) return;
+    const dx = event.clientX - dragOrigin.current.x;
+    const dy = event.clientY - dragOrigin.current.y;
+    if (Math.hypot(dx, dy) < DRAG_THRESHOLD) return;
+    clearDragTimer();
+    dragStarted.current = true;
+    startWindowDrag();
+  }
+
+  function finishPointer() {
+    clearDragTimer();
+    dragStarted.current = false;
+    requestEndRoamingDrag();
+  }
+
+
+  const roamingMoving = feedPhase === "idle" && roaming && moving;
+  const movingDirection = direction < 0 ? -1 : 1;
+  const shouldFlipForDirection = movingDirection !== roamingSourceDirectionByRunner[runnerId];
+  const movingClass = roamingMoving && shouldFlipForDirection ? " roaming-direction-flipped" : "";
+  const feedClass = feedPhase === "ready"
+    ? " file-drop-ready"
+    : feedPhase === "processing"
       ? " file-drop-ready"
-      : " file-drop-consuming";
-  const image = feedPhase === "idle" ? frames[frame] : feedingFrames[feedFrame];
+      : feedPhase === "consuming" || feedPhase === "finishing"
+      ? " file-drop-consuming"
+      : "";
+  const className = `character-window${feedClass}${typingMotion && !roamingMoving && feedPhase === "idle" ? ` typing-motion-${typingMotion}` : ""}${followPointer ? " following-pointer" : ""}${roaming ? " roaming-mode" : ""}${roamingMoving ? ` roaming-moving${movingClass}` : ""}`;
+  const roamingStyle = roamingMoving
+    ? ({ "--roam-size": roamingVisualScaleByRunner[runnerId] } as CSSProperties & { "--roam-size": number })
+    : undefined;
+  const image = feedPhase !== "idle"
+    ? feedingFrames[feedFrame]
+    : roamingMoving
+      ? roamingFrames[roamingFrame % roamingFrames.length]
+      : frames[frame];
 
   return (
     <div
-      className={`character-window${feedClass}${typingMotion && feedPhase === "idle" ? ` typing-motion-${typingMotion}` : ""}${followPointer ? " following-pointer" : ""}`}
+      className={className}
+      data-runner={runnerId}
+      style={roamingStyle}
       onPointerDown={startDrag}
+      onPointerMove={continueDrag}
+      onPointerUp={finishPointer}
+      onPointerCancel={finishPointer}
       onContextMenu={(event) => {
         event.preventDefault();
         void showCharacterContextMenu();
       }}
-      title={followPointer ? "마우스 따라다니는 중" : "드래그해서 이동 · 우클릭으로 옵션 열기"}
+      title={
+        roaming
+          ? "모니터를 자유롭게 돌아다니는 중 · 우클릭으로 옵션 열기"
+          : followPointer
+            ? "마우스를 따라다니는 중"
+            : "드래그해서 이동 · 우클릭으로 옵션 열기"
+      }
     >
       <img src={image} alt="RunDev 캐릭터" draggable={false} />
       <button

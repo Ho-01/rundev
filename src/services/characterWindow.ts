@@ -4,26 +4,50 @@ import { getCurrentWebview, type DragDropEvent } from "@tauri-apps/api/webview";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import type { RunnerSelection } from "../types/activity";
 
-export type CharacterWindowState = { visible: boolean; followPointer: boolean };
+export type CharacterWindowState = {
+  visible: boolean;
+  followPointer: boolean;
+  roaming: boolean;
+  moving: boolean;
+  direction: number;
+};
+
+export type CharacterMotionState = { moving: boolean; direction: number };
+
 
 function isTauri() {
   return "__TAURI_INTERNALS__" in window;
 }
 
 export async function getCharacterWindowState(): Promise<CharacterWindowState> {
-  if (!isTauri()) return { visible: false, followPointer: false };
+  if (!isTauri()) return { visible: false, followPointer: false, roaming: false, moving: false, direction: 1 };
   return invoke<CharacterWindowState>("get_state");
 }
 
 export async function setCharacterWindowVisible(visible: boolean): Promise<CharacterWindowState> {
-  if (!isTauri()) return { visible, followPointer: false };
+  if (!isTauri()) return { visible, followPointer: false, roaming: false, moving: false, direction: 1 };
   return invoke<CharacterWindowState>("set_visible", { visible });
+}
+
+export async function toggleCharacterRoaming() {
+  if (!isTauri()) return;
+  await invoke("toggle_roaming");
 }
 
 export async function dragCharacterWindow() {
   if (!isTauri()) return;
   await getCurrentWindow().startDragging();
   await invoke("save_position");
+}
+
+export async function beginCharacterDrag() {
+  if (!isTauri()) return;
+  await invoke("begin_character_drag");
+}
+
+export async function endCharacterDrag() {
+  if (!isTauri()) return;
+  await invoke("end_character_drag");
 }
 
 export async function beginCharacterFileDrop() {
@@ -56,6 +80,13 @@ export async function subscribeCharacterWindowState(
 ): Promise<UnlistenFn> {
   if (!isTauri()) return () => {};
   return listen<CharacterWindowState>("character-window-state-changed", ({ payload }) => callback(payload));
+}
+
+export async function subscribeCharacterMotion(
+  callback: (state: CharacterMotionState) => void
+): Promise<UnlistenFn> {
+  if (!isTauri()) return () => {};
+  return listen<CharacterMotionState>("character-window-motion-changed", ({ payload }) => callback(payload));
 }
 
 export async function subscribeRunnerSelection(
