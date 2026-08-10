@@ -27,6 +27,8 @@ html.character-body #root { height: 100%; }
 .character-window:active { cursor: grabbing; }
 .character-window.following-pointer, .character-window.following-pointer:active { cursor: default; }
 .character-window > img { width: 100%; height: 100%; object-fit: contain; pointer-events: none; transition: transform 38ms linear; }
+.character-window.file-drop-ready > button,
+.character-window.file-drop-consuming > button { opacity: 0; pointer-events: none; }
 .character-window.typing-motion-1 > img { transform: translateY(-2px) rotate(-1.5deg); }
 .character-window.typing-motion-2 > img { transform: translateY(0) rotate(0); }
 .character-window.typing-motion-3 > img { transform: translateY(-2px) rotate(1.5deg); }

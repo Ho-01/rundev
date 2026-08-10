@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { getCurrentWebview, type DragDropEvent } from "@tauri-apps/api/webview";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import type { RunnerSelection } from "../types/activity";
 
@@ -23,6 +24,21 @@ export async function dragCharacterWindow() {
   if (!isTauri()) return;
   await getCurrentWindow().startDragging();
   await invoke("save_position");
+}
+
+export async function beginCharacterFileDrop() {
+  if (!isTauri()) return;
+  await invoke("begin_character_file_drop");
+}
+
+export async function endCharacterFileDrop() {
+  if (!isTauri()) return;
+  await invoke("end_character_file_drop");
+}
+
+export async function trashDroppedFiles(paths: string[]) {
+  if (!isTauri()) return paths.length;
+  return invoke<number>("trash_dropped_files", { paths });
 }
 
 export async function showCharacterContextMenu() {
@@ -52,4 +68,11 @@ export async function subscribeRunnerSelection(
 export async function subscribeTypingPulse(callback: () => void): Promise<UnlistenFn> {
   if (!isTauri()) return () => {};
   return listen("keyboard-typing-pulse", callback);
+}
+
+export async function subscribeCharacterFileDrop(
+  callback: (event: DragDropEvent) => void
+): Promise<UnlistenFn> {
+  if (!isTauri()) return () => {};
+  return getCurrentWebview().onDragDropEvent(({ payload }) => callback(payload));
 }

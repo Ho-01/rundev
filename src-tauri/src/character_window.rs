@@ -1,12 +1,14 @@
 use serde::Serialize;
 use sqlx::SqlitePool;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::time::Duration;
 use tauri::{
     menu::{CheckMenuItem, Menu, MenuItem},
     AppHandle, Emitter, LogicalSize, Manager, PhysicalPosition,
 };
 
 use crate::database::AppState;
+use crate::file_drop;
 
 const VISIBLE_KEY: &str = "character.window.visible";
 const X_KEY: &str = "character.window.x";
@@ -14,9 +16,15 @@ const Y_KEY: &str = "character.window.y";
 const LAYOUT_KEY: &str = "character.window.layout";
 const COMPACT_LAYOUT: &str = "compact-v2";
 const FOLLOW_POINTER_KEY: &str = "character.window.follow_pointer";
+const BASE_WINDOW_LOGICAL_SIZE: f64 = 48.0;
+const FILE_DROP_WINDOW_LOGICAL_SIZE: f64 = 88.0;
+const FILE_DROP_GROW_MS: u64 = 35;
+const FILE_DROP_SHRINK_MS: u64 = 20;
+const FILE_DROP_RESIZE_FRAME_MS: u64 = 14;
 
 static FOLLOW_POINTER: AtomicBool = AtomicBool::new(false);
 static CONTEXT_MENU_OPEN: AtomicBool = AtomicBool::new(false);
+static FILE_DROP_ACTIVE: AtomicBool = AtomicBool::new(false);
 
 pub fn is_pointer_following() -> bool {
     FOLLOW_POINTER.load(Ordering::Relaxed)
@@ -33,8 +41,12 @@ pub async fn restore(app: &AppHandle, pool: &SqlitePool) -> Result<(), String> {
     let Some(window) = app.get_webview_window("character") else {
         return Err("character window is unavailable".to_string());
     };
+    FILE_DROP_ACTIVE.store(false, Ordering::Relaxed);
     window
-        .set_size(LogicalSize::new(48.0, 48.0))
+        .set_size(LogicalSize::new(
+            BASE_WINDOW_LOGICAL_SIZE,
+            BASE_WINDOW_LOGICAL_SIZE,
+        ))
         .map_err(|error| error.to_string())?;
     FOLLOW_POINTER.store(
         setting(pool, FOLLOW_POINTER_KEY).await?.as_deref() == Some("true"),
@@ -82,7 +94,10 @@ pub async fn set_visible(
         .get_webview_window("character")
         .ok_or_else(|| "character window is unavailable".to_string())?;
     window
-        .set_size(LogicalSize::new(48.0, 48.0))
+        .set_size(LogicalSize::new(
+            BASE_WINDOW_LOGICAL_SIZE,
+            BASE_WINDOW_LOGICAL_SIZE,
+        ))
         .map_err(|error| error.to_string())?;
     if visible {
         if setting(&state.pool, LAYOUT_KEY).await?.as_deref() != Some(COMPACT_LAYOUT)
@@ -97,6 +112,7 @@ pub async fn set_visible(
         }
         window.show()
     } else {
+        FILE_DROP_ACTIVE.store(false, Ordering::Relaxed);
         window.hide()
     }
     .map_err(|error| error.to_string())?;
@@ -113,7 +129,9 @@ pub fn start_pointer_follower(app: AppHandle) {
     tauri::async_runtime::spawn(async move {
         let mut last_position = None;
         loop {
-            if !FOLLOW_POINTER.load(Ordering::Relaxed) || CONTEXT_MENU_OPEN.load(Ordering::Relaxed)
+            if !FOLLOW_POINTER.load(Ordering::Relaxed)
+                || CONTEXT_MENU_OPEN.load(Ordering::Relaxed)
+                || FILE_DROP_ACTIVE.load(Ordering::Relaxed)
             {
                 last_position = None;
                 tokio::time::sleep(std::time::Duration::from_millis(250)).await;
@@ -137,6 +155,40 @@ pub fn start_pointer_follower(app: AppHandle) {
             tokio::time::sleep(std::time::Duration::from_millis(33)).await;
         }
     });
+}
+
+#[tauri::command]
+pub async fn begin_character_file_drop(app: AppHandle) -> Result<(), String> {
+    let window = app
+        .get_webview_window("character")
+        .ok_or_else(|| "character window is unavailable".to_string())?;
+    FILE_DROP_ACTIVE.store(true, Ordering::Relaxed);
+    if let Err(error) =
+        animate_window_size(&window, FILE_DROP_WINDOW_LOGICAL_SIZE, FILE_DROP_GROW_MS).await
+    {
+        FILE_DROP_ACTIVE.store(false, Ordering::Relaxed);
+        return Err(error);
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn end_character_file_drop(app: AppHandle) -> Result<(), String> {
+    let window = app.get_webview_window("character").ok_or_else(|| {
+        FILE_DROP_ACTIVE.store(false, Ordering::Relaxed);
+        "character window is unavailable".to_string()
+    })?;
+    let result = animate_window_size(&window, BASE_WINDOW_LOGICAL_SIZE, FILE_DROP_SHRINK_MS).await;
+    FILE_DROP_ACTIVE.store(false, Ordering::Relaxed);
+    result
+}
+
+#[tauri::command]
+pub fn trash_dropped_files(paths: Vec<String>) -> Result<u32, String> {
+    if !FILE_DROP_ACTIVE.load(Ordering::Relaxed) {
+        return Err("파일 드롭 상태가 활성화되어 있지 않습니다.".to_string());
+    }
+    file_drop::trash_paths(&paths)
 }
 
 #[tauri::command]
@@ -258,6 +310,89 @@ fn position_near_main(app: &AppHandle, window: &tauri::WebviewWindow) {
         y = y.clamp(min_y, max_y.max(min_y));
     }
     let _ = window.set_position(PhysicalPosition::new(x, y));
+}
+
+fn resize_around_fixed_center(
+    window: &tauri::WebviewWindow,
+    logical_size: f64,
+    center_twice: (i64, i64),
+    scale_factor: f64,
+) -> Result<(), String> {
+    #[cfg(windows)]
+    {
+        use windows::Win32::UI::WindowsAndMessaging::{SetWindowPos, SWP_NOACTIVATE, SWP_NOZORDER};
+
+        let physical_size = (logical_size * scale_factor).round() as i64;
+        let next_x = (center_twice.0 - physical_size).div_euclid(2);
+        let next_y = (center_twice.1 - physical_size).div_euclid(2);
+        let x = i32::try_from(next_x)
+            .map_err(|_| "캐릭터 창 위치가 범위를 벗어났습니다.".to_string())?;
+        let y = i32::try_from(next_y)
+            .map_err(|_| "캐릭터 창 위치가 범위를 벗어났습니다.".to_string())?;
+        let size = i32::try_from(physical_size)
+            .map_err(|_| "캐릭터 창 크기가 범위를 벗어났습니다.".to_string())?;
+        let hwnd = window.hwnd().map_err(|error| error.to_string())?;
+
+        unsafe {
+            SetWindowPos(hwnd, None, x, y, size, size, SWP_NOACTIVATE | SWP_NOZORDER)
+                .map_err(|error| error.to_string())
+        }
+    }
+
+    #[cfg(not(windows))]
+    {
+        window
+            .set_size(LogicalSize::new(logical_size, logical_size))
+            .map_err(|error| error.to_string())?;
+        let next_size = window.outer_size().map_err(|error| error.to_string())?;
+        let next_x = (center_twice.0 - i64::from(next_size.width)).div_euclid(2);
+        let next_y = (center_twice.1 - i64::from(next_size.height)).div_euclid(2);
+        let x = i32::try_from(next_x)
+            .map_err(|_| "캐릭터 창 위치가 범위를 벗어났습니다.".to_string())?;
+        let y = i32::try_from(next_y)
+            .map_err(|_| "캐릭터 창 위치가 범위를 벗어났습니다.".to_string())?;
+        window
+            .set_position(PhysicalPosition::new(x, y))
+            .map_err(|error| error.to_string())
+    }
+}
+
+async fn animate_window_size(
+    window: &tauri::WebviewWindow,
+    target_logical_size: f64,
+    duration_ms: u64,
+) -> Result<(), String> {
+    let scale_factor = window.scale_factor().map_err(|error| error.to_string())?;
+    let position = window.outer_position().map_err(|error| error.to_string())?;
+    let current_size = window.outer_size().map_err(|error| error.to_string())?;
+    let center_twice = (
+        i64::from(position.x) * 2 + i64::from(current_size.width),
+        i64::from(position.y) * 2 + i64::from(current_size.height),
+    );
+    let start_logical_size = f64::from(current_size.width) / scale_factor;
+    if (start_logical_size - target_logical_size).abs() < 0.5 {
+        return resize_around_fixed_center(window, target_logical_size, center_twice, scale_factor);
+    }
+
+    let steps = (duration_ms / FILE_DROP_RESIZE_FRAME_MS).max(1);
+    let frame_ms = (duration_ms / steps).max(1);
+    let growing = target_logical_size > start_logical_size;
+
+    for step in 1..=steps {
+        let progress = step as f64 / steps as f64;
+        let eased = if growing {
+            1.0 - (1.0 - progress).powi(3)
+        } else {
+            progress * progress * (3.0 - 2.0 * progress)
+        };
+        let next_size = start_logical_size + (target_logical_size - start_logical_size) * eased;
+        resize_around_fixed_center(window, next_size, center_twice, scale_factor)?;
+        if step < steps {
+            tokio::time::sleep(Duration::from_millis(frame_ms)).await;
+        }
+    }
+
+    Ok(())
 }
 
 #[tauri::command]

@@ -1,6 +1,6 @@
 [package]
 name = "rundev"
-version = "0.6.2"
+version = "0.6.3"
 description = "A local-first developer activity companion"
 authors = ["RunDev"]
 edition = "2021"
@@ -40,6 +40,7 @@ ed25519-dalek = "2"
 [target.'cfg(windows)'.dependencies]
 windows = { version = "0.61", features = [
   "Win32_UI_WindowsAndMessaging",
+  "Win32_UI_Shell",
   "Win32_UI_Input_KeyboardAndMouse",
   "Win32_System_LibraryLoader",
   "Win32_System_SystemInformation",
@@ -50,3 +51,10 @@ windows = { version = "0.61", features = [
 objc2 = "0.6"
 objc2-app-kit = "0.3"
 objc2-core-graphics = "0.3"
+objc2-foundation = { version = "0.3", default-features = false, features = [
+  "NSFileManager",
+  "NSError",
+  "NSObject",
+  "NSString",
+  "NSURL"
+] }

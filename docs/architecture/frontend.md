@@ -55,6 +55,9 @@ flowchart LR
 - 화면 단위 비동기 상태는 Zustand store에 둔다.
 - `main`과 `character` 창은 같은 진입점을 사용하되 window label로 렌더링할 view를
   분리한다. 캐릭터 창의 표시 여부와 마지막 물리 좌표는 Rust가 SQLite에 저장한다.
+- `character` 창은 `characterWindow` service를 통해 Tauri의 파일 드롭 이벤트를 구독한다.
+  React는 파일 드롭 준비/먹기 상태와 runner별 PNG 프레임 전환만 관리하며, 파일 이동·
+  창 크기·이동 잠금은 Rust command에 위임한다.
 
 ## 디자인 원칙
 

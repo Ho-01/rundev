@@ -93,6 +93,9 @@ Updater는 GitHub Releases의 `latest.json`을 endpoint로 사용한다. 공개�
 - 표시 여부, 수동 위치와 포인터 따라다니기 설정을 `app_settings`에 저장
 - 우클릭 네이티브 메뉴와 전역 포인터 우하단을 따르는 창 이동 루프 소유
 - 전역 포인터 좌표는 활성화 중 창 배치에만 사용하고 저장·로그·React 전달 금지
+- 파일 드롭 중에는 Rust가 이동 잠금과 48→88 logical px 임시 창 크기의 보간을 소유한다.
+  `file_drop` adapter는 드롭된 regular file만 Windows Recycle Bin 또는 macOS Trash로
+  이동하며 경로를 저장하거나 진단 로그에 기록하지 않는다.
 
 ### `host_metrics`
 

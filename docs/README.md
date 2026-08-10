@@ -44,3 +44,4 @@
 - [0010 키 입력 횟수 집계](decisions/0010-keyboard-count-collection.md)
 - [0011 개발 집중시간 집계](decisions/0011-focus-time-classification.md)
 - [0012 개발자 레벨 등급](decisions/0012-developer-level-tiers.md)
+- [0035 플로팅 캐릭터 파일 드롭 휴지통 처리](decisions/0035-character-file-drop-to-trash.md)

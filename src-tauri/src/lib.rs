@@ -5,6 +5,7 @@ mod character_window;
 mod commands;
 mod database;
 mod diagnostics;
+mod file_drop;
 mod host_metrics;
 mod keyboard;
 mod progression;
@@ -151,6 +152,9 @@ pub fn run() {
             character_window::set_visible,
             character_window::save_position,
             character_window::show_context_menu,
+            character_window::begin_character_file_drop,
+            character_window::end_character_file_drop,
+            character_window::trash_dropped_files,
             commands::get_system_stats,
             commands::set_host_metrics_mode,
             commands::set_system_panel_expanded,
