@@ -116,14 +116,16 @@ If an idle target regresses, first inspect recurring `requestAnimationFrame`, Re
 OS polling intervals, and image decoding. Do not reduce activity/keyboard privacy guarantees
 to improve these numbers.
 
-The desktop app icon is generated from the checked-in reference image. Regenerate all
-platform variants after changing the reference image or composition:
+The desktop app icon is generated from the checked-in reference image. The macOS bundle
+uses a separately authored ICNS so its native size slots are preserved. Regenerate all
+platform variants after changing either source:
 
 ```powershell
 npm.cmd run icons:app
 ```
 
 - source image: `src-tauri/app-icon-reference.jpg`
+- macOS source icon: `src-tauri/app-icon-macos.icns`
 - generated composition: `src-tauri/app-icon-source.png`
 - bundle outputs: `src-tauri/icons/`
 
