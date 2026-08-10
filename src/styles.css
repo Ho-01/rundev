@@ -13,8 +13,16 @@ html, body, #root { width: 100%; min-height: 100%; margin: 0; }
 body { overflow: hidden; background: #1c1c1e; }
 button { color: inherit; font: inherit; }
 
-body.character-body { background: transparent; }
-.character-body #root { height: 100%; }
+html.character-body,
+html.character-body body,
+html.character-body #root,
+body.character-body,
+body.character-body #root {
+  background: transparent !important;
+}
+html.character-body,
+html.character-body body,
+html.character-body #root { height: 100%; }
 .character-window { position: relative; display: grid; width: 100%; height: 100%; place-items: center; cursor: grab; user-select: none; }
 .character-window:active { cursor: grabbing; }
 .character-window.following-pointer, .character-window.following-pointer:active { cursor: default; }

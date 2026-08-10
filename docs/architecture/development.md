@@ -116,14 +116,14 @@ If an idle target regresses, first inspect recurring `requestAnimationFrame`, Re
 OS polling intervals, and image decoding. Do not reduce activity/keyboard privacy guarantees
 to improve these numbers.
 
-The desktop app icon is generated from the default coding cat. Regenerate all platform
-variants after changing its source or composition:
+The desktop app icon is generated from the checked-in reference image. Regenerate all
+platform variants after changing the reference image or composition:
 
 ```powershell
 npm.cmd run icons:app
 ```
 
-- source character: `src/assets/runners/master/coding-cat/01.png`
+- source image: `src-tauri/app-icon-reference.jpg`
 - generated composition: `src-tauri/app-icon-source.png`
 - bundle outputs: `src-tauri/icons/`
 
