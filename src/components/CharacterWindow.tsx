@@ -3,6 +3,7 @@ import { X } from "lucide-react";
 import type { DragDropEvent } from "@tauri-apps/api/webview";
 import { desktopRunnerFramesById } from "../assets/runners/desktop";
 import { feedingRunnerFramesById } from "../assets/runners/feeding";
+import { grabbedRunnerFramesById } from "../assets/runners/grabbed";
 import { roamingRunnerFramesById } from "../assets/runners/roaming";
 import type { RunnerId } from "../types/activity";
 import {
@@ -17,6 +18,7 @@ import {
   showCharacterContextMenu,
   subscribeCharacterMotion,
   subscribeCharacterFileDrop,
+  subscribeCharacterDragEnd,
   subscribeCharacterWindowState,
   subscribeRunnerSelection,
   subscribeTypingPulse,
@@ -26,6 +28,7 @@ import {
 const DRAG_THRESHOLD = 7;
 const DRAG_DELAY_MS = 140;
 const ROAMING_FRAME_INTERVAL_MS = 170;
+const GRABBED_FRAME_INTERVAL_MS = 300;
 const FEED_FRAME_INTERVAL_MS = 200;
 const FEED_SWALLOW_HOLD_MS = 280;
 const FEED_FRAME_SEQUENCE = [1, 2, 1, 2, 3] as const;
@@ -45,6 +48,15 @@ const roamingVisualScaleByRunner: Record<RunnerId, number> = {
   "coding-shrimp": 1,
   "coding-vtuber": 1
 };
+const grabbedVisualScaleByRunner: Record<RunnerId, number> = {
+  "coding-cat": 1.35,
+  "coding-fish": 1.25,
+  "coding-orange-cat": 1.25,
+  "coding-shrimp": 1.3,
+  // The held sprite's head is 98 px wide versus 145 px in the seated sprite.
+  // Keep the perceived head size consistent while the character is held.
+  "coding-vtuber": 1.5
+};
 
 export function CharacterWindow() {
   const [runnerId, setRunnerId] = useState<RunnerId>("coding-cat");
@@ -55,6 +67,8 @@ export function CharacterWindow() {
   const [moving, setMoving] = useState(false);
   const [direction, setDirection] = useState(1);
   const [roamingFrame, setRoamingFrame] = useState(0);
+  const [dragVisualActive, setDragVisualActive] = useState(false);
+  const [grabbedFrame, setGrabbedFrame] = useState(0);
   const [feedPhase, setFeedPhase] = useState<FeedPhase>("idle");
   const [feedFrame, setFeedFrame] = useState(0);
   const lastTypingAt = useRef(Number.NEGATIVE_INFINITY);
@@ -73,6 +87,7 @@ export function CharacterWindow() {
   const [windowVisible, setWindowVisible] = useState(false);
   const frames = desktopRunnerFramesById[runnerId];
   const feedingFrames = feedingRunnerFramesById[runnerId];
+  const grabbedFrames = grabbedRunnerFramesById[runnerId];
   const roamingFrames = roamingRunnerFramesById[runnerId];
 
   useEffect(() => {
@@ -83,6 +98,15 @@ export function CharacterWindow() {
     }, ROAMING_FRAME_INTERVAL_MS);
     return () => window.clearInterval(timer);
   }, [feedPhase, moving, roaming, roamingFrames.length, runnerId, windowVisible]);
+
+  useEffect(() => {
+    setGrabbedFrame(0);
+    if (!windowVisible || feedPhase !== "idle" || !dragVisualActive || grabbedFrames.length < 2) return;
+    const timer = window.setInterval(() => {
+      setGrabbedFrame((current) => (current + 1) % grabbedFrames.length);
+    }, GRABBED_FRAME_INTERVAL_MS);
+    return () => window.clearInterval(timer);
+  }, [dragVisualActive, feedPhase, grabbedFrames.length, runnerId, windowVisible]);
 
   useEffect(() => {
     void getCharacterRunner().then(({ runnerId: selectedRunner }) => setRunnerId(selectedRunner));
@@ -295,6 +319,17 @@ export function CharacterWindow() {
     };
   }, []);
 
+  useEffect(() => {
+    let unlisten = () => {};
+    void subscribeCharacterDragEnd(() => {
+      clearDragTimer();
+      finishWindowDrag();
+    }).then((next) => {
+      unlisten = next;
+    });
+    return () => unlisten();
+  }, []);
+
   function clearDragTimer() {
     if (dragTimer.current !== null) {
       window.clearTimeout(dragTimer.current);
@@ -328,34 +363,43 @@ export function CharacterWindow() {
     });
   }
 
-  function startWindowDrag() {
-    if (!roaming) {
-      void dragCharacterWindow();
-      return;
-    }
+  function finishWindowDrag() {
+    dragStarted.current = false;
+    setDragVisualActive(false);
+    requestEndRoamingDrag();
+  }
 
+  function startWindowDrag() {
+    setGrabbedFrame(0);
+    setDragVisualActive(true);
     dragPauseReleaseRequested.current = false;
-    const pending = beginCharacterDrag();
+    const pending = beginCharacterDrag(grabbedVisualScaleByRunner[runnerId]);
     dragPausePromise.current = pending;
-    void pending.then(() => {
-      if (!dragStarted.current || dragPauseReleaseRequested.current) {
-        dragPauseReleaseRequested.current = false;
-        dragPausePromise.current = null;
-        return endCharacterDrag();
-      }
-      dragPauseActive.current = true;
-      clearDragPauseSafetyTimer();
-      dragPauseSafetyTimer.current = window.setTimeout(() => {
+    void pending
+      .then(() => {
+        if (!dragStarted.current || dragPauseReleaseRequested.current) {
+          dragPauseReleaseRequested.current = false;
+          dragPausePromise.current = null;
+          return endCharacterDrag();
+        }
+        if (roaming) {
+          dragPauseActive.current = true;
+          clearDragPauseSafetyTimer();
+          dragPauseSafetyTimer.current = window.setTimeout(() => {
+            requestEndRoamingDrag();
+          }, 15_000);
+        }
+        return dragCharacterWindow();
+      })
+      .catch(() => {
+        setDragVisualActive(false);
         requestEndRoamingDrag();
-      }, 15_000);
-      return dragCharacterWindow();
-    }).catch(() => {
-      requestEndRoamingDrag();
-    });
+      });
   }
 
   function startDrag(event: PointerEvent<HTMLDivElement>) {
-    if (event.button !== 0 || followPointer || feedPhase !== "idle") return;
+    if (event.button !== 0 || followPointer || feedPhaseRef.current !== "idle") return;
+    event.currentTarget.setPointerCapture(event.pointerId);
     dragOrigin.current = { x: event.clientX, y: event.clientY };
     dragStarted.current = false;
     clearDragTimer();
@@ -376,14 +420,17 @@ export function CharacterWindow() {
     startWindowDrag();
   }
 
-  function finishPointer() {
+  function finishPointer(event: PointerEvent<HTMLDivElement>) {
     clearDragTimer();
-    dragStarted.current = false;
-    requestEndRoamingDrag();
+    finishWindowDrag();
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
   }
 
 
-  const roamingMoving = feedPhase === "idle" && roaming && moving;
+  const draggingCharacter = dragVisualActive && feedPhase === "idle";
+  const roamingMoving = feedPhase === "idle" && !draggingCharacter && roaming && moving;
   const movingDirection = direction < 0 ? -1 : 1;
   const shouldFlipForDirection = movingDirection !== roamingSourceDirectionByRunner[runnerId];
   const movingClass = roamingMoving && shouldFlipForDirection ? " roaming-direction-flipped" : "";
@@ -394,12 +441,14 @@ export function CharacterWindow() {
       : feedPhase === "consuming" || feedPhase === "finishing"
       ? " file-drop-consuming"
       : "";
-  const className = `character-window${feedClass}${typingMotion && !roamingMoving && feedPhase === "idle" ? ` typing-motion-${typingMotion}` : ""}${followPointer ? " following-pointer" : ""}${roaming ? " roaming-mode" : ""}${roamingMoving ? ` roaming-moving${movingClass}` : ""}`;
-  const roamingStyle = roamingMoving
+  const className = `character-window${feedClass}${draggingCharacter ? " character-dragging" : ""}${typingMotion && !draggingCharacter && !roamingMoving && feedPhase === "idle" ? ` typing-motion-${typingMotion}` : ""}${followPointer ? " following-pointer" : ""}${roaming ? " roaming-mode" : ""}${roamingMoving ? ` roaming-moving${movingClass}` : ""}`;
+  const characterStyle = roamingMoving
     ? ({ "--roam-size": roamingVisualScaleByRunner[runnerId] } as CSSProperties & { "--roam-size": number })
     : undefined;
   const image = feedPhase !== "idle"
     ? feedingFrames[feedFrame]
+    : draggingCharacter
+      ? grabbedFrames[grabbedFrame % grabbedFrames.length]
     : roamingMoving
       ? roamingFrames[roamingFrame % roamingFrames.length]
       : frames[frame];
@@ -408,7 +457,7 @@ export function CharacterWindow() {
     <div
       className={className}
       data-runner={runnerId}
-      style={roamingStyle}
+      style={characterStyle}
       onPointerDown={startDrag}
       onPointerMove={continueDrag}
       onPointerUp={finishPointer}

@@ -40,9 +40,9 @@ export async function dragCharacterWindow() {
   await invoke("save_position");
 }
 
-export async function beginCharacterDrag() {
+export async function beginCharacterDrag(scale: number) {
   if (!isTauri()) return;
-  await invoke("begin_character_drag");
+  await invoke("begin_character_drag", { scale });
 }
 
 export async function endCharacterDrag() {
@@ -87,6 +87,11 @@ export async function subscribeCharacterMotion(
 ): Promise<UnlistenFn> {
   if (!isTauri()) return () => {};
   return listen<CharacterMotionState>("character-window-motion-changed", ({ payload }) => callback(payload));
+}
+
+export async function subscribeCharacterDragEnd(callback: () => void): Promise<UnlistenFn> {
+  if (!isTauri()) return () => {};
+  return listen("character-window-drag-ended", callback);
 }
 
 export async function subscribeRunnerSelection(

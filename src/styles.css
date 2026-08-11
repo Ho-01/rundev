@@ -25,11 +25,13 @@ html.character-body body,
 html.character-body #root { height: 100%; }
 .character-window { position: relative; display: grid; width: 100%; height: 100%; place-items: center; cursor: grab; user-select: none; }
 .character-window:active { cursor: grabbing; }
+.character-window.character-dragging, .character-window.character-dragging:active { cursor: grabbing; }
 .character-window.following-pointer, .character-window.following-pointer:active { cursor: default; }
 .character-window.roaming-mode, .character-window.roaming-mode:active { cursor: default; }
 .character-window > img { width: 100%; height: 100%; object-fit: contain; pointer-events: none; transition: transform 38ms linear; }
 .character-window.file-drop-ready > button,
-.character-window.file-drop-consuming > button { opacity: 0; pointer-events: none; }
+.character-window.file-drop-consuming > button,
+.character-window.character-dragging > button { opacity: 0; pointer-events: none; }
 .character-window.roaming-moving { --roam-scale: 1; --roam-size: 1; }
 .character-window.roaming-moving.roaming-direction-flipped { --roam-scale: -1; }
 .character-window.roaming-moving > img { animation: character-roaming-bob .68s steps(4, end) infinite; transform-origin: center center; }

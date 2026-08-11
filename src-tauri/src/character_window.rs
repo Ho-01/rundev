@@ -1,6 +1,6 @@
 use serde::Serialize;
 use sqlx::SqlitePool;
-use std::sync::atomic::{AtomicBool, AtomicI8, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicI8, AtomicU64, Ordering};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tauri::{
     menu::{CheckMenuItem, Menu, MenuItem},
@@ -10,6 +10,9 @@ use tauri::{
 use crate::database::AppState;
 use crate::file_drop;
 
+#[cfg(windows)]
+use windows::Win32::UI::Input::KeyboardAndMouse::{GetAsyncKeyState, VK_LBUTTON};
+
 const VISIBLE_KEY: &str = "character.window.visible";
 const X_KEY: &str = "character.window.x";
 const Y_KEY: &str = "character.window.y";
@@ -18,6 +21,7 @@ const COMPACT_LAYOUT: &str = "compact-v2";
 const FOLLOW_POINTER_KEY: &str = "character.window.follow_pointer";
 const ROAMING_KEY: &str = "character.window.roaming";
 const MOTION_EVENT: &str = "character-window-motion-changed";
+const DRAG_END_EVENT: &str = "character-window-drag-ended";
 const ROAM_IDLE_MIN_MS: u64 = 1_200;
 const ROAM_IDLE_MAX_MS: u64 = 7_800;
 const ROAM_SPEED_MIN: f64 = 140.0;
@@ -35,7 +39,53 @@ static MOVING: AtomicBool = AtomicBool::new(false);
 static MOTION_DIRECTION: AtomicI8 = AtomicI8::new(1);
 static CONTEXT_MENU_OPEN: AtomicBool = AtomicBool::new(false);
 static DRAGGING: AtomicBool = AtomicBool::new(false);
+static DRAG_SESSION: AtomicU64 = AtomicU64::new(0);
 static FILE_DROP_ACTIVE: AtomicBool = AtomicBool::new(false);
+
+#[cfg(target_os = "macos")]
+#[link(name = "CoreGraphics", kind = "framework")]
+extern "C" {
+    fn CGEventSourceButtonState(state_id: u32, button: u32) -> bool;
+}
+
+#[cfg(windows)]
+fn primary_mouse_button_pressed() -> bool {
+    unsafe { GetAsyncKeyState(i32::from(VK_LBUTTON.0)) < 0 }
+}
+
+#[cfg(target_os = "macos")]
+fn primary_mouse_button_pressed() -> bool {
+    unsafe { CGEventSourceButtonState(0, 0) }
+}
+
+#[cfg(not(any(windows, target_os = "macos")))]
+fn primary_mouse_button_pressed() -> bool {
+    true
+}
+
+fn resize_character_window_centered(
+    window: &tauri::WebviewWindow,
+    logical_size: f64,
+) -> Result<(), String> {
+    let previous_position = window.outer_position().map_err(|error| error.to_string())?;
+    let previous_size = window.outer_size().map_err(|error| error.to_string())?;
+    window
+        .set_size(LogicalSize::new(logical_size, logical_size))
+        .map_err(|error| error.to_string())?;
+    let resized = window.outer_size().map_err(|error| error.to_string())?;
+    let width_delta = i32::try_from(resized.width)
+        .unwrap_or(i32::MAX)
+        .saturating_sub(i32::try_from(previous_size.width).unwrap_or(i32::MAX));
+    let height_delta = i32::try_from(resized.height)
+        .unwrap_or(i32::MAX)
+        .saturating_sub(i32::try_from(previous_size.height).unwrap_or(i32::MAX));
+    window
+        .set_position(PhysicalPosition::new(
+            previous_position.x.saturating_sub(width_delta / 2),
+            previous_position.y.saturating_sub(height_delta / 2),
+        ))
+        .map_err(|error| error.to_string())
+}
 
 pub fn is_pointer_following() -> bool {
     FOLLOW_POINTER.load(Ordering::Relaxed)
@@ -383,15 +433,44 @@ fn next_roam_segment(window: &tauri::WebviewWindow, random_state: &mut u64) -> O
 }
 
 #[tauri::command]
-pub fn begin_character_drag(app: AppHandle) -> Result<(), String> {
+pub fn begin_character_drag(scale: f64, app: AppHandle) -> Result<(), String> {
+    let window = app
+        .get_webview_window("character")
+        .ok_or_else(|| "character window is unavailable".to_string())?;
+    let scale = if scale.is_finite() {
+        scale.clamp(1.0, 2.0)
+    } else {
+        1.0
+    };
+    resize_character_window_centered(&window, BASE_WINDOW_LOGICAL_SIZE * scale)?;
+    let session = DRAG_SESSION.fetch_add(1, Ordering::Relaxed) + 1;
     DRAGGING.store(true, Ordering::Relaxed);
     emit_motion(&app, false, MOTION_DIRECTION.load(Ordering::Relaxed));
+    tauri::async_runtime::spawn(async move {
+        loop {
+            if !DRAGGING.load(Ordering::Relaxed) || DRAG_SESSION.load(Ordering::Relaxed) != session
+            {
+                return;
+            }
+            if !primary_mouse_button_pressed() {
+                DRAGGING.store(false, Ordering::Relaxed);
+                let _ = app.emit(DRAG_END_EVENT, ());
+                return;
+            }
+            tokio::time::sleep(Duration::from_millis(16)).await;
+        }
+    });
     Ok(())
 }
 
 #[tauri::command]
-pub fn end_character_drag() {
+pub fn end_character_drag(app: AppHandle) -> Result<(), String> {
     DRAGGING.store(false, Ordering::Relaxed);
+    DRAG_SESSION.fetch_add(1, Ordering::Relaxed);
+    if let Some(window) = app.get_webview_window("character") {
+        resize_character_window_centered(&window, BASE_WINDOW_LOGICAL_SIZE)?;
+    }
+    Ok(())
 }
 
 #[tauri::command]
