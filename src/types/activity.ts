@@ -171,8 +171,32 @@ export type RunnerId =
   | "coding-shrimp"
   | "coding-vtuber";
 
+export type RunnerSkinId = "default" | "pool-party";
+
 export type RunnerSelection = {
   runnerId: RunnerId;
+  skinId: RunnerSkinId;
+};
+
+export type RunnerSkin = {
+  skinId: RunnerSkinId;
+  name: string;
+  description: string;
+  requiredActiveSeconds: number;
+  owned: boolean;
+  equipped: boolean;
+};
+
+export type RunnerCharacter = {
+  runnerId: RunnerId;
+  name: string;
+  skins: RunnerSkin[];
+};
+
+export type RunnerSkinCollection = {
+  selected: RunnerSelection;
+  totalDevelopmentSeconds: number;
+  characters: RunnerCharacter[];
 };
 
 export type WhipStats = {

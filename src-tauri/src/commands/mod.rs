@@ -1,6 +1,6 @@
 use crate::{
     activity, adapters, ai_xp, database::AppState, diagnostics, host_metrics, keyboard,
-    progression, tray, whip, xp_boost,
+    progression, runner_skins, tray, whip, xp_boost,
 };
 use chrono::{DateTime, Datelike, Duration, Local, NaiveDate, Utc};
 use serde::Serialize;
@@ -190,12 +190,6 @@ pub struct AiActivityStatus {
     claude_active_sessions: i64,
 }
 
-#[derive(Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct RunnerSelection {
-    runner_id: String,
-}
-
 #[tauri::command]
 pub async fn get_keyboard_activity_today(
     state: State<'_, AppState>,
@@ -260,19 +254,10 @@ pub async fn record_whip(state: State<'_, AppState>) -> Result<whip::WhipStats, 
 }
 
 #[tauri::command]
-pub async fn get_runner_selection(state: State<'_, AppState>) -> Result<RunnerSelection, String> {
-    let runner_id =
-        sqlx::query_scalar("SELECT value FROM app_settings WHERE key = 'runner.selected'")
-            .fetch_optional(&state.pool)
-            .await
-            .map_err(|error| error.to_string())?
-            .unwrap_or_else(|| "coding-cat".to_string());
-    let runner_id = if runner_id == "coding-white-cat" {
-        "coding-shrimp".to_string()
-    } else {
-        runner_id
-    };
-    Ok(RunnerSelection { runner_id })
+pub async fn get_runner_selection(
+    state: State<'_, AppState>,
+) -> Result<runner_skins::RunnerSelection, String> {
+    runner_skins::selection(&state.pool).await
 }
 
 #[tauri::command]
@@ -280,33 +265,37 @@ pub async fn set_runner_selection(
     runner_id: String,
     app: AppHandle,
     state: State<'_, AppState>,
-) -> Result<(), String> {
-    if !is_supported_runner(&runner_id) {
-        return Err("지원하지 않는 개발자 캐릭터입니다.".to_string());
-    }
-    sqlx::query(
-        "INSERT INTO app_settings (key, value) VALUES ('runner.selected', ?)
-         ON CONFLICT(key) DO UPDATE SET value = excluded.value",
-    )
-    .bind(&runner_id)
-    .execute(&state.pool)
-    .await
-    .map_err(|error| error.to_string())?;
-    tray::set_runner(&runner_id);
-    let _ = app.emit("runner-selection-changed", RunnerSelection { runner_id });
-    Ok(())
+) -> Result<runner_skins::RunnerSelection, String> {
+    let selection = runner_skins::select_runner(&state.pool, &runner_id).await?;
+    tray::set_runner(&selection.runner_id, &selection.skin_id);
+    let _ = app.emit("runner-selection-changed", selection.clone());
+    Ok(selection)
 }
 
-fn is_supported_runner(runner_id: &str) -> bool {
-    matches!(
-        runner_id,
-        "coding-cat" | "coding-fish" | "coding-orange-cat" | "coding-shrimp" | "coding-vtuber"
-    )
+#[tauri::command]
+pub async fn get_runner_skin_collection(
+    state: State<'_, AppState>,
+) -> Result<runner_skins::RunnerSkinCollection, String> {
+    runner_skins::collection(&state.pool).await
+}
+
+#[tauri::command]
+pub async fn equip_runner_skin(
+    runner_id: String,
+    skin_id: String,
+    app: AppHandle,
+    state: State<'_, AppState>,
+) -> Result<runner_skins::RunnerSelection, String> {
+    let selection = runner_skins::equip_skin(&state.pool, &runner_id, &skin_id).await?;
+    tray::set_runner(&selection.runner_id, &selection.skin_id);
+    let _ = app.emit("runner-selection-changed", selection.clone());
+    Ok(selection)
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{activity_intensity, is_supported_runner, week_start};
+    use super::{activity_intensity, week_start};
+    use crate::runner_skins::is_supported_runner;
     use chrono::NaiveDate;
 
     #[test]

@@ -82,7 +82,7 @@ export async function showCharacterContextMenu() {
 }
 
 export async function getCharacterRunner(): Promise<RunnerSelection> {
-  if (!isTauri()) return { runnerId: "coding-cat" };
+  if (!isTauri()) return { runnerId: "coding-cat", skinId: "default" };
   return invoke<RunnerSelection>("get_runner_selection");
 }
 

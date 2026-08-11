@@ -503,6 +503,42 @@ html.character-body #root { height: 100%; }
 .character-window-setting[aria-checked="true"] > i { background: #8fb84c; }
 .character-window-setting[aria-checked="true"] > i > b { background: #fff; transform: translateX(13px); }
 .character-window-setting:focus-visible { outline: 2px solid rgba(143,184,76,.65); outline-offset: 2px; }
+.runner-collection-dialog { max-height: calc(100% - 18px); overflow-y: auto; scrollbar-width: thin; }
+.runner-collection-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.runner-collection-heading > div { display: grid; gap: 3px; }
+.runner-collection-heading span { display: inline-flex; align-items: center; gap: 4px; color: #9bc96b; font-size: 9px; font-weight: 700; letter-spacing: .03em; }
+.runner-collection-heading h2 { margin: 0; font-size: 15px; }
+.runner-collection-heading > button { display: grid; width: 25px; height: 25px; place-items: center; color: #aaaab0; background: #36363a; border: 1px solid rgba(255,255,255,.08); border-radius: 6px; cursor: pointer; }
+.runner-collection-heading > button:hover { color: #f0f0f2; background: #45454a; }
+.runner-collection-dialog > p { margin: 9px 0 12px; color: #98989e; font-size: 10px; line-height: 1.45; }
+.runner-collection-section { display: grid; gap: 7px; }
+.runner-collection-section + .runner-collection-section { margin-top: 13px; }
+.runner-collection-label { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.runner-collection-label strong { color: #e5e5e8; font-size: 11px; }
+.runner-collection-label small { color: #818187; font-size: 9px; }
+.runner-character-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; }
+.runner-character-grid button { display: grid; min-width: 0; gap: 2px; justify-items: center; padding: 5px 2px 4px; color: #9d9da3; background: #222225; border: 1px solid transparent; border-radius: 7px; cursor: pointer; }
+.runner-character-grid button:hover:not(:disabled) { color: #dedee2; background: #2d2d31; }
+.runner-character-grid button.selected { color: #eff5e7; background: #293124; border-color: rgba(143,184,76,.65); box-shadow: inset 0 0 0 1px rgba(143,184,76,.12); }
+.runner-character-grid button:disabled { cursor: wait; }
+.runner-character-grid img { width: 39px; height: 39px; object-fit: contain; image-rendering: pixelated; }
+.runner-character-grid span { width: 100%; overflow: hidden; font-size: 7px; line-height: 1.2; text-align: center; text-overflow: ellipsis; white-space: nowrap; }
+.runner-skin-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
+.runner-skin-card { position: relative; display: grid; grid-template-rows: 78px auto auto; min-width: 0; padding: 7px; overflow: hidden; background: linear-gradient(145deg, #25262a, #202023); border: 1px solid #3b3b40; border-radius: 9px; }
+.runner-skin-card.equipped { border-color: rgba(143,184,76,.72); box-shadow: inset 0 0 0 1px rgba(143,184,76,.16); }
+.runner-skin-card > img { width: 100%; height: 76px; object-fit: contain; image-rendering: pixelated; }
+.runner-skin-card.locked > img { opacity: .62; filter: saturate(.55) brightness(.78); }
+.runner-skin-card > div > strong { display: block; overflow: hidden; color: #ececef; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.runner-skin-card > div > p { display: -webkit-box; min-height: 28px; margin: 3px 0 6px; overflow: hidden; color: #929299; font-size: 8px; line-height: 1.35; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.runner-skin-card > button { display: inline-flex; min-height: 25px; align-items: center; justify-content: center; gap: 4px; color: #171a15; background: #a8ce6b; border: 0; border-radius: 5px; font-size: 9px; font-weight: 700; cursor: pointer; }
+.runner-skin-card > button:disabled { color: #cbd4c2; background: #3d4935; cursor: default; }
+.runner-skin-lock { display: grid; gap: 3px; align-self: end; color: #bdbdc2; }
+.runner-skin-lock > span { display: inline-flex; align-items: center; gap: 3px; font-size: 8px; }
+.runner-skin-lock progress { width: 100%; height: 4px; overflow: hidden; accent-color: #66bbd4; border: 0; border-radius: 999px; }
+.runner-skin-lock small { color: #83838a; font-size: 7px; text-align: right; }
+.runner-skin-lock-icon { position: absolute; top: 7px; right: 7px; display: grid; width: 22px; height: 22px; place-items: center; color: #f0f0f2; background: rgba(20,20,22,.7); border: 1px solid rgba(255,255,255,.14); border-radius: 50%; }
+.runner-collection-error { margin: 8px 0 0 !important; color: #ff9a91 !important; }
+.runner-collection-dialog .character-window-setting { margin-top: 12px; }
 
 .runner-face {
   position: absolute;

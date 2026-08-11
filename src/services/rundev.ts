@@ -20,6 +20,8 @@ import type {
   TraitId,
   TraitProgress,
   RunnerId,
+  RunnerSkinCollection,
+  RunnerSkinId,
   RunnerSelection,
   WhipStats,
   XpBoostStatus,
@@ -169,7 +171,8 @@ function previewRunner(): RunnerSelection {
   return {
     runnerId: supported.includes(requested as RunnerId)
       ? (requested as RunnerId)
-      : "coding-cat"
+      : "coding-cat",
+    skinId: "default"
   };
 }
 
@@ -283,9 +286,42 @@ function getPreviewDashboard() {
   };
 }
 
-export async function setRunnerSelection(runnerId: RunnerId) {
-  if (!isTauri()) return;
-  await invoke("set_runner_selection", { runnerId });
+export async function setRunnerSelection(runnerId: RunnerId): Promise<RunnerSelection> {
+  if (!isTauri()) return { runnerId, skinId: "default" };
+  return invoke<RunnerSelection>("set_runner_selection", { runnerId });
+}
+
+export async function getRunnerSkinCollection(): Promise<RunnerSkinCollection> {
+  if (!isTauri()) {
+    const selection = previewRunner();
+    return {
+      selected: selection,
+      totalDevelopmentSeconds: 0,
+      characters: [
+        { runnerId: "coding-cat", name: "코딩 고양이", skins: [{ skinId: "default", name: "기본 스킨", description: "RunDev의 기본 코딩 고양이입니다.", requiredActiveSeconds: 0, owned: true, equipped: selection.runnerId === "coding-cat" }] },
+        { runnerId: "coding-orange-cat", name: "주황 고양이", skins: [{ skinId: "default", name: "기본 스킨", description: "RunDev의 기본 주황 고양이입니다.", requiredActiveSeconds: 0, owned: true, equipped: selection.runnerId === "coding-orange-cat" }] },
+        { runnerId: "coding-shrimp", name: "주황 새우", skins: [{ skinId: "default", name: "기본 스킨", description: "RunDev의 기본 주황 새우입니다.", requiredActiveSeconds: 0, owned: true, equipped: selection.runnerId === "coding-shrimp" }] },
+        { runnerId: "coding-fish", name: "파란 물고기", skins: [{ skinId: "default", name: "기본 스킨", description: "RunDev의 기본 파란 물고기입니다.", requiredActiveSeconds: 0, owned: true, equipped: selection.runnerId === "coding-fish" }] },
+        {
+          runnerId: "coding-vtuber",
+          name: "핑크 버튜버",
+          skins: [
+            { skinId: "default", name: "기본 스킨", description: "헤드셋을 쓰고 코딩하는 핑크 버튜버입니다.", requiredActiveSeconds: 0, owned: true, equipped: selection.runnerId === "coding-vtuber" },
+            { skinId: "pool-party", name: "수영장 파티", description: "선글라스와 파란 도트 비키니로 여름 코딩을 즐깁니다.", requiredActiveSeconds: 18_000, owned: false, equipped: false }
+          ]
+        }
+      ]
+    };
+  }
+  return invoke<RunnerSkinCollection>("get_runner_skin_collection");
+}
+
+export async function equipRunnerSkin(
+  runnerId: RunnerId,
+  skinId: RunnerSkinId
+): Promise<RunnerSelection> {
+  if (!isTauri()) return { runnerId, skinId };
+  return invoke<RunnerSelection>("equip_runner_skin", { runnerId, skinId });
 }
 
 export async function openKeyboardPermissionSettings() {

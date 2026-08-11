@@ -45,13 +45,20 @@ const VTUBER_FRAMES: [&[u8]; 4] = [
     include_bytes!("../../icons/tray/coding-vtuber/03.png").as_slice(),
     include_bytes!("../../icons/tray/coding-vtuber/04.png").as_slice(),
 ];
+const POOL_PARTY_VTUBER_FRAMES: [&[u8]; 4] = [
+    include_bytes!("../../icons/tray/coding-vtuber-pool-party/01.png").as_slice(),
+    include_bytes!("../../icons/tray/coding-vtuber-pool-party/02.png").as_slice(),
+    include_bytes!("../../icons/tray/coding-vtuber-pool-party/03.png").as_slice(),
+    include_bytes!("../../icons/tray/coding-vtuber-pool-party/04.png").as_slice(),
+];
 
-pub fn set_runner(runner: &str) {
-    let runner_index = match runner {
-        "coding-fish" => 1,
-        "coding-orange-cat" => 2,
-        "coding-shrimp" | "coding-white-cat" => 3,
-        "coding-vtuber" => 4,
+pub fn set_runner(runner: &str, skin: &str) {
+    let runner_index = match (runner, skin) {
+        ("coding-vtuber", "pool-party") => 5,
+        ("coding-fish", _) => 1,
+        ("coding-orange-cat", _) => 2,
+        ("coding-shrimp" | "coding-white-cat", _) => 3,
+        ("coding-vtuber", _) => 4,
         _ => 0,
     };
     SELECTED_RUNNER.store(runner_index, Ordering::Relaxed);
@@ -63,6 +70,7 @@ fn selected_frames() -> &'static [&'static [u8]; 4] {
         2 => &ORANGE_CAT_FRAMES,
         3 => &SHRIMP_FRAMES,
         4 => &VTUBER_FRAMES,
+        5 => &POOL_PARTY_VTUBER_FRAMES,
         _ => &CAT_FRAMES,
     }
 }

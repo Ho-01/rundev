@@ -38,6 +38,7 @@ ADR은 이미 내려진 중요한 기술 결정을 기록한다. 결정이 바�
 | [0022](0022-character-pointer-following.md) | 화면 캐릭터의 전역 포인터 따라다니기 | Accepted |
 | [0023](0023-character-monitor-roaming.md) | 플로팅 캐릭터의 모니터 자유 이동 | Accepted |
 | [0035](0035-character-file-drop-to-trash.md) | 플로팅 캐릭터 파일 드롭 휴지통 처리 | Accepted |
+| [0036](0036-character-skin-collection.md) | 로컬 집중 마일스톤 기반 캐릭터 스킨 컬렉션 | Accepted |
 
 ## 새 ADR 작성 형식
 

@@ -46,9 +46,12 @@ describe("App", () => {
     expect(screen.getByRole("heading", { name: "RunDev 정보" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "진단 로그 폴더" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "개발자 변경" }));
-    expect(screen.getByText("주황 고양이")).toBeInTheDocument();
+    expect(await screen.findByText("주황 고양이")).toBeInTheDocument();
     expect(screen.getByText("주황 새우")).toBeInTheDocument();
     expect(screen.getByText("핑크 버튜버")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "핑크 버튜버" }));
+    expect(await screen.findByText("수영장 파티")).toBeInTheDocument();
+    expect(screen.getByText("누적 집중 5시간")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "활동 통계" }));
     expect(await screen.findByRole("complementary", { name: "활동 통계" })).toBeInTheDocument();
     const todayTab = screen.getByRole("tab", { name: "오늘" });

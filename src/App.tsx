@@ -84,7 +84,8 @@ import type {
   ,TraitId
   ,TraitProgress
 } from "./types/activity";
-import { runnerFramesById, runnerOptions } from "./assets/runners";
+import { runnerFrames as framesForRunner } from "./assets/runners";
+import { RunnerCollectionDialog } from "./components/RunnerCollectionDialog";
 import openAiIcon from "./assets/providers/openai.svg";
 
 const KEYBOARD_PERMISSION_REPAIR_PENDING_KEY =
@@ -667,7 +668,7 @@ export function App() {
     setFocusActivity,
     setSystemStats
   } = useDashboardStore();
-  const runnerFrames = runnerFramesById[runner?.runnerId ?? "coding-cat"];
+  const runnerFrames = framesForRunner(runner?.runnerId ?? "coding-cat", runner?.skinId ?? "default");
 
   useEffect(() => subscribeMainWindowActivity(setMainWindowActive), []);
 
@@ -1728,46 +1729,14 @@ export function App() {
         </div>
       )}
       {runnerDialogOpen && (
-        <div className="dialog-backdrop" role="presentation">
-          <section
-            className="account-dialog runner-dialog"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="runner-title"
-          >
-            <h2 id="runner-title">개발자 변경</h2>
-            <p>트레이와 RunDev 화면에 표시할 개발자 캐릭터를 선택하세요.</p>
-            <div className="runner-options">
-              {runnerOptions.map((option) => (
-                <button
-                  key={option.id}
-                  type="button"
-                  className={runner?.runnerId === option.id ? "selected" : ""}
-                  onClick={() => void selectRunner(option.id).then(() => setRunnerDialogOpen(false))}
-                >
-                  <img src={option.frame} alt="" aria-hidden="true" />
-                  <span>{option.name}</span>
-                </button>
-              ))}
-            </div>
-            <button
-              type="button"
-              className="character-window-setting"
-              role="switch"
-              aria-checked={characterWindowVisible}
-              onClick={() => void toggleCharacterWindow()}
-            >
-              <span>
-                <strong>화면에 캐릭터 띄우기</strong>
-                <small>다른 앱 위에서도 타이핑 리듬을 보여줍니다.</small>
-              </span>
-              <i aria-hidden="true"><b /></i>
-            </button>
-            <div className="dialog-actions">
-              <button type="button" onClick={() => setRunnerDialogOpen(false)}>닫기</button>
-            </div>
-          </section>
-        </div>
+        <RunnerCollectionDialog
+          selection={runner}
+          characterWindowVisible={characterWindowVisible}
+          onClose={() => setRunnerDialogOpen(false)}
+          onSelectRunner={selectRunner}
+          onSelectionChanged={refresh}
+          onToggleCharacterWindow={toggleCharacterWindow}
+        />
       )}
       {cursorConsentOpen && (
         <div className="dialog-backdrop" role="presentation">

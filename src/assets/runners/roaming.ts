@@ -1,4 +1,4 @@
-import type { RunnerId } from "../../types/activity";
+import type { RunnerId, RunnerSkinId } from "../../types/activity";
 import codingCatRoam from "./master/coding-cat/roam.png";
 import codingCatRoam02 from "./master/coding-cat/roam-02.png";
 import codingCatRoam03 from "./master/coding-cat/roam-03.png";
@@ -19,6 +19,10 @@ import codingVtuberRoam from "./master/coding-vtuber/roam.png";
 import codingVtuberRoam02 from "./master/coding-vtuber/roam-02.png";
 import codingVtuberRoam03 from "./master/coding-vtuber/roam-03.png";
 import codingVtuberRoam04 from "./master/coding-vtuber/roam-04.png";
+import poolPartyVtuberRoam from "./master/coding-vtuber/pool-party/roam.png";
+import poolPartyVtuberRoam02 from "./master/coding-vtuber/pool-party/roam-02.png";
+import poolPartyVtuberRoam03 from "./master/coding-vtuber/pool-party/roam-03.png";
+import poolPartyVtuberRoam04 from "./master/coding-vtuber/pool-party/roam-04.png";
 
 export const roamingRunnerFramesById: Record<RunnerId, string[]> = {
   "coding-cat": [codingCatRoam, codingCatRoam02, codingCatRoam03, codingCatRoam04],
@@ -32,3 +36,17 @@ export const roamingRunnerFramesById: Record<RunnerId, string[]> = {
   "coding-shrimp": [codingShrimpRoam, codingShrimpRoam02, codingShrimpRoam03, codingShrimpRoam04],
   "coding-vtuber": [codingVtuberRoam, codingVtuberRoam02, codingVtuberRoam03, codingVtuberRoam04]
 };
+
+const poolPartyVtuberRoamingFrames = [
+  poolPartyVtuberRoam,
+  poolPartyVtuberRoam02,
+  poolPartyVtuberRoam03,
+  poolPartyVtuberRoam04
+];
+
+export function roamingRunnerFrames(runnerId: RunnerId, skinId: RunnerSkinId = "default") {
+  if (runnerId === "coding-vtuber" && skinId === "pool-party") {
+    return poolPartyVtuberRoamingFrames;
+  }
+  return roamingRunnerFramesById[runnerId];
+}

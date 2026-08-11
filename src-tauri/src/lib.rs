@@ -9,6 +9,7 @@ mod file_drop;
 mod host_metrics;
 mod keyboard;
 mod progression;
+mod runner_skins;
 mod tray;
 mod whip;
 mod xp_boost;
@@ -72,11 +73,9 @@ pub fn run() {
             diagnostics::init(&app_data_dir)?;
             let database_url = format!("sqlite://{}", app_data_dir.join("rundev.db").display());
             let pool = tauri::async_runtime::block_on(database::connect(&database_url))?;
-            let selected_runner: Option<String> = tauri::async_runtime::block_on(
-                sqlx::query_scalar("SELECT value FROM app_settings WHERE key = 'runner.selected'")
-                    .fetch_optional(&pool),
-            )?;
-            tray::set_runner(selected_runner.as_deref().unwrap_or("coding-cat"));
+            let selected_runner = tauri::async_runtime::block_on(runner_skins::selection(&pool))
+                .map_err(std::io::Error::other)?;
+            tray::set_runner(&selected_runner.runner_id, &selected_runner.skin_id);
             app.manage(AppState { pool: pool.clone() });
             if let Err(error) =
                 tauri::async_runtime::block_on(character_window::restore(app.handle(), &pool))
@@ -156,6 +155,8 @@ pub fn run() {
             commands::open_diagnostics_folder,
             commands::get_runner_selection,
             commands::set_runner_selection,
+            commands::get_runner_skin_collection,
+            commands::equip_runner_skin,
             character_window::get_state,
             character_window::set_visible,
             character_window::save_position,

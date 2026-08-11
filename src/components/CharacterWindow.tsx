@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState, type CSSProperties, type PointerEvent } from "react";
 import { Maximize2, X } from "lucide-react";
 import type { DragDropEvent } from "@tauri-apps/api/webview";
-import { desktopRunnerFramesById } from "../assets/runners/desktop";
-import { feedingRunnerFramesById } from "../assets/runners/feeding";
-import { grabbedRunnerFramesById } from "../assets/runners/grabbed";
-import { roamingRunnerFramesById } from "../assets/runners/roaming";
-import type { RunnerId } from "../types/activity";
+import { desktopRunnerFrames } from "../assets/runners/desktop";
+import { feedingRunnerFrames } from "../assets/runners/feeding";
+import { grabbedRunnerFrames } from "../assets/runners/grabbed";
+import { roamingRunnerFrames } from "../assets/runners/roaming";
+import type { RunnerId, RunnerSkinId } from "../types/activity";
 import {
   beginCharacterDrag,
   beginCharacterFileDrop,
@@ -63,8 +63,17 @@ const grabbedVisualScaleByRunner: Record<RunnerId, number> = {
   "coding-vtuber": 1.5
 };
 
+function grabbedVisualScale(runnerId: RunnerId, skinId: RunnerSkinId) {
+  // Pool Party held frames use the same normalized canvas, but the standing head is
+  // 16% narrower than the seated pose. Compensate only enough to match head size.
+  return runnerId === "coding-vtuber" && skinId === "pool-party"
+    ? 1.16
+    : grabbedVisualScaleByRunner[runnerId];
+}
+
 export function CharacterWindow() {
   const [runnerId, setRunnerId] = useState<RunnerId>("coding-cat");
+  const [skinId, setSkinId] = useState<RunnerSkinId>("default");
   const [frame, setFrame] = useState(0);
   const [typingMotion, setTypingMotion] = useState(0);
   const [followPointer, setFollowPointer] = useState(false);
@@ -97,19 +106,22 @@ export function CharacterWindow() {
   const feedBeginPromise = useRef<Promise<void> | null>(null);
   const feedFinishTimer = useRef<number | null>(null);
   const [windowVisible, setWindowVisible] = useState(false);
-  const frames = desktopRunnerFramesById[runnerId];
-  const feedingFrames = feedingRunnerFramesById[runnerId];
-  const grabbedFrames = grabbedRunnerFramesById[runnerId];
-  const roamingFrames = roamingRunnerFramesById[runnerId];
+  const frames = desktopRunnerFrames(runnerId, skinId);
+  const feedingFrames = feedingRunnerFrames(runnerId, skinId);
+  const grabbedFrames = grabbedRunnerFrames(runnerId, skinId);
+  const roamingFrames = roamingRunnerFrames(runnerId, skinId);
+  const roamingFrameInterval = runnerId === "coding-vtuber" && skinId === "pool-party"
+    ? 260
+    : ROAMING_FRAME_INTERVAL_MS;
 
   useEffect(() => {
     setRoamingFrame(0);
     if (!windowVisible || feedPhase !== "idle" || !roaming || !moving || roamingFrames.length < 2) return;
     const timer = window.setInterval(() => {
       setRoamingFrame((current) => (current + 1) % roamingFrames.length);
-    }, ROAMING_FRAME_INTERVAL_MS);
+    }, roamingFrameInterval);
     return () => window.clearInterval(timer);
-  }, [feedPhase, moving, roaming, roamingFrames.length, runnerId, windowVisible]);
+  }, [feedPhase, moving, roaming, roamingFrameInterval, roamingFrames.length, runnerId, windowVisible]);
 
   useEffect(() => {
     setGrabbedFrame(0);
@@ -121,9 +133,15 @@ export function CharacterWindow() {
   }, [dragVisualActive, feedPhase, grabbedFrames.length, runnerId, windowVisible]);
 
   useEffect(() => {
-    void getCharacterRunner().then(({ runnerId: selectedRunner }) => setRunnerId(selectedRunner));
+    void getCharacterRunner().then((selection) => {
+      setRunnerId(selection.runnerId);
+      setSkinId(selection.skinId);
+    });
     let unlisten = () => {};
-    void subscribeRunnerSelection(({ runnerId: selectedRunner }) => setRunnerId(selectedRunner)).then((next) => {
+    void subscribeRunnerSelection((selection) => {
+      setRunnerId(selection.runnerId);
+      setSkinId(selection.skinId);
+    }).then((next) => {
       unlisten = next;
     });
     return () => unlisten();
@@ -396,7 +414,7 @@ export function CharacterWindow() {
     setGrabbedFrame(0);
     setDragVisualActive(true);
     dragPauseReleaseRequested.current = false;
-    const pending = beginCharacterDrag(grabbedVisualScaleByRunner[runnerId]);
+    const pending = beginCharacterDrag(grabbedVisualScale(runnerId, skinId));
     dragPausePromise.current = pending;
     void pending
       .then(() => {
