@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type CSSProperties, type PointerEvent } from "react";
-import { X } from "lucide-react";
+import { Maximize2, X } from "lucide-react";
 import type { DragDropEvent } from "@tauri-apps/api/webview";
 import { desktopRunnerFramesById } from "../assets/runners/desktop";
 import { feedingRunnerFramesById } from "../assets/runners/feeding";
@@ -12,8 +12,10 @@ import {
   dragCharacterWindow,
   endCharacterDrag,
   endCharacterFileDrop,
+  finishCharacterResize,
   getCharacterWindowState,
   getCharacterRunner,
+  resizeCharacterWindow,
   setCharacterWindowVisible,
   showCharacterContextMenu,
   subscribeCharacterMotion,
@@ -27,6 +29,9 @@ import {
 
 const DRAG_THRESHOLD = 7;
 const DRAG_DELAY_MS = 140;
+const CHARACTER_SIZE_MIN = 36;
+const CHARACTER_SIZE_MAX = 128;
+const DEFAULT_CHARACTER_SIZE = 48;
 const ROAMING_FRAME_INTERVAL_MS = 170;
 const GRABBED_FRAME_INTERVAL_MS = 300;
 const FEED_FRAME_INTERVAL_MS = 200;
@@ -65,10 +70,13 @@ export function CharacterWindow() {
   const [followPointer, setFollowPointer] = useState(false);
   const [roaming, setRoaming] = useState(false);
   const [moving, setMoving] = useState(false);
+  const [hoveringCharacter, setHoveringCharacter] = useState(false);
   const [direction, setDirection] = useState(1);
   const [roamingFrame, setRoamingFrame] = useState(0);
   const [dragVisualActive, setDragVisualActive] = useState(false);
+  const [resizingCharacter, setResizingCharacter] = useState(false);
   const [grabbedFrame, setGrabbedFrame] = useState(0);
+  const [characterSize, setCharacterSize] = useState(DEFAULT_CHARACTER_SIZE);
   const [feedPhase, setFeedPhase] = useState<FeedPhase>("idle");
   const [feedFrame, setFeedFrame] = useState(0);
   const lastTypingAt = useRef(Number.NEGATIVE_INFINITY);
@@ -81,6 +89,10 @@ export function CharacterWindow() {
   const dragPauseActive = useRef(false);
   const dragPauseReleaseRequested = useRef(false);
   const dragPauseSafetyTimer = useRef<number | null>(null);
+  const characterSizeRef = useRef(DEFAULT_CHARACTER_SIZE);
+  const resizeGesture = useRef<{ pointerId: number; startX: number; startY: number; startSize: number } | null>(null);
+  const resizePending = useRef<number | null>(null);
+  const resizeFlushPromise = useRef<Promise<void> | null>(null);
   const feedPhaseRef = useRef<FeedPhase>("idle");
   const feedBeginPromise = useRef<Promise<void> | null>(null);
   const feedFinishTimer = useRef<number | null>(null);
@@ -122,18 +134,25 @@ export function CharacterWindow() {
     let unlistenMotion = () => {};
     let active = true;
 
-    function applyState({ followPointer: follows, roaming: isRoaming, moving: isMoving, direction: nextDirection, visible }: {
+    function applyState({ followPointer: follows, roaming: isRoaming, moving: isMoving, direction: nextDirection, visible, size }: {
       followPointer: boolean;
       roaming: boolean;
       moving: boolean;
       direction: number;
       visible: boolean;
+      size: number;
     }) {
       setFollowPointer(follows);
       setRoaming(isRoaming);
       setMoving(isMoving);
       setDirection(nextDirection);
       setWindowVisible(visible);
+      if (follows || isMoving || !visible) setHoveringCharacter(false);
+      if (Number.isFinite(size)) {
+        const nextSize = Math.min(CHARACTER_SIZE_MAX, Math.max(CHARACTER_SIZE_MIN, size));
+        characterSizeRef.current = nextSize;
+        setCharacterSize(nextSize);
+      }
     }
 
     void Promise.all([
@@ -141,6 +160,7 @@ export function CharacterWindow() {
       subscribeCharacterMotion(({ moving: isMoving, direction: nextDirection }) => {
         setMoving(isMoving);
         setDirection(nextDirection);
+        if (isMoving) setHoveringCharacter(false);
       })
     ]).then(([nextState, nextMotion]) => {
       if (!active) {
@@ -233,6 +253,7 @@ export function CharacterWindow() {
 
   function startFileDropHover() {
     if (feedPhaseRef.current !== "idle" || feedBeginPromise.current !== null) return;
+    setHoveringCharacter(false);
     setFeedState("ready");
     const pending = beginCharacterFileDrop();
     feedBeginPromise.current = pending;
@@ -365,11 +386,13 @@ export function CharacterWindow() {
 
   function finishWindowDrag() {
     dragStarted.current = false;
+    setHoveringCharacter(false);
     setDragVisualActive(false);
     requestEndRoamingDrag();
   }
 
   function startWindowDrag() {
+    setHoveringCharacter(false);
     setGrabbedFrame(0);
     setDragVisualActive(true);
     dragPauseReleaseRequested.current = false;
@@ -428,9 +451,106 @@ export function CharacterWindow() {
     }
   }
 
+  function handlePointerEnter() {
+    if (!followPointer && !moving && feedPhaseRef.current === "idle" && !dragStarted.current) {
+      setHoveringCharacter(true);
+    }
+  }
+
+  function handlePointerLeave() {
+    setHoveringCharacter(false);
+  }
+
+  function clampCharacterSize(size: number) {
+    return Math.min(CHARACTER_SIZE_MAX, Math.max(CHARACTER_SIZE_MIN, size));
+  }
+
+  function flushCharacterResize() {
+    if (resizeFlushPromise.current) return resizeFlushPromise.current;
+    const pending = (async () => {
+      while (resizePending.current !== null) {
+        const requestedSize = resizePending.current;
+        resizePending.current = null;
+        try {
+          const appliedSize = await resizeCharacterWindow(requestedSize);
+          characterSizeRef.current = appliedSize;
+          setCharacterSize(appliedSize);
+        } catch {
+          resizePending.current = null;
+          return;
+        }
+      }
+    })();
+    resizeFlushPromise.current = pending;
+    void pending.finally(() => {
+      if (resizeFlushPromise.current !== pending) return;
+      resizeFlushPromise.current = null;
+      if (resizePending.current !== null) void flushCharacterResize();
+    });
+    return pending;
+  }
+
+  function startCharacterResize(event: PointerEvent<HTMLButtonElement>) {
+    if (event.button !== 0 || followPointer || feedPhaseRef.current !== "idle" || dragVisualActive) return;
+    event.preventDefault();
+    event.stopPropagation();
+    clearDragTimer();
+    setHoveringCharacter(false);
+    resizeGesture.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      startSize: characterSizeRef.current
+    };
+    setResizingCharacter(true);
+    event.currentTarget.setPointerCapture(event.pointerId);
+  }
+
+  function continueCharacterResize(event: PointerEvent<HTMLButtonElement>) {
+    const gesture = resizeGesture.current;
+    if (!gesture || gesture.pointerId !== event.pointerId) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const horizontalDistance = gesture.startX - event.clientX;
+    const verticalDistance = event.clientY - gesture.startY;
+    const nextSize = clampCharacterSize(gesture.startSize + (horizontalDistance + verticalDistance) / 2);
+    characterSizeRef.current = nextSize;
+    setCharacterSize(nextSize);
+    resizePending.current = nextSize;
+    void flushCharacterResize();
+  }
+
+  function finishCharacterResizeGesture(event: PointerEvent<HTMLButtonElement>) {
+    const gesture = resizeGesture.current;
+    if (!gesture || gesture.pointerId !== event.pointerId) return;
+    event.preventDefault();
+    event.stopPropagation();
+    resizeGesture.current = null;
+    setResizingCharacter(false);
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    resizePending.current = characterSizeRef.current;
+    void flushCharacterResize().finally(() => {
+      void finishCharacterResize(characterSizeRef.current)
+        .then((appliedSize) => {
+          characterSizeRef.current = appliedSize;
+          setCharacterSize(appliedSize);
+        })
+        .catch(() => {});
+    });
+  }
+
 
   const draggingCharacter = dragVisualActive && feedPhase === "idle";
   const roamingMoving = feedPhase === "idle" && !draggingCharacter && roaming && moving;
+  const canResizeCharacter = !followPointer && feedPhase === "idle" && !draggingCharacter;
+  const controlsVisible = hoveringCharacter
+    && !followPointer
+    && !moving
+    && feedPhase === "idle"
+    && !draggingCharacter
+    && !resizingCharacter;
   const movingDirection = direction < 0 ? -1 : 1;
   const shouldFlipForDirection = movingDirection !== roamingSourceDirectionByRunner[runnerId];
   const movingClass = roamingMoving && shouldFlipForDirection ? " roaming-direction-flipped" : "";
@@ -441,7 +561,7 @@ export function CharacterWindow() {
       : feedPhase === "consuming" || feedPhase === "finishing"
       ? " file-drop-consuming"
       : "";
-  const className = `character-window${feedClass}${draggingCharacter ? " character-dragging" : ""}${typingMotion && !draggingCharacter && !roamingMoving && feedPhase === "idle" ? ` typing-motion-${typingMotion}` : ""}${followPointer ? " following-pointer" : ""}${roaming ? " roaming-mode" : ""}${roamingMoving ? ` roaming-moving${movingClass}` : ""}`;
+  const className = `character-window${feedClass}${controlsVisible ? " character-controls-visible" : ""}${draggingCharacter ? " character-dragging" : ""}${resizingCharacter ? " character-resizing" : ""}${typingMotion && !draggingCharacter && !roamingMoving && feedPhase === "idle" ? ` typing-motion-${typingMotion}` : ""}${followPointer ? " following-pointer" : ""}${roaming ? " roaming-mode" : ""}${roamingMoving ? ` roaming-moving${movingClass}` : ""}`;
   const characterStyle = roamingMoving
     ? ({ "--roam-size": roamingVisualScaleByRunner[runnerId] } as CSSProperties & { "--roam-size": number })
     : undefined;
@@ -462,6 +582,8 @@ export function CharacterWindow() {
       onPointerMove={continueDrag}
       onPointerUp={finishPointer}
       onPointerCancel={finishPointer}
+      onPointerEnter={handlePointerEnter}
+      onPointerLeave={handlePointerLeave}
       onContextMenu={(event) => {
         event.preventDefault();
         void showCharacterContextMenu();
@@ -475,7 +597,22 @@ export function CharacterWindow() {
       }
     >
       <img src={image} alt="RunDev 캐릭터" draggable={false} />
+      {canResizeCharacter && (
+        <button
+          className="character-control character-resize-handle"
+          type="button"
+          aria-label="캐릭터 크기 조절"
+          title={`크기 조절 (${Math.round(characterSize)}px)`}
+          onPointerDown={startCharacterResize}
+          onPointerMove={continueCharacterResize}
+          onPointerUp={finishCharacterResizeGesture}
+          onPointerCancel={finishCharacterResizeGesture}
+        >
+          <Maximize2 size={10} strokeWidth={2.4} />
+        </button>
+      )}
       <button
+        className="character-control character-hide-button"
         type="button"
         aria-label="캐릭터 숨기기"
         title="숨기기"

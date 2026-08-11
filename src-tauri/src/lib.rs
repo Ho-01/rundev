@@ -162,6 +162,8 @@ pub fn run() {
             character_window::show_context_menu,
             character_window::begin_character_drag,
             character_window::end_character_drag,
+            character_window::resize_character_window,
+            character_window::finish_character_resize,
             character_window::begin_character_file_drop,
             character_window::end_character_file_drop,
             character_window::trash_dropped_files,

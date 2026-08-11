@@ -10,6 +10,7 @@ export type CharacterWindowState = {
   roaming: boolean;
   moving: boolean;
   direction: number;
+  size: number;
 };
 
 export type CharacterMotionState = { moving: boolean; direction: number };
@@ -20,12 +21,12 @@ function isTauri() {
 }
 
 export async function getCharacterWindowState(): Promise<CharacterWindowState> {
-  if (!isTauri()) return { visible: false, followPointer: false, roaming: false, moving: false, direction: 1 };
+  if (!isTauri()) return { visible: false, followPointer: false, roaming: false, moving: false, direction: 1, size: 48 };
   return invoke<CharacterWindowState>("get_state");
 }
 
 export async function setCharacterWindowVisible(visible: boolean): Promise<CharacterWindowState> {
-  if (!isTauri()) return { visible, followPointer: false, roaming: false, moving: false, direction: 1 };
+  if (!isTauri()) return { visible, followPointer: false, roaming: false, moving: false, direction: 1, size: 48 };
   return invoke<CharacterWindowState>("set_visible", { visible });
 }
 
@@ -48,6 +49,16 @@ export async function beginCharacterDrag(scale: number) {
 export async function endCharacterDrag() {
   if (!isTauri()) return;
   await invoke("end_character_drag");
+}
+
+export async function resizeCharacterWindow(size: number): Promise<number> {
+  if (!isTauri()) return size;
+  return invoke<number>("resize_character_window", { size });
+}
+
+export async function finishCharacterResize(size: number): Promise<number> {
+  if (!isTauri()) return size;
+  return invoke<number>("finish_character_resize", { size });
 }
 
 export async function beginCharacterFileDrop() {

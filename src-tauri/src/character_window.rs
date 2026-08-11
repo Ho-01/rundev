@@ -20,6 +20,7 @@ const LAYOUT_KEY: &str = "character.window.layout";
 const COMPACT_LAYOUT: &str = "compact-v2";
 const FOLLOW_POINTER_KEY: &str = "character.window.follow_pointer";
 const ROAMING_KEY: &str = "character.window.roaming";
+const SIZE_KEY: &str = "character.window.size";
 const MOTION_EVENT: &str = "character-window-motion-changed";
 const DRAG_END_EVENT: &str = "character-window-drag-ended";
 const ROAM_IDLE_MIN_MS: u64 = 1_200;
@@ -27,8 +28,11 @@ const ROAM_IDLE_MAX_MS: u64 = 7_800;
 const ROAM_SPEED_MIN: f64 = 140.0;
 const ROAM_SPEED_MAX: f64 = 360.0;
 const ROAM_AREA_INSET_RATIO: f64 = 0.12;
-const BASE_WINDOW_LOGICAL_SIZE: f64 = 48.0;
-const FILE_DROP_WINDOW_LOGICAL_SIZE: f64 = 88.0;
+const DEFAULT_WINDOW_LOGICAL_SIZE: f64 = 48.0;
+const MIN_WINDOW_LOGICAL_SIZE: f64 = 36.0;
+const MAX_WINDOW_LOGICAL_SIZE: f64 = 128.0;
+const FILE_DROP_MAX_LOGICAL_SIZE: f64 = 160.0;
+const FILE_DROP_SIZE_SCALE: f64 = 88.0 / DEFAULT_WINDOW_LOGICAL_SIZE;
 const FILE_DROP_GROW_MS: u64 = 15;
 const FILE_DROP_SHRINK_MS: u64 = 10;
 const FILE_DROP_RESIZE_FRAME_MS: u64 = 14;
@@ -40,6 +44,8 @@ static MOTION_DIRECTION: AtomicI8 = AtomicI8::new(1);
 static CONTEXT_MENU_OPEN: AtomicBool = AtomicBool::new(false);
 static DRAGGING: AtomicBool = AtomicBool::new(false);
 static DRAG_SESSION: AtomicU64 = AtomicU64::new(0);
+static RESIZING: AtomicBool = AtomicBool::new(false);
+static WINDOW_LOGICAL_SIZE_BITS: AtomicU64 = AtomicU64::new(DEFAULT_WINDOW_LOGICAL_SIZE.to_bits());
 static FILE_DROP_ACTIVE: AtomicBool = AtomicBool::new(false);
 
 #[cfg(target_os = "macos")]
@@ -61,6 +67,36 @@ fn primary_mouse_button_pressed() -> bool {
 #[cfg(not(any(windows, target_os = "macos")))]
 fn primary_mouse_button_pressed() -> bool {
     true
+}
+
+fn clamp_window_logical_size(size: f64) -> f64 {
+    if size.is_finite() {
+        size.clamp(MIN_WINDOW_LOGICAL_SIZE, MAX_WINDOW_LOGICAL_SIZE)
+    } else {
+        DEFAULT_WINDOW_LOGICAL_SIZE
+    }
+}
+
+fn window_logical_size() -> f64 {
+    clamp_window_logical_size(f64::from_bits(
+        WINDOW_LOGICAL_SIZE_BITS.load(Ordering::Relaxed),
+    ))
+}
+
+fn set_window_logical_size(size: f64) -> f64 {
+    let size = clamp_window_logical_size(size);
+    WINDOW_LOGICAL_SIZE_BITS.store(size.to_bits(), Ordering::Relaxed);
+    size
+}
+
+fn file_drop_logical_size_for(base_size: f64) -> f64 {
+    (clamp_window_logical_size(base_size) * FILE_DROP_SIZE_SCALE)
+        .min(FILE_DROP_MAX_LOGICAL_SIZE)
+        .max(clamp_window_logical_size(base_size))
+}
+
+fn file_drop_logical_size() -> f64 {
+    file_drop_logical_size_for(window_logical_size())
 }
 
 fn resize_character_window_centered(
@@ -87,6 +123,28 @@ fn resize_character_window_centered(
         .map_err(|error| error.to_string())
 }
 
+fn resize_character_window_from_bottom_left(
+    window: &tauri::WebviewWindow,
+    logical_size: f64,
+) -> Result<(), String> {
+    let previous_position = window.outer_position().map_err(|error| error.to_string())?;
+    let previous_size = window.outer_size().map_err(|error| error.to_string())?;
+    window
+        .set_size(LogicalSize::new(logical_size, logical_size))
+        .map_err(|error| error.to_string())?;
+    let resized = window.outer_size().map_err(|error| error.to_string())?;
+    let previous_width = i32::try_from(previous_size.width).unwrap_or(i32::MAX);
+    let resized_width = i32::try_from(resized.width).unwrap_or(i32::MAX);
+    window
+        .set_position(PhysicalPosition::new(
+            previous_position
+                .x
+                .saturating_add(previous_width.saturating_sub(resized_width)),
+            previous_position.y,
+        ))
+        .map_err(|error| error.to_string())
+}
+
 pub fn is_pointer_following() -> bool {
     FOLLOW_POINTER.load(Ordering::Relaxed)
 }
@@ -103,6 +161,7 @@ pub struct CharacterWindowState {
     pub roaming: bool,
     pub moving: bool,
     pub direction: i8,
+    pub size: f64,
 }
 
 #[derive(Clone, Serialize)]
@@ -118,11 +177,14 @@ pub async fn restore(app: &AppHandle, pool: &SqlitePool) -> Result<(), String> {
     };
     FILE_DROP_ACTIVE.store(false, Ordering::Relaxed);
     DRAGGING.store(false, Ordering::Relaxed);
+    RESIZING.store(false, Ordering::Relaxed);
+    let size = setting(pool, SIZE_KEY)
+        .await?
+        .and_then(|value| value.parse::<f64>().ok())
+        .map(set_window_logical_size)
+        .unwrap_or_else(|| set_window_logical_size(DEFAULT_WINDOW_LOGICAL_SIZE));
     window
-        .set_size(LogicalSize::new(
-            BASE_WINDOW_LOGICAL_SIZE,
-            BASE_WINDOW_LOGICAL_SIZE,
-        ))
+        .set_size(LogicalSize::new(size, size))
         .map_err(|error| error.to_string())?;
     FOLLOW_POINTER.store(
         setting(pool, FOLLOW_POINTER_KEY).await?.as_deref() == Some("true"),
@@ -165,6 +227,7 @@ pub async fn get_state(state: tauri::State<'_, AppState>) -> Result<CharacterWin
         roaming: ROAMING.load(Ordering::Relaxed),
         moving: MOVING.load(Ordering::Relaxed),
         direction: MOTION_DIRECTION.load(Ordering::Relaxed),
+        size: window_logical_size(),
     })
 }
 
@@ -177,11 +240,9 @@ pub async fn set_visible(
     let window = app
         .get_webview_window("character")
         .ok_or_else(|| "character window is unavailable".to_string())?;
+    let size = window_logical_size();
     window
-        .set_size(LogicalSize::new(
-            BASE_WINDOW_LOGICAL_SIZE,
-            BASE_WINDOW_LOGICAL_SIZE,
-        ))
+        .set_size(LogicalSize::new(size, size))
         .map_err(|error| error.to_string())?;
     if visible {
         if setting(&state.pool, LAYOUT_KEY).await?.as_deref() != Some(COMPACT_LAYOUT)
@@ -202,6 +263,7 @@ pub async fn set_visible(
     save_setting(&state.pool, VISIBLE_KEY, visible.to_string()).await?;
     if !visible {
         DRAGGING.store(false, Ordering::Relaxed);
+        RESIZING.store(false, Ordering::Relaxed);
         FILE_DROP_ACTIVE.store(false, Ordering::Relaxed);
         emit_motion(&app, false, MOTION_DIRECTION.load(Ordering::Relaxed));
     }
@@ -211,6 +273,7 @@ pub async fn set_visible(
         roaming: ROAMING.load(Ordering::Relaxed),
         moving: MOVING.load(Ordering::Relaxed),
         direction: MOTION_DIRECTION.load(Ordering::Relaxed),
+        size: window_logical_size(),
     };
     let _ = app.emit("character-window-state-changed", &next);
     Ok(next)
@@ -241,7 +304,10 @@ pub fn start_pointer_follower(app: AppHandle) {
                 continue;
             }
 
-            if DRAGGING.load(Ordering::Relaxed) || FILE_DROP_ACTIVE.load(Ordering::Relaxed) {
+            if DRAGGING.load(Ordering::Relaxed)
+                || RESIZING.load(Ordering::Relaxed)
+                || FILE_DROP_ACTIVE.load(Ordering::Relaxed)
+            {
                 if roam_segment.take().is_some() {
                     emit_motion(&app, false, MOTION_DIRECTION.load(Ordering::Relaxed));
                 }
@@ -442,7 +508,7 @@ pub fn begin_character_drag(scale: f64, app: AppHandle) -> Result<(), String> {
     } else {
         1.0
     };
-    resize_character_window_centered(&window, BASE_WINDOW_LOGICAL_SIZE * scale)?;
+    resize_character_window_centered(&window, window_logical_size() * scale)?;
     let session = DRAG_SESSION.fetch_add(1, Ordering::Relaxed) + 1;
     DRAGGING.store(true, Ordering::Relaxed);
     emit_motion(&app, false, MOTION_DIRECTION.load(Ordering::Relaxed));
@@ -468,9 +534,45 @@ pub fn end_character_drag(app: AppHandle) -> Result<(), String> {
     DRAGGING.store(false, Ordering::Relaxed);
     DRAG_SESSION.fetch_add(1, Ordering::Relaxed);
     if let Some(window) = app.get_webview_window("character") {
-        resize_character_window_centered(&window, BASE_WINDOW_LOGICAL_SIZE)?;
+        resize_character_window_centered(&window, window_logical_size())?;
     }
     Ok(())
+}
+
+#[tauri::command]
+pub fn resize_character_window(size: f64, app: AppHandle) -> Result<f64, String> {
+    let window = app
+        .get_webview_window("character")
+        .ok_or_else(|| "character window is unavailable".to_string())?;
+    let size = set_window_logical_size(size);
+    RESIZING.store(true, Ordering::Relaxed);
+    emit_motion(&app, false, MOTION_DIRECTION.load(Ordering::Relaxed));
+    resize_character_window_from_bottom_left(&window, size)?;
+    Ok(size)
+}
+
+#[tauri::command]
+pub async fn finish_character_resize(
+    size: f64,
+    app: AppHandle,
+    state: tauri::State<'_, AppState>,
+) -> Result<f64, String> {
+    let size = set_window_logical_size(size);
+    RESIZING.store(false, Ordering::Relaxed);
+    save_setting(&state.pool, SIZE_KEY, size.to_string()).await?;
+    let visible = setting(&state.pool, VISIBLE_KEY).await?.as_deref() == Some("true");
+    let _ = app.emit(
+        "character-window-state-changed",
+        CharacterWindowState {
+            visible,
+            follow_pointer: FOLLOW_POINTER.load(Ordering::Relaxed),
+            roaming: ROAMING.load(Ordering::Relaxed),
+            moving: MOVING.load(Ordering::Relaxed),
+            direction: MOTION_DIRECTION.load(Ordering::Relaxed),
+            size,
+        },
+    );
+    Ok(size)
 }
 
 #[tauri::command]
@@ -481,7 +583,7 @@ pub async fn begin_character_file_drop(app: AppHandle) -> Result<(), String> {
     FILE_DROP_ACTIVE.store(true, Ordering::Relaxed);
     emit_motion(&app, false, MOTION_DIRECTION.load(Ordering::Relaxed));
     if let Err(error) =
-        animate_window_size(&window, FILE_DROP_WINDOW_LOGICAL_SIZE, FILE_DROP_GROW_MS).await
+        animate_window_size(&window, file_drop_logical_size(), FILE_DROP_GROW_MS).await
     {
         FILE_DROP_ACTIVE.store(false, Ordering::Relaxed);
         return Err(error);
@@ -495,7 +597,7 @@ pub async fn end_character_file_drop(app: AppHandle) -> Result<(), String> {
         FILE_DROP_ACTIVE.store(false, Ordering::Relaxed);
         "character window is unavailable".to_string()
     })?;
-    let result = animate_window_size(&window, BASE_WINDOW_LOGICAL_SIZE, FILE_DROP_SHRINK_MS).await;
+    let result = animate_window_size(&window, window_logical_size(), FILE_DROP_SHRINK_MS).await;
     FILE_DROP_ACTIVE.store(false, Ordering::Relaxed);
     result
 }
@@ -555,6 +657,7 @@ pub async fn toggle_pointer_following(app: &AppHandle) -> Result<(), String> {
     save_setting(&state.pool, FOLLOW_POINTER_KEY, follow.to_string()).await?;
     if follow {
         DRAGGING.store(false, Ordering::Relaxed);
+        RESIZING.store(false, Ordering::Relaxed);
         ROAMING.store(false, Ordering::Relaxed);
         crate::tray::set_roaming(false);
         save_setting(&state.pool, ROAMING_KEY, "false".to_string()).await?;
@@ -572,6 +675,7 @@ pub async fn toggle_pointer_following(app: &AppHandle) -> Result<(), String> {
             roaming: ROAMING.load(Ordering::Relaxed),
             moving: MOVING.load(Ordering::Relaxed),
             direction: MOTION_DIRECTION.load(Ordering::Relaxed),
+            size: window_logical_size(),
         },
     );
     Ok(())
@@ -584,6 +688,7 @@ pub async fn toggle_roaming(app: AppHandle) -> Result<(), String> {
     }
     let roaming = !ROAMING.load(Ordering::Relaxed);
     DRAGGING.store(false, Ordering::Relaxed);
+    RESIZING.store(false, Ordering::Relaxed);
     ROAMING.store(roaming, Ordering::Relaxed);
     crate::tray::set_roaming(roaming);
     let state = app.state::<AppState>();
@@ -601,6 +706,7 @@ pub async fn toggle_roaming(app: AppHandle) -> Result<(), String> {
             roaming,
             moving: MOVING.load(Ordering::Relaxed),
             direction: MOTION_DIRECTION.load(Ordering::Relaxed),
+            size: window_logical_size(),
         },
     );
     Ok(())
@@ -797,4 +903,22 @@ async fn save_setting(pool: &SqlitePool, key: &str, value: String) -> Result<(),
     sqlx::query("INSERT INTO app_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value")
         .bind(key).bind(value).execute(pool).await.map_err(|error| error.to_string())?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{clamp_window_logical_size, file_drop_logical_size_for};
+
+    #[test]
+    fn clamps_user_selected_character_size() {
+        assert_eq!(clamp_window_logical_size(12.0), 36.0);
+        assert_eq!(clamp_window_logical_size(72.0), 72.0);
+        assert_eq!(clamp_window_logical_size(250.0), 128.0);
+    }
+
+    #[test]
+    fn file_drop_growth_respects_the_resized_character_limit() {
+        assert_eq!(file_drop_logical_size_for(48.0), 88.0);
+        assert_eq!(file_drop_logical_size_for(128.0), 160.0);
+    }
 }

@@ -29,18 +29,21 @@ html.character-body #root { height: 100%; }
 .character-window.following-pointer, .character-window.following-pointer:active { cursor: default; }
 .character-window.roaming-mode, .character-window.roaming-mode:active { cursor: default; }
 .character-window > img { width: 100%; height: 100%; object-fit: contain; pointer-events: none; transition: transform 38ms linear; }
-.character-window.file-drop-ready > button,
-.character-window.file-drop-consuming > button,
-.character-window.character-dragging > button { opacity: 0; pointer-events: none; }
+.character-window.file-drop-ready > .character-control,
+.character-window.file-drop-consuming > .character-control,
+.character-window.character-dragging > .character-control { opacity: 0; pointer-events: none; }
 .character-window.roaming-moving { --roam-scale: 1; --roam-size: 1; }
 .character-window.roaming-moving.roaming-direction-flipped { --roam-scale: -1; }
 .character-window.roaming-moving > img { animation: character-roaming-bob .68s steps(4, end) infinite; transform-origin: center center; }
 .character-window.typing-motion-1 > img { transform: translateY(-2px) rotate(-1.5deg); }
 .character-window.typing-motion-2 > img { transform: translateY(0) rotate(0); }
 .character-window.typing-motion-3 > img { transform: translateY(-2px) rotate(1.5deg); }
-.character-window > button { position: absolute; top: 1px; right: 1px; display: grid; width: 16px; height: 16px; padding: 0; place-items: center; color: rgba(255,255,255,.8); background: rgba(20,20,22,.72); border: 1px solid rgba(255,255,255,.14); border-radius: 999px; opacity: 0; cursor: pointer; transition: opacity .15s ease, background .15s ease; }
-.character-window:hover > button, .character-window > button:focus-visible { opacity: 1; }
-.character-window > button:hover { background: rgba(40,40,44,.9); }
+.character-window > .character-control { position: absolute; z-index: 2; display: grid; width: 16px; height: 16px; padding: 0; place-items: center; color: rgba(255,255,255,.8); background: rgba(20,20,22,.72); border: 1px solid rgba(255,255,255,.14); border-radius: 999px; opacity: 0; pointer-events: none; transition: opacity .15s ease, background .15s ease; }
+.character-window.character-controls-visible > .character-control, .character-window > .character-control:focus-visible { opacity: 1; pointer-events: auto; }
+.character-window > .character-control:hover { background: rgba(40,40,44,.9); }
+.character-window > .character-hide-button { top: 1px; right: 1px; cursor: pointer; }
+.character-window > .character-resize-handle { bottom: 1px; left: 1px; cursor: nesw-resize; touch-action: none; }
+.character-window.character-resizing > .character-resize-handle { opacity: 1; pointer-events: auto; }
 
 .popover-shell {
   position: relative;
