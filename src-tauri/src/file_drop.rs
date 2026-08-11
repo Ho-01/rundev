@@ -1,21 +1,27 @@
 use std::path::Path;
 
-/// Moves explicitly dropped regular files to the platform trash.
+/// Moves explicitly dropped files or directories to the platform trash.
 ///
 /// The paths are used only for this operation. They are not persisted or logged.
 pub fn trash_paths(paths: &[String]) -> Result<u32, String> {
+    validate_paths(paths)?;
+
+    platform::trash_paths(paths)
+}
+
+fn validate_paths(paths: &[String]) -> Result<(), String> {
     if paths.is_empty() {
-        return Err("드롭된 파일이 없습니다.".to_string());
+        return Err("드롭된 항목이 없습니다.".to_string());
     }
 
     for path in paths {
         let candidate = Path::new(path);
-        if !candidate.is_file() {
-            return Err("파일만 휴지통으로 이동할 수 있습니다.".to_string());
+        if !(candidate.is_file() || candidate.is_dir()) {
+            return Err("파일 또는 폴더만 휴지통으로 이동할 수 있습니다.".to_string());
         }
     }
 
-    platform::trash_paths(paths)
+    Ok(())
 }
 
 #[cfg(windows)]
@@ -67,17 +73,27 @@ mod platform {
 
 #[cfg(test)]
 mod tests {
-    use super::trash_paths;
+    use super::validate_paths;
 
     #[test]
     fn rejects_empty_drop() {
-        assert!(trash_paths(&[]).is_err());
+        assert!(validate_paths(&[]).is_err());
     }
 
     #[test]
-    fn rejects_missing_or_directory_paths_before_platform_call() {
-        assert!(trash_paths(&["C:\\path-that-does-not-exist\\file.txt".to_string()]).is_err());
-        assert!(trash_paths(&[".".to_string()]).is_err());
+    fn rejects_missing_paths_before_platform_call() {
+        let missing = std::env::temp_dir().join("rundev-file-drop-path-that-does-not-exist");
+
+        assert!(validate_paths(&[missing.to_string_lossy().into_owned()]).is_err());
+    }
+
+    #[test]
+    fn accepts_existing_file_and_directory_paths() {
+        let file = std::env::current_exe().expect("current test executable path");
+        let directory = std::env::temp_dir();
+
+        assert!(validate_paths(&[file.to_string_lossy().into_owned()]).is_ok());
+        assert!(validate_paths(&[directory.to_string_lossy().into_owned()]).is_ok());
     }
 }
 
