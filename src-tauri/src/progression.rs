@@ -216,9 +216,17 @@ pub async fn stats(pool: &SqlitePool, period: &str) -> Result<ActivityStats, Str
     }
     let mut apps: Vec<_> = app_totals
         .into_iter()
-        .map(|(app_name, active_seconds)| AppUsage { app_name, active_seconds })
+        .map(|(app_name, active_seconds)| AppUsage {
+            app_name,
+            active_seconds,
+        })
         .collect();
-    apps.sort_by(|left, right| right.active_seconds.cmp(&left.active_seconds).then_with(|| left.app_name.cmp(&right.app_name)));
+    apps.sort_by(|left, right| {
+        right
+            .active_seconds
+            .cmp(&left.active_seconds)
+            .then_with(|| left.app_name.cmp(&right.app_name))
+    });
     let mut activity_by_hour = HashMap::<(String, i64), i64>::new();
     for (started_at, mut remaining) in activity_sessions {
         let Ok(parsed) = DateTime::parse_from_rfc3339(&started_at) else {
