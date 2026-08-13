@@ -23,6 +23,10 @@ import poolPartyVtuber1 from "./ui/coding-vtuber/pool-party/01.png";
 import poolPartyVtuber2 from "./ui/coding-vtuber/pool-party/02.png";
 import poolPartyVtuber3 from "./ui/coding-vtuber/pool-party/03.png";
 import poolPartyVtuber4 from "./ui/coding-vtuber/pool-party/04.png";
+import codingChubbyCat1 from "./ui/coding-chubby-cat/01.png";
+import codingChubbyCat2 from "./ui/coding-chubby-cat/02.png";
+import codingChubbyCat3 from "./ui/coding-chubby-cat/03.png";
+import codingChubbyCat4 from "./ui/coding-chubby-cat/04.png";
 
 export const runnerFramesById: Record<RunnerId, string[]> = {
   "coding-cat": [codingCat1, codingCat2, codingCat3, codingCat4],
@@ -39,7 +43,8 @@ export const runnerFramesById: Record<RunnerId, string[]> = {
     codingShrimp3,
     codingShrimp4
   ],
-  "coding-vtuber": [codingVtuber1, codingVtuber2, codingVtuber3, codingVtuber4]
+  "coding-vtuber": [codingVtuber1, codingVtuber2, codingVtuber3, codingVtuber4],
+  "coding-chubby-cat": [codingChubbyCat1, codingChubbyCat2, codingChubbyCat3, codingChubbyCat4]
 };
 
 export const runnerOptions: { id: RunnerId; name: string; frame: string }[] = [
@@ -47,7 +52,8 @@ export const runnerOptions: { id: RunnerId; name: string; frame: string }[] = [
   { id: "coding-orange-cat", name: "주황 고양이", frame: codingOrangeCat1 },
   { id: "coding-shrimp", name: "주황 새우", frame: codingShrimp1 },
   { id: "coding-fish", name: "노란 물고기", frame: codingFish1 },
-  { id: "coding-vtuber", name: "핑크 버튜버", frame: codingVtuber1 }
+  { id: "coding-vtuber", name: "핑크 버튜버", frame: codingVtuber1 },
+  { id: "coding-chubby-cat", name: "하찮은 뚱냥이", frame: codingChubbyCat1 }
 ];
 
 const poolPartyVtuberFrames = [

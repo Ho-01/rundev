@@ -166,7 +166,8 @@ function previewRunner(): RunnerSelection {
     "coding-fish",
     "coding-orange-cat",
     "coding-shrimp",
-    "coding-vtuber"
+    "coding-vtuber",
+    "coding-chubby-cat"
   ];
   return {
     runnerId: supported.includes(requested as RunnerId)
@@ -308,6 +309,20 @@ export async function getRunnerSkinCollection(): Promise<RunnerSkinCollection> {
           skins: [
             { skinId: "default", name: "기본 스킨", description: "헤드셋을 쓰고 코딩하는 핑크 버튜버입니다.", requiredActiveSeconds: 0, owned: true, equipped: selection.runnerId === "coding-vtuber" },
             { skinId: "pool-party", name: "수영장 파티", description: "선글라스와 파란 도트 비키니로 여름 코딩을 즐깁니다.", requiredActiveSeconds: 18_000, owned: false, equipped: false }
+          ]
+        },
+        {
+          runnerId: "coding-chubby-cat",
+          name: "하찮은 뚱냥이",
+          skins: [
+            {
+              skinId: "default",
+              name: "기본 스킨",
+              description: "삐뚤한 낙서선으로 그린 통통하고 하찮은 고양이입니다.",
+              requiredActiveSeconds: 0,
+              owned: true,
+              equipped: selection.runnerId === "coding-chubby-cat"
+            }
           ]
         }
       ]

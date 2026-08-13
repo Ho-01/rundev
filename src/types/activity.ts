@@ -169,7 +169,8 @@ export type RunnerId =
   | "coding-fish"
   | "coding-orange-cat"
   | "coding-shrimp"
-  | "coding-vtuber";
+  | "coding-vtuber"
+  | "coding-chubby-cat";
 
 export type RunnerSkinId = "default" | "pool-party";
 

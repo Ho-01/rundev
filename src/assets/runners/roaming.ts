@@ -23,6 +23,10 @@ import poolPartyVtuberRoam from "./master/coding-vtuber/pool-party/roam.png";
 import poolPartyVtuberRoam02 from "./master/coding-vtuber/pool-party/roam-02.png";
 import poolPartyVtuberRoam03 from "./master/coding-vtuber/pool-party/roam-03.png";
 import poolPartyVtuberRoam04 from "./master/coding-vtuber/pool-party/roam-04.png";
+import codingChubbyCatRoam from "./master/coding-chubby-cat/roam.png";
+import codingChubbyCatRoam02 from "./master/coding-chubby-cat/roam-02.png";
+import codingChubbyCatRoam03 from "./master/coding-chubby-cat/roam-03.png";
+import codingChubbyCatRoam04 from "./master/coding-chubby-cat/roam-04.png";
 
 export const roamingRunnerFramesById: Record<RunnerId, string[]> = {
   "coding-cat": [codingCatRoam, codingCatRoam02, codingCatRoam03, codingCatRoam04],
@@ -34,7 +38,13 @@ export const roamingRunnerFramesById: Record<RunnerId, string[]> = {
     codingOrangeCatRoam04
   ],
   "coding-shrimp": [codingShrimpRoam, codingShrimpRoam02, codingShrimpRoam03, codingShrimpRoam04],
-  "coding-vtuber": [codingVtuberRoam, codingVtuberRoam02, codingVtuberRoam03, codingVtuberRoam04]
+  "coding-vtuber": [codingVtuberRoam, codingVtuberRoam02, codingVtuberRoam03, codingVtuberRoam04],
+  "coding-chubby-cat": [
+    codingChubbyCatRoam,
+    codingChubbyCatRoam02,
+    codingChubbyCatRoam03,
+    codingChubbyCatRoam04
+  ]
 };
 
 const poolPartyVtuberRoamingFrames = [

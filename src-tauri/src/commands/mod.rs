@@ -305,6 +305,7 @@ mod tests {
         assert!(is_supported_runner("coding-orange-cat"));
         assert!(is_supported_runner("coding-shrimp"));
         assert!(is_supported_runner("coding-vtuber"));
+        assert!(is_supported_runner("coding-chubby-cat"));
         assert!(!is_supported_runner("../custom"));
     }
 

@@ -45,14 +45,16 @@ const roamingSourceDirectionByRunner: Record<RunnerId, 1 | -1> = {
   "coding-fish": 1,
   "coding-orange-cat": 1,
   "coding-shrimp": 1,
-  "coding-vtuber": -1
+  "coding-vtuber": -1,
+  "coding-chubby-cat": -1
 };
 const roamingVisualScaleByRunner: Record<RunnerId, number> = {
   "coding-cat": 0.82,
   "coding-fish": 0.72,
   "coding-orange-cat": 0.79,
   "coding-shrimp": 1,
-  "coding-vtuber": 1
+  "coding-vtuber": 1,
+  "coding-chubby-cat": 0.84
 };
 const grabbedVisualScaleByRunner: Record<RunnerId, number> = {
   "coding-cat": 1.35,
@@ -61,7 +63,8 @@ const grabbedVisualScaleByRunner: Record<RunnerId, number> = {
   "coding-shrimp": 1.3,
   // The held sprite's head is 98 px wide versus 145 px in the seated sprite.
   // Keep the perceived head size consistent while the character is held.
-  "coding-vtuber": 1.5
+  "coding-vtuber": 1.5,
+  "coding-chubby-cat": 1.25
 };
 
 function grabbedVisualScale(runnerId: RunnerId, skinId: RunnerSkinId) {

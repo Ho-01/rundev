@@ -27,3 +27,20 @@ describe("pool party pink vtuber skin", () => {
     }
   });
 });
+
+describe("chubby cat character", () => {
+  it("provides every visual state", () => {
+    const runnerId = "coding-chubby-cat" as const;
+
+    const visualStates = [
+      runnerFrames(runnerId),
+      desktopRunnerFrames(runnerId),
+      feedingRunnerFrames(runnerId),
+      grabbedRunnerFrames(runnerId),
+      roamingRunnerFrames(runnerId)
+    ];
+
+    expect(visualStates.map((frames) => frames.length)).toEqual([4, 4, 4, 3, 4]);
+    expect(visualStates.every((frames) => frames.every(Boolean))).toBe(true);
+  });
+});

@@ -18,7 +18,8 @@ export const grabbedRunnerFramesById: Record<RunnerId, string[]> = {
   "coding-fish": frames("coding-fish"),
   "coding-orange-cat": frames("coding-orange-cat"),
   "coding-shrimp": frames("coding-shrimp"),
-  "coding-vtuber": frames("coding-vtuber")
+  "coding-vtuber": frames("coding-vtuber"),
+  "coding-chubby-cat": frames("coding-chubby-cat")
 };
 
 export function grabbedRunnerFrames(runnerId: RunnerId, skinId: RunnerSkinId = "default") {

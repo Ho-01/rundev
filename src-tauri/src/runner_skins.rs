@@ -75,6 +75,10 @@ const RUNNERS: &[RunnerDefinition] = &[
         runner_id: "coding-vtuber",
         name: "핑크 버튜버",
     },
+    RunnerDefinition {
+        runner_id: "coding-chubby-cat",
+        name: "하찮은 뚱냥이",
+    },
 ];
 
 const SKINS: &[SkinDefinition] = &[
@@ -119,6 +123,13 @@ const SKINS: &[SkinDefinition] = &[
         name: "수영장 파티",
         description: "선글라스와 파란 도트 비키니로 여름 코딩을 즐깁니다.",
         required_active_seconds: POOL_PARTY_REQUIRED_ACTIVE_SECONDS,
+    },
+    SkinDefinition {
+        runner_id: "coding-chubby-cat",
+        skin_id: DEFAULT_SKIN_ID,
+        name: "기본 스킨",
+        description: "삐뚤한 낙서선으로 그린 통통하고 하찮은 고양이입니다.",
+        required_active_seconds: 0,
     },
 ];
 
@@ -309,6 +320,7 @@ mod tests {
     #[test]
     fn accepts_only_packaged_runner_ids() {
         assert!(is_supported_runner("coding-vtuber"));
+        assert!(is_supported_runner("coding-chubby-cat"));
         assert!(!is_supported_runner("../custom"));
     }
 

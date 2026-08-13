@@ -51,10 +51,17 @@ const POOL_PARTY_VTUBER_FRAMES: [&[u8]; 4] = [
     include_bytes!("../../icons/tray/coding-vtuber-pool-party/03.png").as_slice(),
     include_bytes!("../../icons/tray/coding-vtuber-pool-party/04.png").as_slice(),
 ];
+const CHUBBY_CAT_FRAMES: [&[u8]; 4] = [
+    include_bytes!("../../icons/tray/coding-chubby-cat/01.png").as_slice(),
+    include_bytes!("../../icons/tray/coding-chubby-cat/02.png").as_slice(),
+    include_bytes!("../../icons/tray/coding-chubby-cat/03.png").as_slice(),
+    include_bytes!("../../icons/tray/coding-chubby-cat/04.png").as_slice(),
+];
 
 pub fn set_runner(runner: &str, skin: &str) {
     let runner_index = match (runner, skin) {
         ("coding-vtuber", "pool-party") => 5,
+        ("coding-chubby-cat", _) => 6,
         ("coding-fish", _) => 1,
         ("coding-orange-cat", _) => 2,
         ("coding-shrimp" | "coding-white-cat", _) => 3,
@@ -71,6 +78,7 @@ fn selected_frames() -> &'static [&'static [u8]; 4] {
         3 => &SHRIMP_FRAMES,
         4 => &VTUBER_FRAMES,
         5 => &POOL_PARTY_VTUBER_FRAMES,
+        6 => &CHUBBY_CAT_FRAMES,
         _ => &CAT_FRAMES,
     }
 }

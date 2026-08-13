@@ -10,7 +10,8 @@ const runnerIds = [
   "coding-orange-cat",
   "coding-shrimp",
   "coding-fish",
-  "coding-vtuber"
+  "coding-vtuber",
+  "coding-chubby-cat"
 ];
 const uiScale = {
   "coding-cat": 1.15
