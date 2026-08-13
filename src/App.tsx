@@ -5,24 +5,24 @@ import {
   Crown,
   Bug,
   BadgeCheck,
-  BarChart3,
   Boxes,
   Code2,
   Flame,
   Hammer,
   Info,
   Keyboard,
-  MonitorCog,
+  MoreHorizontal,
   Network,
+  PanelLeft,
+  PanelRight,
   RotateCcw,
-  Settings2,
   Sprout,
   SquareTerminal,
   Target,
   Workflow,
-  Zap
-  ,Plus
-  ,X
+  Zap,
+  Plus,
+  X
 } from "lucide-react";
 import { useDashboardStore } from "./store/dashboard";
 import {
@@ -90,6 +90,8 @@ import openAiIcon from "./assets/providers/openai.svg";
 
 const KEYBOARD_PERMISSION_REPAIR_PENDING_KEY =
   "keyboard.macos.permissionRepairPending";
+const PANEL_TRANSITION_MS = 180;
+type ExpandedPanelSide = "left" | "right";
 import claudeIcon from "./assets/providers/claude.svg";
 import cursorIcon from "./assets/providers/cursor.svg";
 import packageJson from "../package.json";
@@ -471,11 +473,12 @@ function FocusAppBreakdown({ apps, title }: { apps: ActivityStats["apps"] | unde
   </section>;
 }
 
-function StatsPanel({ dailyStats, weeklyStats, activityHistory, activeHistoryDays, onClose }: {
+function StatsPanel({ dailyStats, weeklyStats, activityHistory, activeHistoryDays, closing, onClose }: {
   dailyStats: ActivityStats | null;
   weeklyStats: ActivityStats | null;
   activityHistory: ActivityHistoryDay[];
   activeHistoryDays: number;
+  closing?: boolean;
   onClose: () => void;
 }) {
   const [activeTab, setActiveTab] = useState<"today" | "week" | "history">("today");
@@ -495,7 +498,7 @@ function StatsPanel({ dailyStats, weeklyStats, activityHistory, activeHistoryDay
     setActiveTab(tabs[nextIndex].id);
     event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>("[role=tab]")[nextIndex]?.focus();
   }
-  return <aside className="stats-panel" aria-label="활동 통계">
+  return <aside className={`stats-panel${closing ? " closing" : ""}`} aria-label="활동 통계">
     <header><strong>활동 통계</strong><button type="button" onClick={onClose} aria-label="통계 접기"><X size={14}/></button></header>
     <div className="stats-tabs" role="tablist" aria-label="통계 기간">
       {tabs.map((tab, index) => <button key={tab.id} id={`stats-tab-${tab.id}`} type="button" role="tab" aria-selected={activeTab === tab.id} aria-controls={`stats-panel-${tab.id}`} tabIndex={activeTab === tab.id ? 0 : -1} onClick={() => setActiveTab(tab.id)} onKeyDown={(event) => moveTab(event, index)}>{tab.label}</button>)}
@@ -595,6 +598,7 @@ export function App() {
   const [runnerDialogOpen, setRunnerDialogOpen] = useState(false);
   const [characterWindowVisible, setCharacterWindowVisibleState] = useState(false);
   const [infoDialogOpen, setInfoDialogOpen] = useState(false);
+  const [headerMenuOpen, setHeaderMenuOpen] = useState(false);
   const [couponDialogOpen, setCouponDialogOpen] = useState(false);
   const [couponCode, setCouponCode] = useState("");
   const [couponPreview, setCouponPreview] = useState<XpCouponPreview | null>(null);
@@ -621,6 +625,7 @@ export function App() {
   const [systemPanelExpanded, setSystemPanelExpanded] = useState(
     () => localStorage.getItem("rundev.systemPanelExpanded") === "true"
   );
+  const [closingPanelSide, setClosingPanelSide] = useState<ExpandedPanelSide | null>(null);
   const [systemSummaryPinned, setSystemSummaryPinned] = useState(
     () => localStorage.getItem("rundev.systemSummaryPinned") === "true"
   );
@@ -636,6 +641,8 @@ export function App() {
   const previousTotalXpRef = useRef<number | null>(null);
   const whipCrackRef = useRef<WhipCrackApi>(null);
   const runnerRef = useRef<HTMLButtonElement>(null);
+  const headerMenuRef = useRef<HTMLDivElement>(null);
+  const panelTransitionTokenRef = useRef(0);
   const shellRef = useRef<HTMLElement>(null);
   const freezeRunner = new URLSearchParams(window.location.search).has("freezeRunner");
   const showXpPreview = new URLSearchParams(window.location.search).has("showXpFx");
@@ -928,6 +935,26 @@ export function App() {
   }, [infoDialogOpen]);
 
   useEffect(() => {
+    if (!headerMenuOpen) return;
+
+    const closeOnOutsidePointer = (event: globalThis.PointerEvent) => {
+      if (!headerMenuRef.current?.contains(event.target as Node)) {
+        setHeaderMenuOpen(false);
+      }
+    };
+    const closeOnEscape = (event: globalThis.KeyboardEvent) => {
+      if (event.key === "Escape") setHeaderMenuOpen(false);
+    };
+
+    window.addEventListener("pointerdown", closeOnOutsidePointer);
+    window.addEventListener("keydown", closeOnEscape);
+    return () => {
+      window.removeEventListener("pointerdown", closeOnOutsidePointer);
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [headerMenuOpen]);
+
+  useEffect(() => {
     void getXpBoostStatus().then(setXpBoost).catch(() => {});
     const timer = window.setInterval(() => setBoostClock(Date.now()), 30_000);
     return () => window.clearInterval(timer);
@@ -1078,6 +1105,11 @@ export function App() {
     [currentActivity?.active, currentActivity?.focused, currentActivity?.appName]
   );
   const currentTier = getLevelTier(character?.level ?? 1);
+  const renderedPanelSide = statsExpanded
+    ? "left"
+    : systemPanelExpanded
+      ? "right"
+      : closingPanelSide;
 
   if (showLevelShowcase) {
     return <LevelShowcase />;
@@ -1086,13 +1118,64 @@ export function App() {
     return <EmblemShowcase />;
   }
 
+  function panelTransitionDuration() {
+    return typeof window.matchMedia === "function" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches
+      ? 0
+      : PANEL_TRANSITION_MS;
+  }
+
+  function closeExpandedPanel(side: ExpandedPanelSide) {
+    const token = ++panelTransitionTokenRef.current;
+    if (side === "left") setStatsExpanded(false);
+    else {
+      setSystemPanelExpanded(false);
+      localStorage.setItem("rundev.systemPanelExpanded", "false");
+    }
+    setClosingPanelSide(side);
+    window.setTimeout(() => {
+      if (panelTransitionTokenRef.current !== token) return;
+      setClosingPanelSide(null);
+      void resizeSystemPanel(false, side, side);
+    }, panelTransitionDuration());
+  }
+
+  async function openExpandedPanel(side: ExpandedPanelSide) {
+    const previousSide = statsExpanded
+      ? "left"
+      : systemPanelExpanded
+        ? "right"
+        : closingPanelSide ?? undefined;
+    const token = ++panelTransitionTokenRef.current;
+
+    if (previousSide && previousSide !== side) {
+      if (previousSide === "left") setStatsExpanded(false);
+      else {
+        setSystemPanelExpanded(false);
+        localStorage.setItem("rundev.systemPanelExpanded", "false");
+      }
+      setClosingPanelSide(previousSide);
+      await new Promise<void>((resolve) => {
+        window.setTimeout(resolve, panelTransitionDuration());
+      });
+      if (panelTransitionTokenRef.current !== token) return;
+      setClosingPanelSide(null);
+    }
+
+    if (side === "left") setStatsExpanded(true);
+    else {
+      setSystemPanelExpanded(true);
+      localStorage.setItem("rundev.systemPanelExpanded", "true");
+    }
+    await resizeSystemPanel(true, side, previousSide);
+  }
+
   function toggleSystemPanel() {
-    const expanded = !systemPanelExpanded;
-    if (expanded) setStatsExpanded(false);
-    setSystemPanelExpanded(expanded);
-    localStorage.setItem("rundev.systemPanelExpanded", String(expanded));
-    const previousSide = statsExpanded ? "left" : systemPanelExpanded ? "right" : undefined;
-    void resizeSystemPanel(expanded, "right", previousSide);
+    if (systemPanelExpanded) {
+      closeExpandedPanel("right");
+      return;
+    }
+    void openExpandedPanel("right");
   }
 
   function changeSystemSummaryPinned(pinned: boolean) {
@@ -1101,19 +1184,18 @@ export function App() {
   }
 
   async function toggleStatsPanel() {
-    const expanded = !statsExpanded;
-    setStatsExpanded(expanded);
-    if (expanded) {
-      setSystemPanelExpanded(false);
-      const [daily, weekly] = await Promise.all([
+    if (statsExpanded) {
+      closeExpandedPanel("left");
+      return;
+    }
+    void openExpandedPanel("left");
+    void Promise.all([
         getActivityStats("day"),
         getActivityStats("week")
-      ]);
+      ]).then(([daily, weekly]) => {
       setDailyStats(daily);
       setWeeklyStats(weekly);
-    }
-    const previousSide = systemPanelExpanded ? "right" : statsExpanded ? "left" : undefined;
-    void resizeSystemPanel(expanded, "left", previousSide);
+    });
   }
 
   async function openTraits() {
@@ -1129,15 +1211,15 @@ export function App() {
   return (
     <main
       ref={shellRef}
-      className={`popover-shell${hasUsageDetails ? " dense" : ""}${showXpPreview ? " preview-xp-fx" : ""}`}
+      className={`popover-shell${hasUsageDetails ? " dense" : ""}${showXpPreview ? " preview-xp-fx" : ""}${renderedPanelSide ? " panel-expanded" : ""}`}
     >
       <WhipCrackOverlay
         ref={whipCrackRef}
-        width={systemPanelExpanded || statsExpanded ? 512 : 340}
+        width={renderedPanelSide ? 512 : 340}
         height={480}
       />
       <PingModeOverlay rootRef={shellRef} onWhip={performWhip} />
-      {statsExpanded && <StatsPanel dailyStats={dailyStats} weeklyStats={weeklyStats} activityHistory={activityHistory} activeHistoryDays={activeHistoryDays} onClose={() => void toggleStatsPanel()} />}
+      {(statsExpanded || closingPanelSide === "left") && <StatsPanel dailyStats={dailyStats} weeklyStats={weeklyStats} activityHistory={activityHistory} activeHistoryDays={activeHistoryDays} closing={closingPanelSide === "left"} onClose={() => void toggleStatsPanel()} />}
       <div className="popover-main">
       <header className="runner-header">
         <div className={`runner-stage tier-${currentTier.id}`}>
@@ -1169,27 +1251,93 @@ export function App() {
                 ) : null}
               </div>
             </div>
-          <div className="header-actions">
-            <button type="button" className="plain-button" aria-label="활동 통계" onClick={() => void toggleStatsPanel()}><BarChart3 size={16}/></button>
-          <button type="button" className="plain-button" aria-label="장치 상태" aria-expanded={systemPanelExpanded} onClick={toggleSystemPanel}><MonitorCog size={16}/></button>
-          <button
-            className="plain-button"
-            type="button"
-            aria-label="RunDev 정보"
-            onClick={() => setInfoDialogOpen(true)}
-          >
-            <Info size={16} />
-            {updateStatus.available && <i className="update-dot" aria-hidden="true" />}
-          </button>
-          <button
-            className="plain-button"
-            type="button"
-            aria-label="개발자 변경"
-            onClick={() => setRunnerDialogOpen(true)}
-          >
-            <Settings2 size={16} />
-          </button>
-        </div>
+            <div className="header-actions">
+              <button
+                type="button"
+                className={`header-action-button ${statsExpanded ? "active" : ""}`}
+                aria-label="활동 통계"
+                aria-pressed={statsExpanded}
+                data-tooltip={statsExpanded ? "활동 통계 닫기" : "활동 통계 열기"}
+                onClick={() => void toggleStatsPanel()}
+              >
+                <PanelLeft size={15} />
+              </button>
+              <button
+                type="button"
+                className={`header-action-button ${systemPanelExpanded ? "active" : ""}`}
+                aria-label="시스템 메트릭"
+                aria-pressed={systemPanelExpanded}
+                data-tooltip={systemPanelExpanded ? "시스템 메트릭 닫기" : "시스템 메트릭 열기"}
+                onClick={toggleSystemPanel}
+              >
+                <PanelRight size={15} />
+              </button>
+              <div className="header-overflow" ref={headerMenuRef}>
+                <button
+                  type="button"
+                  className={`header-action-button ${headerMenuOpen ? "active" : ""}`}
+                  aria-label="앱 메뉴"
+                  aria-haspopup="menu"
+                  aria-expanded={headerMenuOpen}
+                  data-tooltip="앱 메뉴"
+                  onClick={() => setHeaderMenuOpen((open) => !open)}
+                >
+                  <MoreHorizontal size={16} />
+                  {updateStatus.available && <i className="update-dot" aria-hidden="true" />}
+                </button>
+                {headerMenuOpen && (
+                  <div className="header-overflow-menu" role="menu">
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={() => {
+                        setHeaderMenuOpen(false);
+                        setRunnerDialogOpen(true);
+                      }}
+                    >
+                      <Crown size={14} />
+                      <span>개발자 컬렉션</span>
+                    </button>
+                    <i className="header-menu-divider" aria-hidden="true" />
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={() => {
+                        setHeaderMenuOpen(false);
+                        setInfoDialogOpen(true);
+                      }}
+                    >
+                      <Info size={14} />
+                      <span>앱 정보 · 업데이트</span>
+                      {updateStatus.available && <i className="menu-update-dot" aria-hidden="true" />}
+                    </button>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={() => {
+                        setHeaderMenuOpen(false);
+                        setCouponError(null);
+                        setCouponDialogOpen(true);
+                      }}
+                    >
+                      <BadgeCheck size={14} />
+                      <span>쿠폰 입력</span>
+                    </button>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={() => {
+                        setHeaderMenuOpen(false);
+                        void showDiagnosticsFolder();
+                      }}
+                    >
+                      <Bug size={14} />
+                      <span>진단 로그 폴더</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
           <div className="header-activity-row">
             <div className="activity-status">
@@ -1583,7 +1731,8 @@ export function App() {
       </div>
       <SystemStatusStrip
         stats={systemStats}
-        expanded={systemPanelExpanded}
+        expanded={systemPanelExpanded || closingPanelSide === "right"}
+        closing={closingPanelSide === "right"}
         pinned={systemSummaryPinned && !statsExpanded}
         onToggle={toggleSystemPanel}
         onPinnedChange={changeSystemSummaryPinned}

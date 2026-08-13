@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type CSSProperties, type PointerEvent } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type MouseEvent, type PointerEvent } from "react";
 import { Maximize2, X } from "lucide-react";
 import type { DragDropEvent } from "@tauri-apps/api/webview";
 import { desktopRunnerFrames } from "../assets/runners/desktop";
@@ -15,6 +15,7 @@ import {
   finishCharacterResize,
   getCharacterWindowState,
   getCharacterRunner,
+  requestCharacterWhip,
   resizeCharacterWindow,
   setCharacterWindowVisible,
   showCharacterContextMenu,
@@ -82,6 +83,7 @@ export function CharacterWindow() {
   const [hoveringCharacter, setHoveringCharacter] = useState(false);
   const [direction, setDirection] = useState(1);
   const [roamingFrame, setRoamingFrame] = useState(0);
+  const [whipPulse, setWhipPulse] = useState<0 | 1 | 2>(0);
   const [dragVisualActive, setDragVisualActive] = useState(false);
   const [resizingCharacter, setResizingCharacter] = useState(false);
   const [grabbedFrame, setGrabbedFrame] = useState(0);
@@ -102,6 +104,7 @@ export function CharacterWindow() {
   const resizeGesture = useRef<{ pointerId: number; startX: number; startY: number; startSize: number } | null>(null);
   const resizePending = useRef<number | null>(null);
   const resizeFlushPromise = useRef<Promise<void> | null>(null);
+  const whipTimer = useRef<number | null>(null);
   const feedPhaseRef = useRef<FeedPhase>("idle");
   const feedBeginPromise = useRef<Promise<void> | null>(null);
   const feedFinishTimer = useRef<number | null>(null);
@@ -559,9 +562,19 @@ export function CharacterWindow() {
     });
   }
 
+  function handleDoubleClick(event: MouseEvent<HTMLDivElement>) {
+    if (feedPhase !== "idle" || followPointer || roaming || moving) return;
+    event.preventDefault();
+    clearDragTimer();
+    void requestCharacterWhip().then((accepted) => {
+      if (!accepted) return;
+      setWhipPulse((current) => (current === 1 ? 2 : 1));
+      if (whipTimer.current !== null) window.clearTimeout(whipTimer.current);
+      whipTimer.current = window.setTimeout(() => setWhipPulse(0), 850);
+    }).catch(() => {});
+  }
 
   const draggingCharacter = dragVisualActive && feedPhase === "idle";
-  const roamingMoving = feedPhase === "idle" && !draggingCharacter && roaming && moving;
   const canResizeCharacter = !followPointer && feedPhase === "idle" && !draggingCharacter;
   const controlsVisible = hoveringCharacter
     && !followPointer
@@ -569,6 +582,7 @@ export function CharacterWindow() {
     && feedPhase === "idle"
     && !draggingCharacter
     && !resizingCharacter;
+  const roamingMoving = feedPhase === "idle" && !draggingCharacter && roaming && moving;
   const movingDirection = direction < 0 ? -1 : 1;
   const shouldFlipForDirection = movingDirection !== roamingSourceDirectionByRunner[runnerId];
   const movingClass = roamingMoving && shouldFlipForDirection ? " roaming-direction-flipped" : "";
@@ -579,7 +593,7 @@ export function CharacterWindow() {
       : feedPhase === "consuming" || feedPhase === "finishing"
       ? " file-drop-consuming"
       : "";
-  const className = `character-window${feedClass}${controlsVisible ? " character-controls-visible" : ""}${draggingCharacter ? " character-dragging" : ""}${resizingCharacter ? " character-resizing" : ""}${typingMotion && !draggingCharacter && !roamingMoving && feedPhase === "idle" ? ` typing-motion-${typingMotion}` : ""}${followPointer ? " following-pointer" : ""}${roaming ? " roaming-mode" : ""}${roamingMoving ? ` roaming-moving${movingClass}` : ""}`;
+  const className = `character-window${feedClass}${controlsVisible ? " character-controls-visible" : ""}${draggingCharacter ? " character-dragging" : ""}${resizingCharacter ? " character-resizing" : ""}${typingMotion && !draggingCharacter && !roamingMoving && feedPhase === "idle" ? ` typing-motion-${typingMotion}` : ""}${followPointer ? " following-pointer" : ""}${roaming ? " roaming-mode" : ""}${roamingMoving ? ` roaming-moving${movingClass}` : ""}${whipPulse && !draggingCharacter ? ` whip-pulse-${whipPulse}` : ""}`;
   const characterStyle = roamingMoving
     ? ({ "--roam-size": roamingVisualScaleByRunner[runnerId] } as CSSProperties & { "--roam-size": number })
     : undefined;
@@ -602,6 +616,7 @@ export function CharacterWindow() {
       onPointerCancel={finishPointer}
       onPointerEnter={handlePointerEnter}
       onPointerLeave={handlePointerLeave}
+      onDoubleClick={handleDoubleClick}
       onContextMenu={(event) => {
         event.preventDefault();
         void showCharacterContextMenu();
@@ -611,7 +626,7 @@ export function CharacterWindow() {
           ? "모니터를 자유롭게 돌아다니는 중 · 우클릭으로 옵션 열기"
           : followPointer
             ? "마우스를 따라다니는 중"
-            : "드래그해서 이동 · 우클릭으로 옵션 열기"
+            : "드래그해서 이동 · 더블클릭으로 채찍질 · 우클릭으로 옵션 열기"
       }
     >
       <img src={image} alt="RunDev 캐릭터" draggable={false} />
@@ -635,6 +650,7 @@ export function CharacterWindow() {
         aria-label="캐릭터 숨기기"
         title="숨기기"
         onPointerDown={(event) => event.stopPropagation()}
+        onDoubleClick={(event) => event.stopPropagation()}
         onClick={() => void setCharacterWindowVisible(false)}
       >
         <X size={9} />

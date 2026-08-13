@@ -15,6 +15,8 @@ export type CharacterWindowState = {
 
 export type CharacterMotionState = { moving: boolean; direction: number };
 
+const CHARACTER_WHIP_COOLDOWN_MS = 140;
+let lastCharacterWhipAt = Number.NEGATIVE_INFINITY;
 
 function isTauri() {
   return "__TAURI_INTERNALS__" in window;
@@ -33,6 +35,15 @@ export async function setCharacterWindowVisible(visible: boolean): Promise<Chara
 export async function toggleCharacterRoaming() {
   if (!isTauri()) return;
   await invoke("toggle_roaming");
+}
+
+export async function requestCharacterWhip() {
+  const now = Date.now();
+  if (now - lastCharacterWhipAt < CHARACTER_WHIP_COOLDOWN_MS) return false;
+  lastCharacterWhipAt = now;
+  if (!isTauri()) return true;
+  await invoke("record_whip");
+  return true;
 }
 
 export async function dragCharacterWindow() {

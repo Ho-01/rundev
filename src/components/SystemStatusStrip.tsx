@@ -16,6 +16,7 @@ import type { SystemStats } from "../types/system";
 type Props = {
   stats: SystemStats;
   expanded: boolean;
+  closing?: boolean;
   pinned: boolean;
   onToggle: () => void;
   onPinnedChange: (pinned: boolean) => void;
@@ -79,12 +80,12 @@ function DetailCard({
   );
 }
 
-export function SystemStatusStrip({ stats, expanded, pinned, onToggle, onPinnedChange }: Props) {
+export function SystemStatusStrip({ stats, expanded, closing, pinned, onToggle, onPinnedChange }: Props) {
   const items = buildStripItems(stats);
   if (!expanded && !pinned) return null;
 
   return (
-    <aside className={`system-strip ${expanded ? "expanded" : "compact"}`} aria-label="장치 상태">
+    <aside className={`system-strip ${expanded ? "expanded" : "compact"}${closing ? " closing" : ""}`} aria-label="장치 상태">
       <div className="system-strip-actions">
       <button
         type="button"

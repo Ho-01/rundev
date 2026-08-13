@@ -5,8 +5,13 @@ import { CharacterWindow } from "./components/CharacterWindow";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import "./styles.css";
 
-const isCharacterWindow = "__TAURI_INTERNALS__" in window && getCurrentWindow().label === "character";
-if (isCharacterWindow) document.body.classList.add("character-body");
+const isTauri = "__TAURI_INTERNALS__" in window;
+const currentWindowLabel = isTauri ? getCurrentWindow().label : null;
+const isCharacterWindow = currentWindowLabel === "character";
+if (isCharacterWindow) {
+  document.documentElement.classList.add("character-body");
+  document.body.classList.add("character-body");
+}
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

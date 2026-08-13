@@ -98,6 +98,8 @@ Updater는 GitHub Releases의 `latest.json`을 endpoint로 사용한다. 공개�
 - 파일 드롭 중에는 Rust가 이동 잠금과 48→88 logical px 임시 창 크기의 보간을 소유한다.
   `file_drop` adapter는 드롭된 regular file만 Windows Recycle Bin 또는 macOS Trash로
   이동하며 경로를 저장하거나 진단 로그에 기록하지 않는다.
+- 수동 플로팅 상태의 더블클릭 채찍질은 기존 `record_whip` 원장을 재사용하며,
+  별도의 XP 이벤트나 캐릭터 전용 원장을 만들지 않는다.
 
 ### `host_metrics`
 

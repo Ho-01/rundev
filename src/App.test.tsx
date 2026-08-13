@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { App } from "./App";
 import { useDashboardStore } from "./store/dashboard";
@@ -23,7 +23,7 @@ describe("App", () => {
       "aria-valuemax",
       "210"
     );
-    fireEvent.click(screen.getByRole("button", { name: "장치 상태" }));
+    fireEvent.click(screen.getByRole("button", { name: "시스템 메트릭" }));
     expect(screen.getByRole("button", { name: "장치 상세 접기" })).toHaveAttribute(
       "aria-expanded",
       "true"
@@ -42,10 +42,18 @@ describe("App", () => {
     fireEvent.click(claudeSummary!);
     expect(within(claudeDetails).getByText("최근 활동 세션")).not.toBeVisible();
     expect(await screen.findByText("오늘 두드린 키보드")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "RunDev 정보" }));
+    fireEvent.click(screen.getByRole("button", { name: "앱 메뉴" }));
+    const appMenu = screen.getByRole("menu");
+    expect(within(appMenu).getByRole("menuitem", { name: "개발자 컬렉션" })).toBeInTheDocument();
+    expect(within(appMenu).getByRole("menuitem", { name: "쿠폰 입력" })).toBeInTheDocument();
+    expect(within(appMenu).getByRole("menuitem", { name: "진단 로그 폴더" })).toBeInTheDocument();
+    fireEvent.click(within(appMenu).getByRole("menuitem", { name: "앱 정보 · 업데이트" }));
     expect(screen.getByRole("heading", { name: "RunDev 정보" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "진단 로그 폴더" })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "개발자 변경" }));
+    const infoDialog = screen.getByRole("dialog", { name: "RunDev 정보" });
+    fireEvent.click(within(infoDialog).getByRole("button", { name: "닫기" }));
+    fireEvent.click(screen.getByRole("button", { name: "앱 메뉴" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "개발자 컬렉션" }));
     expect(await screen.findByText("주황 고양이")).toBeInTheDocument();
     expect(screen.getByText("주황 새우")).toBeInTheDocument();
     expect(screen.getByText("핑크 버튜버")).toBeInTheDocument();
@@ -96,4 +104,5 @@ describe("App", () => {
       screen.getByRole("button", { name: "권한 다시 연결" })
     ).toBeInTheDocument();
   });
+
 });
