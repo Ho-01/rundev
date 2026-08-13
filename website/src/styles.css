@@ -95,6 +95,12 @@ button { color: inherit; }
 .eyebrow { display: flex; align-items: center; gap: 9px; }
 .eyebrow__mark { display: grid; width: 23px; height: 23px; place-items: center; color: #1f2816; background: var(--sage); border-radius: 6px; font-size: 15px; }
 h1, h2, h3, p { overflow-wrap: break-word; }
+html[lang="ko"] h1,
+html[lang="ko"] h2,
+html[lang="ko"] h3,
+html[lang="ko"] p,
+html[lang="ko"] small { word-break: keep-all; }
+html[lang="ko"] .progression-copy h2 { font-size: clamp(40px, 3.7vw, 52px); }
 h1 { max-width: 650px; margin: 0; font-size: clamp(54px, 5.25vw, 78px); font-weight: 680; letter-spacing: -.065em; line-height: 1.04; }
 h1 em, h2 em { color: var(--sage-dark); font-style: normal; }
 [data-theme="dark"] h1 em, [data-theme="dark"] h2 em { color: #add678; }
