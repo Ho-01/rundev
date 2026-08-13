@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="ko" data-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#f4f2eb" />
+    <meta name="description" content="RunDev는 개발 활동을 XP와 캐릭터 성장으로 바꾸는 로컬 우선 데스크톱 컴패니언입니다." />
+    <meta property="og:title" content="RunDev — 개발하는 시간을 성장으로" />
+    <meta property="og:description" content="개발 활동과 AI 도구 사용량을 로컬에서 기록하고, XP와 캐릭터 성장으로 확인하세요." />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="icon" href="/assets/app-icon.png" type="image/png" />
+    <script>
+      try {
+        const savedTheme = localStorage.getItem("rundev-site-theme");
+        const preferredTheme = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+        document.documentElement.dataset.theme = savedTheme || preferredTheme;
+      } catch {}
+    </script>
+    <link rel="stylesheet" href="/styles.css" />
+    <title>RunDev — 개발하는 시간을 성장으로</title>
+  </head>
+  <body>
+    <a class="skip-link" href="#main" data-i18n="skip">본문으로 건너뛰기</a>
+
+    <div class="announcement">
+      <div class="announcement__inner">
+        <span class="announcement__pulse" aria-hidden="true"></span>
+        <span data-i18n="announcement">RunDev v0.6.7 출시</span>
+        <a href="https://github.com/Ho-01/rundev/releases/latest" target="_blank" rel="noreferrer">
+          <span data-i18n="releaseNotes">릴리스 보기</span><span aria-hidden="true"> →</span>
+        </a>
+      </div>
+    </div>
+
+    <header class="site-header">
+      <div class="site-header__inner">
+        <a class="brand" href="#top" aria-label="RunDev home">
+          <img src="/assets/app-icon.png" width="36" height="36" alt="" />
+          <span>RunDev</span>
+        </a>
+
+        <button class="mobile-menu-button icon-button" type="button" aria-controls="site-nav" aria-expanded="false">
+          <span class="sr-only" data-i18n="openMenu">메뉴 열기</span>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" /></svg>
+        </button>
+
+        <nav id="site-nav" class="site-nav" aria-label="Primary">
+          <a href="#features" data-i18n="navFeatures">기능</a>
+          <a href="#privacy" data-i18n="navPrivacy">프라이버시</a>
+          <a href="#characters" data-i18n="navCharacters">캐릭터</a>
+          <a href="#faq" data-i18n="navFaq">FAQ</a>
+        </nav>
+
+        <div class="header-actions">
+          <button class="locale-button" type="button" aria-label="Switch language"><span class="locale-current">KO</span><span class="locale-divider">/</span><span class="locale-next">EN</span></button>
+          <button class="theme-button icon-button" type="button" aria-label="다크 모드로 전환">
+            <svg class="sun-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.42 1.42M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.42-1.42M17.66 6.34l1.41-1.41"/></svg>
+            <svg class="moon-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 14.2A8.5 8.5 0 0 1 9.8 3.5 8.5 8.5 0 1 0 20.5 14.2Z"/></svg>
+          </button>
+          <a class="button button--small button--dark header-download" href="https://github.com/Ho-01/rundev/releases/latest" target="_blank" rel="noreferrer" data-i18n="download">다운로드</a>
+        </div>
+      </div>
+    </header>
+
+    <main id="main">
+      <section id="top" class="hero section-shell">
+        <div class="hero__copy reveal">
+          <p class="eyebrow"><span class="eyebrow__mark" aria-hidden="true">⌁</span><span data-i18n="heroEyebrow">로컬 우선 개발 컴패니언</span></p>
+          <h1 data-i18n-html="heroTitle">개발하는 시간을,<br /><em>눈에 보이는 성장</em>으로.</h1>
+          <p class="hero__lead" data-i18n="heroLead">집중 시간, 키 입력 횟수, 연결한 AI 도구의 집계 사용량을 XP로 바꾸세요. 작은 개발자 캐릭터가 당신과 함께 성장합니다.</p>
+          <div class="hero__actions">
+            <a class="button button--dark" href="https://github.com/Ho-01/rundev/releases/latest" target="_blank" rel="noreferrer"><span data-i18n="downloadLatest">최신 버전 다운로드</span><span aria-hidden="true"> ↗</span></a>
+            <a class="button button--text" href="https://github.com/Ho-01/rundev" target="_blank" rel="noreferrer"><span data-i18n="viewGithub">GitHub에서 보기</span><span aria-hidden="true"> →</span></a>
+          </div>
+          <div class="hero__facts" aria-label="Product facts">
+            <div><strong data-i18n="factLocalValue">100% 로컬</strong><span data-i18n="factLocalLabel">데이터 저장</span></div>
+            <div><strong>5</strong><span data-i18n="factCharacters">개발자 캐릭터</span></div>
+            <div><strong>10</strong><span data-i18n="factTiers">성장 티어</span></div>
+          </div>
+        </div>
+
+        <div class="product-stage reveal reveal--late" aria-label="RunDev product preview">
+          <div class="stage-grid" aria-hidden="true"></div>
+          <div class="orbit orbit--one" aria-hidden="true"></div>
+          <div class="orbit orbit--two" aria-hidden="true"></div>
+
+          <div class="app-frame">
+            <div class="app-frame__bar">
+              <div class="traffic-lights" aria-hidden="true"><i></i><i></i><i></i></div>
+              <span>RunDev</span>
+              <span class="app-frame__status"><i></i><span data-i18n="runningLocal">로컬에서 실행 중</span></span>
+            </div>
+            <div class="app-frame__viewport">
+              <img src="/assets/dashboard-active.png" alt="RunDev dashboard showing developer activity and AI usage" width="640" height="960" />
+            </div>
+          </div>
+
+          <div class="floating-card floating-card--character">
+            <img src="/assets/coding-cat.gif" alt="" width="72" height="72" />
+            <div><span data-i18n="companion">오늘의 컴패니언</span><strong data-i18n="codingCat">코딩 고양이</strong></div>
+          </div>
+          <div class="floating-card floating-card--privacy">
+            <span class="privacy-check" aria-hidden="true">✓</span>
+            <div><strong data-i18n="privateByDesign">설계부터 프라이빗</strong><span data-i18n="nothingLeaves">원문 데이터 외부 전송 없음</span></div>
+          </div>
+          <div class="floating-card floating-card--xp"><span>+10</span><small>XP</small></div>
+        </div>
+      </section>
+
+      <section class="ticker" aria-label="Supported tools">
+        <div class="ticker__track">
+          <span>Codex</span><i>✦</i><span>Claude Code</span><i>✦</i><span>Cursor</span><i>✦</i><span data-i18n="focusTime">개발 집중 시간</span><i>✦</i><span data-i18n="keyCount">키 입력 횟수</span><i>✦</i>
+          <span aria-hidden="true">Codex</span><i aria-hidden="true">✦</i><span aria-hidden="true">Claude Code</span><i aria-hidden="true">✦</i><span aria-hidden="true">Cursor</span><i aria-hidden="true">✦</i><span aria-hidden="true" data-i18n="focusTime">개발 집중 시간</span><i aria-hidden="true">✦</i><span aria-hidden="true" data-i18n="keyCount">키 입력 횟수</span><i aria-hidden="true">✦</i>
+        </div>
+      </section>
+
+      <section id="features" class="feature-section section-shell">
+        <div class="section-heading reveal">
+          <p class="kicker" data-i18n="featureKicker">PRODUCT</p>
+          <h2 data-i18n-html="featureTitle">숫자를 세는 앱이 아니라,<br /><em>계속하고 싶게 만드는 루프.</em></h2>
+          <p data-i18n="featureLead">개발 활동을 방해하지 않으면서 오늘의 진척, 장기 성장, 수집의 즐거움을 한 화면에 연결합니다.</p>
+        </div>
+
+        <div class="feature-switcher reveal">
+          <div class="feature-tabs" role="tablist" aria-label="RunDev features">
+            <button type="button" role="tab" aria-selected="true" aria-controls="feature-panel" data-feature="progress">
+              <span class="tab-index">01</span><span><strong data-i18n="progressTitle">활동이 곧 성장</strong><small data-i18n="progressDesc">집중·키 입력·AI 사용량을 하나의 성장으로</small></span>
+            </button>
+            <button type="button" role="tab" aria-selected="false" aria-controls="feature-panel" data-feature="companion">
+              <span class="tab-index">02</span><span><strong data-i18n="companionTitle">화면 위 컴패니언</strong><small data-i18n="companionDesc">작업 흐름을 깨지 않는 작은 동료</small></span>
+            </button>
+            <button type="button" role="tab" aria-selected="false" aria-controls="feature-panel" data-feature="insight">
+              <span class="tab-index">03</span><span><strong data-i18n="insightTitle">가볍고 명확한 인사이트</strong><small data-i18n="insightDesc">오늘과 이번 주의 리듬만 선명하게</small></span>
+            </button>
+          </div>
+
+          <div id="feature-panel" class="feature-panel" role="tabpanel">
+            <div class="feature-visual feature-visual--progress is-active" data-feature-panel="progress">
+              <div class="level-card">
+                <span data-i18n="currentTier">현재 티어</span>
+                <div class="level-card__body"><div class="tier-badge">&lt;/&gt;</div><div><strong data-i18n="codeMaker">코드 메이커</strong><small>LV. 15</small></div></div>
+                <div class="xp-row"><span>72 / 100 XP</span><span>+28 XP</span></div>
+                <div class="progress-bar"><i></i></div>
+              </div>
+              <div class="metric-grid">
+                <div><span data-i18n="devTime">개발 시간</span><strong>1h 31m</strong><small>+10 XP</small></div>
+                <div><span data-i18n="keyInput">키 입력</span><strong>8,421</strong><small>+10 XP</small></div>
+              </div>
+              <div class="next-goal"><span class="goal-icon">◎</span><span><small data-i18n="nextGoal">다음 목표</small><strong data-i18n="focusNine">9분 더 집중하기</strong></span><b>+10 XP</b></div>
+            </div>
+
+            <div class="feature-visual feature-visual--companion" data-feature-panel="companion" hidden>
+              <div class="desk-line" aria-hidden="true"></div>
+              <div class="companion-stage">
+                <span class="thought">⌁</span>
+                <img src="/assets/coding-cat.gif" alt="Coding cat companion" width="170" height="170" />
+              </div>
+              <div class="interaction-chips"><span data-i18n="roam">자유 이동</span><span data-i18n="fileDrop">파일 먹기</span><span data-i18n="skins">스킨 수집</span></div>
+            </div>
+
+            <div class="feature-visual feature-visual--insight" data-feature-panel="insight" hidden>
+              <div class="week-chart" aria-label="Weekly activity chart"><i style="--h:34%"></i><i style="--h:52%"></i><i style="--h:45%"></i><i style="--h:76%"></i><i style="--h:64%"></i><i style="--h:91%"></i><i style="--h:58%"></i></div>
+              <div class="chart-labels"><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span><span>S</span></div>
+              <div class="insight-summary"><div><small data-i18n="thisWeek">이번 주</small><strong>12h 48m</strong></div><div><small data-i18n="streak">연속 기록</small><strong>6 days</strong></div></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="privacy" class="privacy-section">
+        <div class="section-shell privacy-grid">
+          <div class="privacy-copy reveal">
+            <p class="kicker kicker--mint" data-i18n="privacyKicker">LOCAL-FIRST</p>
+            <h2 data-i18n-html="privacyTitle">당신의 작업은<br /><em>당신의 기기에.</em></h2>
+            <p data-i18n="privacyLead">RunDev는 생산성을 보여주기 위해 작업 내용을 들여다볼 필요가 없다고 믿습니다. 필요한 집계값만 로컬 SQLite에 저장합니다.</p>
+            <a class="inline-link" href="https://github.com/Ho-01/rundev/blob/main/docs/product/privacy.md" target="_blank" rel="noreferrer"><span data-i18n="readPrivacy">프라이버시 원칙 읽기</span><span aria-hidden="true"> →</span></a>
+          </div>
+          <div class="privacy-ledger reveal reveal--late">
+            <div class="ledger-header"><span data-i18n="dataBoundary">데이터 경계</span><span class="local-badge"><i></i> LOCAL</span></div>
+            <ul>
+              <li><span class="ledger-icon ledger-icon--yes">✓</span><span><strong data-i18n="collectAllowed">집계하는 것</strong><small data-i18n="collectAllowedDesc">활성 개발 앱의 분류와 시간, 마지막 입력 이후 경과 시간, 연결한 AI 도구의 집계 사용량</small></span></li>
+              <li><span class="ledger-icon ledger-icon--no">×</span><span><strong data-i18n="collectNever">수집하지 않는 것</strong><small data-i18n="collectNeverDesc">키 입력 내용, 클립보드, 화면 캡처, 프롬프트·응답 원문, 소스 코드</small></span></li>
+              <li><span class="ledger-icon ledger-icon--lock">⌂</span><span><strong data-i18n="storage">저장 위치</strong><small data-i18n="storageDesc">사용자 기기의 로컬 SQLite. 별도 RunDev 서버 계정 없음</small></span></li>
+            </ul>
+            <div class="ledger-footer"><span data-i18n="networkStatus">원문 데이터 네트워크 전송</span><strong>0 bytes</strong></div>
+          </div>
+        </div>
+      </section>
+
+      <section id="characters" class="characters-section section-shell">
+        <div class="section-heading section-heading--split reveal">
+          <div><p class="kicker" data-i18n="charactersKicker">COMPANIONS</p><h2 data-i18n-html="charactersTitle">당신의 책상에 맞는<br /><em>작은 개발자 한 명.</em></h2></div>
+          <p data-i18n="charactersLead">오늘의 기분에 따라 캐릭터를 고르고, 화면 위에 띄워 두세요. 작업할수록 함께 쌓이는 애착을 만듭니다.</p>
+        </div>
+        <div class="character-grid reveal">
+          <article class="character-card character-card--sage"><span>01</span><img src="/assets/coding-cat.gif" alt="Coding cat" width="128" height="128" /><strong data-i18n="codingCat">코딩 고양이</strong></article>
+          <article class="character-card character-card--orange"><span>02</span><img src="/assets/coding-orange-cat.gif" alt="Orange coding cat" width="128" height="128" /><strong data-i18n="orangeCat">주황 고양이</strong></article>
+          <article class="character-card character-card--coral"><span>03</span><img src="/assets/coding-shrimp.gif" alt="Coding shrimp" width="128" height="128" /><strong data-i18n="shrimp">주황 새우</strong></article>
+          <article class="character-card character-card--yellow"><span>04</span><img src="/assets/coding-fish.gif" alt="Coding fish" width="128" height="128" /><strong data-i18n="fish">노란 물고기</strong></article>
+          <article class="character-card character-card--pink"><span>05</span><img src="/assets/coding-vtuber.gif" alt="Coding vtuber" width="128" height="128" /><strong data-i18n="vtuber">핑크 버튜버</strong></article>
+        </div>
+      </section>
+
+      <section class="progression-section section-shell">
+        <div class="progression-card reveal">
+          <div class="progression-copy"><p class="kicker kicker--gold" data-i18n="progressionKicker">LONG-TERM PROGRESS</p><h2 data-i18n-html="progressionTitle">새싹에서<br /><em>레전드 개발자까지.</em></h2><p data-i18n="progressionLead">레벨이 오르면 티어의 형태와 색이 달라집니다. 매일의 작은 활동이 장기적인 개발 기록으로 남습니다.</p></div>
+          <div class="progression-image"><img src="/assets/tier-emblems.png" alt="RunDev developer tier emblems" loading="lazy" /></div>
+        </div>
+      </section>
+
+      <section class="how-section section-shell">
+        <div class="section-heading reveal"><p class="kicker" data-i18n="howKicker">HOW IT WORKS</p><h2 data-i18n-html="howTitle">설치하고, 연결하고,<br /><em>평소처럼 개발하세요.</em></h2></div>
+        <ol class="steps reveal">
+          <li><span>01</span><div class="step-icon">↓</div><h3 data-i18n="stepInstall">RunDev 설치</h3><p data-i18n="stepInstallDesc">Windows 또는 macOS에 설치하면 트레이에서 조용히 시작합니다.</p></li>
+          <li><span>02</span><div class="step-icon">⌁</div><h3 data-i18n="stepConnect">도구 연결</h3><p data-i18n="stepConnectDesc">원하는 경우 Codex, Claude Code, Cursor의 집계 사용량을 연결합니다.</p></li>
+          <li><span>03</span><div class="step-icon">↗</div><h3 data-i18n="stepGrow">평소처럼 성장</h3><p data-i18n="stepGrowDesc">개발 흐름은 그대로. RunDev가 진척을 XP와 캐릭터 성장으로 보여줍니다.</p></li>
+        </ol>
+      </section>
+
+      <section id="faq" class="faq-section section-shell">
+        <div class="faq-heading reveal"><p class="kicker">FAQ</p><h2 data-i18n="faqTitle">궁금한 점</h2><p data-i18n="faqLead">설치하기 전에 가장 많이 궁금해할 내용을 정리했습니다.</p></div>
+        <div class="faq-list reveal">
+          <details><summary><span data-i18n="faqPlatformsQ">어떤 운영체제를 지원하나요?</span><i></i></summary><p data-i18n="faqPlatformsA">Windows와 Apple Silicon·Intel macOS를 지원합니다. 최신 설치 파일은 GitHub Releases에서 받을 수 있습니다.</p></details>
+          <details><summary><span data-i18n="faqPrivacyQ">키보드에 입력한 내용을 읽나요?</span><i></i></summary><p data-i18n="faqPrivacyA">아니요. 키 입력 내용은 읽거나 저장하지 않고 누른 횟수만 집계합니다. 프롬프트, 응답, 소스 코드도 수집하지 않습니다.</p></details>
+          <details><summary><span data-i18n="faqAccountQ">RunDev 계정이 필요한가요?</span><i></i></summary><p data-i18n="faqAccountA">필요하지 않습니다. RunDev 서버 계정 없이 로컬에서 동작합니다. AI 도구 연동도 사용자가 선택할 때만 이루어집니다.</p></details>
+          <details><summary><span data-i18n="faqPriceQ">무료인가요?</span><i></i></summary><p data-i18n="faqPriceA">현재 빌드는 GitHub Releases에서 받을 수 있습니다. 향후 Steam 제품화 정책은 출시 준비와 함께 안내할 예정입니다.</p></details>
+        </div>
+      </section>
+
+      <section class="cta-section section-shell reveal">
+        <div class="cta-card">
+          <div class="cta-pattern" aria-hidden="true"></div>
+          <img src="/assets/coding-cat.gif" alt="" width="120" height="120" />
+          <p class="kicker kicker--mint" data-i18n="ctaKicker">READY WHEN YOU ARE</p>
+          <h2 data-i18n-html="ctaTitle">오늘 작성한 코드가<br /><em>오늘의 성장으로 남도록.</em></h2>
+          <p data-i18n="ctaLead">개발 흐름은 바꾸지 마세요. RunDev만 곁에 두면 됩니다.</p>
+          <div class="cta-actions"><a class="button button--light" href="https://github.com/Ho-01/rundev/releases/latest" target="_blank" rel="noreferrer" data-i18n="downloadRunDev">RunDev 다운로드</a><a class="button button--ghost" href="https://github.com/Ho-01/rundev" target="_blank" rel="noreferrer">GitHub ↗</a></div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div class="section-shell footer-grid">
+        <div class="footer-brand"><a class="brand" href="#top"><img src="/assets/app-icon.png" width="34" height="34" alt="" /><span>RunDev</span></a><p data-i18n="footerTagline">개발하는 시간을 성장으로 바꾸는 로컬 우선 컴패니언.</p></div>
+        <div><strong data-i18n="footerProduct">제품</strong><a href="#features" data-i18n="navFeatures">기능</a><a href="#privacy" data-i18n="navPrivacy">프라이버시</a><a href="#characters" data-i18n="navCharacters">캐릭터</a></div>
+        <div><strong data-i18n="footerResources">리소스</strong><a href="https://github.com/Ho-01/rundev/releases/latest" target="_blank" rel="noreferrer" data-i18n="releases">릴리스</a><a href="https://github.com/Ho-01/rundev/tree/main/docs" target="_blank" rel="noreferrer" data-i18n="docs">문서</a><a href="https://github.com/Ho-01/rundev" target="_blank" rel="noreferrer">GitHub</a></div>
+        <div><strong data-i18n="footerSupport">지원</strong><a href="#faq">FAQ</a><a href="https://github.com/Ho-01/rundev/issues" target="_blank" rel="noreferrer" data-i18n="issues">이슈 제보</a><a href="https://github.com/Ho-01/rundev/blob/main/CHANGELOG.md" target="_blank" rel="noreferrer">Changelog</a></div>
+      </div>
+      <div class="section-shell footer-bottom"><span>© 2026 RunDev.</span><span data-i18n="footerLocal">Built local-first for developers.</span></div>
+    </footer>
+
+    <script type="module" src="/main.js"></script>
+  </body>
+</html>
