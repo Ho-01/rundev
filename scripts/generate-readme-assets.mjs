@@ -78,7 +78,10 @@ try {
     {
       name: "runner-picker",
       query: "?preview=disconnected&runner=coding-fish&freezeRunner=1",
-      action: async () => page.getByRole("button", { name: "개발자 변경" }).click()
+      action: async () => {
+        await page.getByRole("button", { name: "앱 메뉴" }).click();
+        await page.getByRole("menuitem", { name: "개발자 컬렉션" }).click();
+      }
     },
     {
       name: "tier-emblems",
