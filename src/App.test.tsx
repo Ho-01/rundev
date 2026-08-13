@@ -24,6 +24,7 @@ describe("App", () => {
       "210"
     );
     fireEvent.click(screen.getByRole("button", { name: "시스템 메트릭" }));
+    expect(document.querySelector(".popover-shell")).toHaveClass("panel-right");
     expect(screen.getByRole("button", { name: "장치 상세 접기" })).toHaveAttribute(
       "aria-expanded",
       "true"
@@ -49,6 +50,7 @@ describe("App", () => {
     expect(within(appMenu).getByRole("menuitem", { name: "진단 로그 폴더" })).toBeInTheDocument();
     fireEvent.click(within(appMenu).getByRole("menuitem", { name: "앱 정보 · 업데이트" }));
     expect(screen.getByRole("heading", { name: "RunDev 정보" })).toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "RunDev 정보" }).parentElement).toHaveClass("dialog-backdrop");
     expect(screen.getByRole("button", { name: "진단 로그 폴더" })).toBeInTheDocument();
     const infoDialog = screen.getByRole("dialog", { name: "RunDev 정보" });
     fireEvent.click(within(infoDialog).getByRole("button", { name: "닫기" }));
@@ -62,6 +64,7 @@ describe("App", () => {
     expect(screen.getByText("누적 집중 5시간")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "활동 통계" }));
     expect(await screen.findByRole("complementary", { name: "활동 통계" })).toBeInTheDocument();
+    expect(document.querySelector(".popover-shell")).toHaveClass("panel-left");
     const todayTab = screen.getByRole("tab", { name: "오늘" });
     expect(todayTab).toHaveAttribute("aria-selected", "true");
     expect(screen.getAllByText("XP 구성")).toHaveLength(1);

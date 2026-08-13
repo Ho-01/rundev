@@ -992,7 +992,8 @@ html.character-body #root { height: 100%; }
 }
 .provider-inline-actions button:disabled { cursor: wait; opacity: .55; }
 .adapter-error { margin: 7px 0 0 40px; color: #ff9a91; font-size: 10px; }
-.dialog-backdrop { position: absolute; z-index: 20; inset: 0; display: grid; place-items: center; padding: 18px; background: rgba(0,0,0,.66); backdrop-filter: blur(3px); }
+.dialog-backdrop { position: absolute; z-index: 20; top: 0; bottom: 0; left: 0; display: grid; width: 340px; place-items: center; padding: 18px; background: rgba(0,0,0,.66); backdrop-filter: blur(3px); }
+.popover-shell.panel-left .dialog-backdrop { left: 172px; }
 .dialog-backdrop.trait-backdrop { padding: 4px; }
 .account-dialog { width: 100%; padding: 16px; background: #29292c; border: 1px solid rgba(255,255,255,.13); border-radius: 10px; box-shadow: 0 16px 40px rgba(0,0,0,.38); }
 .account-dialog h2 { margin: 0 0 13px; font-size: 14px; }

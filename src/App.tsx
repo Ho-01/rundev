@@ -1211,7 +1211,7 @@ export function App() {
   return (
     <main
       ref={shellRef}
-      className={`popover-shell${hasUsageDetails ? " dense" : ""}${showXpPreview ? " preview-xp-fx" : ""}${renderedPanelSide ? " panel-expanded" : ""}`}
+      className={`popover-shell${hasUsageDetails ? " dense" : ""}${showXpPreview ? " preview-xp-fx" : ""}${renderedPanelSide ? ` panel-expanded panel-${renderedPanelSide}` : ""}`}
     >
       <WhipCrackOverlay
         ref={whipCrackRef}
