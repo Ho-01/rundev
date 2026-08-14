@@ -15,6 +15,13 @@ static COMPACT_MAIN_X: OnceLock<Mutex<Option<i32>>> = OnceLock::new();
 static FOLLOW_POINTER_ITEM: OnceLock<CheckMenuItem<tauri::Wry>> = OnceLock::new();
 static ROAMING_ITEM: OnceLock<CheckMenuItem<tauri::Wry>> = OnceLock::new();
 
+const COMPACT_WIDTH: f64 = 320.0;
+const EXPANDED_WIDTH: f64 = 492.0;
+const PREFERRED_HEIGHT: f64 = 520.0;
+const COMPACT_HEIGHT: f64 = 480.0;
+const MINIMUM_HEIGHT: f64 = 400.0;
+const WORK_AREA_GAP: f64 = 8.0;
+
 const CAT_FRAMES: [&[u8]; 4] = [
     include_bytes!("../../icons/tray/coding/01.png").as_slice(),
     include_bytes!("../../icons/tray/coding/02.png").as_slice(),
@@ -233,14 +240,11 @@ pub(crate) fn set_system_panel_expanded(
     expansion_side: Option<&str>,
     previous_expansion_side: Option<&str>,
 ) -> Result<(), String> {
-    const COMPACT_WIDTH: f64 = 340.0;
-    const EXPANDED_WIDTH: f64 = 512.0;
-    const HEIGHT: f64 = 480.0;
-
     let window = app
         .get_webview_window("main")
         .ok_or_else(|| "main window is unavailable".to_string())?;
     let scale = window.scale_factor().map_err(|error| error.to_string())?;
+    let monitor = window.current_monitor().ok().flatten();
     let current_size = window.outer_size().map_err(|error| error.to_string())?;
     let current_position = window.outer_position().map_err(|error| error.to_string())?;
     let target_width = ((if expanded {
@@ -249,7 +253,12 @@ pub(crate) fn set_system_panel_expanded(
         COMPACT_WIDTH
     }) * scale)
         .round() as u32;
-    let target_height = (HEIGHT * scale).round() as u32;
+    let target_height = preferred_main_window_height(
+        scale,
+        monitor
+            .as_ref()
+            .map(|monitor| monitor.work_area().size.height),
+    );
     let compact_width = (COMPACT_WIDTH * scale).round() as u32;
     let current_left_inset = if previous_expansion_side == Some("left") {
         current_size.width.saturating_sub(compact_width)
@@ -275,9 +284,9 @@ pub(crate) fn set_system_panel_expanded(
     let mut x = main_x.saturating_sub(i32::try_from(target_left_inset).unwrap_or(i32::MAX));
     let mut y = current_position.y;
 
-    if let Ok(Some(monitor)) = window.current_monitor() {
+    if let Some(monitor) = monitor {
         let work = monitor.work_area();
-        let gap = (8.0 * scale).round() as i32;
+        let gap = (WORK_AREA_GAP * scale).round() as i32;
         let min_x = work.position.x.saturating_add(gap);
         let min_y = work.position.y.saturating_add(gap);
         let max_x = work
@@ -306,6 +315,25 @@ pub(crate) fn set_system_panel_expanded(
         *anchor.lock().map_err(|error| error.to_string())? = None;
     }
     Ok(())
+}
+
+fn preferred_main_window_height(scale: f64, work_area_height: Option<u32>) -> u32 {
+    let preferred = (PREFERRED_HEIGHT * scale).round() as u32;
+    let compact = (COMPACT_HEIGHT * scale).round() as u32;
+    let minimum = (MINIMUM_HEIGHT * scale).round() as u32;
+    let reserved_gap = (WORK_AREA_GAP * 2.0 * scale).round() as u32;
+
+    match work_area_height {
+        Some(height) => {
+            let available = height.saturating_sub(reserved_gap);
+            if available >= preferred {
+                preferred
+            } else {
+                available.min(compact).max(minimum.min(available))
+            }
+        }
+        None => preferred,
+    }
 }
 
 fn toggle_main_window(app: &tauri::AppHandle, tray_rect: Rect) {
@@ -363,7 +391,7 @@ fn position_near_tray(app: &tauri::AppHandle, window: &tauri::WebviewWindow, tra
     let work_bottom = work_top + f64::from(work.size.height);
     let width = f64::from(window_size.width);
     let height = f64::from(window_size.height);
-    let gap = 8.0;
+    let gap = WORK_AREA_GAP;
 
     let mut x = tray_center_x - width / 2.0;
     let mut y;
@@ -387,4 +415,21 @@ fn position_near_tray(app: &tauri::AppHandle, window: &tauri::WebviewWindow, tra
     x = x.clamp(work_left + gap, work_right - width - gap);
     y = y.clamp(work_top + gap, work_bottom - height - gap);
     let _ = window.set_position(PhysicalPosition::new(x.round() as i32, y.round() as i32));
+}
+
+#[cfg(test)]
+mod tests {
+    use super::preferred_main_window_height;
+
+    #[test]
+    fn uses_preferred_height_when_the_work_area_has_room() {
+        assert_eq!(preferred_main_window_height(1.0, Some(800)), 520);
+        assert_eq!(preferred_main_window_height(1.5, Some(1_200)), 780);
+    }
+
+    #[test]
+    fn falls_back_to_compact_height_for_short_work_areas() {
+        assert_eq!(preferred_main_window_height(1.0, Some(510)), 480);
+        assert_eq!(preferred_main_window_height(1.0, Some(450)), 434);
+    }
 }

@@ -637,6 +637,7 @@ export function App() {
   const [weeklyStats, setWeeklyStats] = useState<ActivityStats | null>(null);
   const [traitProgress, setTraitProgress] = useState<TraitProgress | null>(null);
   const [traitDialogOpen, setTraitDialogOpen] = useState(false);
+  const [overlayHeight, setOverlayHeight] = useState(520);
   const [xpGainFx, setXpGainFx] = useState<number | null>(() =>
     new URLSearchParams(window.location.search).has("showXpFx") ? 10 : null
   );
@@ -1114,6 +1115,18 @@ export function App() {
       ? "right"
       : closingPanelSide;
 
+  useEffect(() => {
+    const updateOverlayHeight = () => {
+      const nextHeight = shellRef.current?.clientHeight || window.innerHeight;
+      if (nextHeight >= 400 && nextHeight <= 520) {
+        setOverlayHeight(nextHeight);
+      }
+    };
+    updateOverlayHeight();
+    window.addEventListener("resize", updateOverlayHeight);
+    return () => window.removeEventListener("resize", updateOverlayHeight);
+  }, []);
+
   if (showLevelShowcase) {
     return <LevelShowcase />;
   }
@@ -1218,8 +1231,8 @@ export function App() {
     >
       <WhipCrackOverlay
         ref={whipCrackRef}
-        width={renderedPanelSide ? 512 : 340}
-        height={480}
+        width={renderedPanelSide ? 492 : 320}
+        height={overlayHeight}
       />
       <PingModeOverlay rootRef={shellRef} onWhip={performWhip} />
       {(statsExpanded || closingPanelSide === "left") && <StatsPanel dailyStats={dailyStats} weeklyStats={weeklyStats} activityHistory={activityHistory} activeHistoryDays={activeHistoryDays} closing={closingPanelSide === "left"} onClose={() => void toggleStatsPanel()} />}

@@ -59,7 +59,7 @@ if (!address || typeof address === "string") throw new Error("Preview server did
 const browser = await chromium.launch({ headless: true });
 try {
   const page = await browser.newPage({
-    viewport: { width: 320, height: 480 },
+    viewport: { width: 320, height: 520 },
     deviceScaleFactor: 2,
     timezoneId: "Asia/Seoul"
   });
@@ -89,7 +89,7 @@ try {
       viewport: { width: 920, height: 1040 }
     }
   ]) {
-    await page.setViewportSize(scenario.viewport ?? { width: 320, height: 480 });
+    await page.setViewportSize(scenario.viewport ?? { width: 320, height: 520 });
     await page.goto(`http://127.0.0.1:${address.port}/${scenario.query}`, {
       waitUntil: "networkidle"
     });

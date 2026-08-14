@@ -7,7 +7,8 @@ describe("App", () => {
   it("renders the starter dashboard", async () => {
     localStorage.clear();
     render(<App />);
-    expect(document.querySelector(".whip-crack-canvas")).toHaveAttribute("width", "340");
+    expect(document.querySelector(".whip-crack-canvas")).toHaveAttribute("width", "320");
+    expect(document.querySelector(".whip-crack-canvas")).toHaveAttribute("height", "520");
     expect(await screen.findByText("RunDev")).toBeInTheDocument();
     const levelButton = await screen.findByRole("button", { name: /레벨 1 · 새싹 개발자 · 특성 열기/ });
     expect(levelButton).toHaveAccessibleName(/사용 가능 포인트 3/);
@@ -31,7 +32,7 @@ describe("App", () => {
       "aria-expanded",
       "true"
     );
-    expect(document.querySelector(".whip-crack-canvas")).toHaveAttribute("width", "512");
+    expect(document.querySelector(".whip-crack-canvas")).toHaveAttribute("width", "492");
     expect(screen.getByText("논리 코어")).toBeInTheDocument();
     expect(screen.getByText("실행 후 최고")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "장치 상세 접기" }));

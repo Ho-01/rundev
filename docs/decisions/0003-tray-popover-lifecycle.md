@@ -3,6 +3,8 @@
 - 상태: Accepted
 - 날짜: 2026-07-28
 
+> 크기 결정은 [ADR-0038](0038-adaptive-tray-popover-size.md)에서 대체했습니다.
+
 ## 맥락
 
 RunDev의 기본 상호작용은 RunCat과 같은 트레이 유틸리티다. 일반 데스크톱 창처럼
