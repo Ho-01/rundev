@@ -9,7 +9,9 @@ describe("App", () => {
     render(<App />);
     expect(document.querySelector(".whip-crack-canvas")).toHaveAttribute("width", "340");
     expect(await screen.findByText("RunDev")).toBeInTheDocument();
-    expect(await screen.findByRole("button", { name: /레벨 1 · 새싹 개발자 · 특성 열기/ })).toBeInTheDocument();
+    const levelButton = await screen.findByRole("button", { name: /레벨 1 · 새싹 개발자 · 특성 열기/ });
+    expect(levelButton).toHaveAccessibleName(/사용 가능 포인트 3/);
+    expect(levelButton.querySelector(".growth-trait-alert")).toHaveAttribute("title", "사용 가능한 특성 포인트 3개");
     expect(await screen.findByText("개발 활동")).toBeInTheDocument();
     expect(await screen.findByText("개발 도구 노려본 시간")).toBeInTheDocument();
     expect(await screen.findByText("마지막으로 본 도구")).toBeInTheDocument();
@@ -21,7 +23,7 @@ describe("App", () => {
     expect((await screen.findAllByText("Cursor")).length).toBeGreaterThanOrEqual(2);
     expect(screen.getByRole("progressbar", { name: "이번 주 AI 토큰 사용 XP" })).toHaveAttribute(
       "aria-valuemax",
-      "210"
+      "500"
     );
     fireEvent.click(screen.getByRole("button", { name: "시스템 메트릭" }));
     expect(document.querySelector(".popover-shell")).toHaveClass("panel-right");

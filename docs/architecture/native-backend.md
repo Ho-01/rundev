@@ -234,13 +234,17 @@ Tauri command로 오늘 합계와 연결 상태만 조회한다.
 
 `ai_xp` 애플리케이션 서비스는 세 어댑터가 저장한 현재 주 토큰 집계를 읽고
 프로바이더별 마일스톤을 계산한다. 새 마일스톤은 기존 `xp_boost::award_xp` 경로를
-통해 `xp_events` 원장에 반영하며, 주간 총 21회(기본 210 XP)를 넘지 않는다.
+통해 `xp_events` 원장에 반영하며, 주간 총 50회(기본 500 XP)를 넘지 않는다.
+Codex·Cursor는 12,500,000 토큰, Claude Code는 25,000,000 토큰마다 마일스톤을
+획득한다.
 React는 계산이나 DB 접근을 하지 않고 동기화 command가 반환한 프로바이더별 기본 XP를
 누적 그래프로 표시한다.
 
 ## 활동 통계와 특성
 
 `progression` 서비스는 기존 로컬 원장에서 일간·주간 시간대 통계를 계산하고 캐릭터
-레벨에서 획득 가능한 특성 포인트를 산출한다. 특성 레벨은 `character_traits`, 1 XP보다
-작은 보너스 잔여분은 `trait_bonus_accumulators`에 저장한다. 실제 추가 XP는 기존
-`xp_events` 원장과 `character_state`를 함께 갱신한다.
+레벨마다 획득 가능한 특성 포인트를 산출한다. 5레벨 단위로 강화 비용이 증가하며,
+특성 레벨은 `character_traits`, 1 XP보다 작은 보너스 잔여분은
+`trait_bonus_accumulators`에 저장한다. 재장전의 날짜별 지급 여부는
+`trait_daily_rewards`로 중복을 막는다. 실제 추가 XP는 기존 `xp_events` 원장과
+`character_state`를 함께 갱신한다.

@@ -2,6 +2,7 @@
 
 - 상태: Accepted
 - 날짜: 2026-08-04
+- 특성 포인트와 효과 규칙 대체: [ADR 0037](0037-trait-economy-and-ai-xp-rebalance.md)
 
 ## 맥락
 

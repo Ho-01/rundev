@@ -142,7 +142,14 @@ export type TraitProgress = {
   availablePoints: number;
   earnedPoints: number;
   spentPoints: number;
-  traits: Array<{ id: TraitId; level: number; maxLevel: number; effectPercent: number }>;
+  traits: Array<{
+    id: TraitId;
+    level: number;
+    maxLevel: number;
+    effectValue: number;
+    effectUnit: "percent" | "xp-per-active-day";
+    upgradeCost: number;
+  }>;
 };
 export type ActivityStats = {
   period: "day" | "week";

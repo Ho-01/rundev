@@ -107,7 +107,7 @@ const previewAiUsage: AiUsageToday = {
 const previewAiWeeklyXp: AiWeeklyXp = {
   weekStartedOn: new Date().toISOString().slice(0, 10),
   earnedXp: 140,
-  maxXp: 210,
+  maxXp: 500,
   codexXp: 50,
   claudeXp: 60,
   cursorXp: 30
@@ -535,14 +535,14 @@ export async function recordWhip() {
 export async function getTraitProgress(): Promise<TraitProgress> {
   if (!isTauri()) {
     return {
-      availablePoints: 2,
-      earnedPoints: 3,
+      availablePoints: 3,
+      earnedPoints: 4,
       spentPoints: 1,
       traits: [
-        { id: "focus-ready", level: 1, maxLevel: 20, effectPercent: 0.5 },
-        { id: "hot-keyboard", level: 0, maxLevel: 20, effectPercent: 0 },
-        { id: "reload", level: 0, maxLevel: 20, effectPercent: 0 },
-        { id: "context-runner", level: 0, maxLevel: 20, effectPercent: 0 }
+        { id: "focus-ready", level: 1, maxLevel: 20, effectValue: 0.5, effectUnit: "percent", upgradeCost: 1 },
+        { id: "hot-keyboard", level: 0, maxLevel: 20, effectValue: 0, effectUnit: "percent", upgradeCost: 1 },
+        { id: "reload", level: 0, maxLevel: 20, effectValue: 0, effectUnit: "xp-per-active-day", upgradeCost: 1 },
+        { id: "context-runner", level: 0, maxLevel: 20, effectValue: 0, effectUnit: "percent", upgradeCost: 1 }
       ]
     };
   }

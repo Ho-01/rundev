@@ -1,7 +1,8 @@
 # 0020. 프로바이더 통합 주간 AI 사용 XP
 
-- 상태: Accepted
+- 상태: Superseded
 - 날짜: 2026-08-04
+- 대체: [ADR 0037](0037-trait-economy-and-ai-xp-rebalance.md)
 
 ## 맥락
 

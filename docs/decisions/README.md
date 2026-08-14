@@ -33,12 +33,13 @@ ADR은 이미 내려진 중요한 기술 결정을 기록한다. 결정이 바�
 | [0017](0017-expandable-host-metrics-detail.md) | 장치 상태 요약과 상세 패널 분리 | Accepted |
 | [0018](0018-local-diagnostic-logs.md) | 제한된 로컬 진단 로그 | Accepted |
 | [0019](0019-signed-local-xp-coupons.md) | 서명된 로컬 XP 쿠폰 | Accepted |
-| [0020](0020-weekly-ai-usage-xp.md) | 프로바이더 통합 주간 AI 사용 XP | Accepted |
+| [0020](0020-weekly-ai-usage-xp.md) | 프로바이더 통합 주간 AI 사용 XP | Superseded |
 | [0021](0021-traits-and-activity-statistics.md) | 로컬 활동 통계와 특성 성장 | Accepted |
 | [0022](0022-character-pointer-following.md) | 화면 캐릭터의 전역 포인터 따라다니기 | Accepted |
 | [0023](0023-character-monitor-roaming.md) | 플로팅 캐릭터의 모니터 자유 이동 | Accepted |
 | [0035](0035-character-file-drop-to-trash.md) | 플로팅 캐릭터 파일 드롭 휴지통 처리 | Accepted |
 | [0036](0036-character-skin-collection.md) | 로컬 집중 마일스톤 기반 캐릭터 스킨 컬렉션 | Accepted |
+| [0037](0037-trait-economy-and-ai-xp-rebalance.md) | 특성 포인트 경제와 AI XP 재조정 | Accepted |
 
 ## 새 ADR 작성 형식
 

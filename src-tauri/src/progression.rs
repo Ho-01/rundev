@@ -20,7 +20,9 @@ pub struct TraitLevel {
     id: String,
     level: i64,
     max_level: i64,
-    effect_percent: f64,
+    effect_value: f64,
+    effect_unit: &'static str,
+    upgrade_cost: i64,
 }
 
 #[derive(Debug, Serialize)]
@@ -71,8 +73,11 @@ pub async fn traits(pool: &SqlitePool) -> Result<TraitProgress, String> {
     .fetch_all(pool)
     .await
     .map_err(|error| error.to_string())?;
-    let spent_points = rows.iter().map(|row| row.1).sum::<i64>();
-    let earned_points = character_level / 5;
+    let spent_points = rows
+        .iter()
+        .map(|row| trait_points_spent(row.1))
+        .sum::<i64>();
+    let earned_points = (character_level - 1).max(0);
     Ok(TraitProgress {
         available_points: (earned_points - spent_points).max(0),
         earned_points,
@@ -80,10 +85,20 @@ pub async fn traits(pool: &SqlitePool) -> Result<TraitProgress, String> {
         traits: rows
             .into_iter()
             .map(|(id, level)| TraitLevel {
+                effect_value: level as f64 * 0.5,
+                effect_unit: if id == "reload" {
+                    "xp-per-active-day"
+                } else {
+                    "percent"
+                },
+                upgrade_cost: if level >= TRAIT_MAX_LEVEL {
+                    0
+                } else {
+                    trait_upgrade_cost(level)
+                },
                 id,
                 level,
                 max_level: TRAIT_MAX_LEVEL,
-                effect_percent: level as f64 * 0.5,
             })
             .collect(),
     })
@@ -101,11 +116,24 @@ pub async fn upgrade(pool: &SqlitePool, trait_id: &str) -> Result<TraitProgress,
         .fetch_one(&mut *transaction)
         .await
         .map_err(|error| error.to_string())?;
-    let spent: i64 = sqlx::query_scalar("SELECT COALESCE(SUM(level), 0) FROM character_traits")
-        .fetch_one(&mut *transaction)
+    let levels: Vec<i64> = sqlx::query_scalar("SELECT level FROM character_traits")
+        .fetch_all(&mut *transaction)
         .await
         .map_err(|error| error.to_string())?;
-    if spent >= character_level / 5 {
+    let spent = levels.into_iter().map(trait_points_spent).sum::<i64>();
+    let current_level: i64 = sqlx::query_scalar(
+        "SELECT COALESCE((SELECT level FROM character_traits WHERE trait_id = ?), 0)",
+    )
+    .bind(trait_id)
+    .fetch_one(&mut *transaction)
+    .await
+    .map_err(|error| error.to_string())?;
+    if current_level >= TRAIT_MAX_LEVEL {
+        return Err("이미 최대 레벨인 특성입니다.".to_string());
+    }
+    let upgrade_cost = trait_upgrade_cost(current_level);
+    let earned_points = (character_level - 1).max(0);
+    if earned_points - spent < upgrade_cost {
         return Err("사용 가능한 특성 포인트가 없습니다.".to_string());
     }
     let changed = sqlx::query(
@@ -126,13 +154,12 @@ pub async fn upgrade(pool: &SqlitePool, trait_id: &str) -> Result<TraitProgress,
     traits(pool).await
 }
 
-pub async fn trait_level(pool: &SqlitePool, trait_id: &str) -> Result<i64, sqlx::Error> {
-    sqlx::query_scalar(
-        "SELECT COALESCE((SELECT level FROM character_traits WHERE trait_id = ?), 0)",
-    )
-    .bind(trait_id)
-    .fetch_one(pool)
-    .await
+fn trait_upgrade_cost(current_level: i64) -> i64 {
+    current_level / 5 + 1
+}
+
+fn trait_points_spent(level: i64) -> i64 {
+    (0..level).map(trait_upgrade_cost).sum()
 }
 
 pub async fn trait_level_in(
@@ -278,4 +305,47 @@ pub async fn stats(pool: &SqlitePool, period: &str) -> Result<ActivityStats, Str
 
 fn week_start(date: NaiveDate) -> NaiveDate {
     date - chrono::Duration::days(i64::from(date.weekday().num_days_from_monday()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{trait_points_spent, trait_upgrade_cost, traits, upgrade};
+    use sqlx::SqlitePool;
+
+    #[test]
+    fn trait_upgrade_costs_increase_every_five_levels() {
+        assert_eq!(trait_upgrade_cost(0), 1);
+        assert_eq!(trait_upgrade_cost(4), 1);
+        assert_eq!(trait_upgrade_cost(5), 2);
+        assert_eq!(trait_upgrade_cost(10), 3);
+        assert_eq!(trait_upgrade_cost(15), 4);
+    }
+
+    #[test]
+    fn maxing_one_trait_costs_fifty_points() {
+        assert_eq!(trait_points_spent(0), 0);
+        assert_eq!(trait_points_spent(5), 5);
+        assert_eq!(trait_points_spent(10), 15);
+        assert_eq!(trait_points_spent(15), 30);
+        assert_eq!(trait_points_spent(20), 50);
+    }
+
+    #[tokio::test]
+    async fn grants_one_point_per_level_after_the_starting_level() {
+        let pool = SqlitePool::connect("sqlite::memory:").await.unwrap();
+        sqlx::migrate!("./migrations").run(&pool).await.unwrap();
+        sqlx::query("UPDATE character_state SET level = 16 WHERE id = 1")
+            .execute(&pool)
+            .await
+            .unwrap();
+
+        for _ in 0..10 {
+            upgrade(&pool, "focus-ready").await.unwrap();
+        }
+        let progress = traits(&pool).await.unwrap();
+        assert_eq!(progress.earned_points, 15);
+        assert_eq!(progress.spent_points, 15);
+        assert_eq!(progress.available_points, 0);
+        assert!(upgrade(&pool, "focus-ready").await.is_err());
+    }
 }

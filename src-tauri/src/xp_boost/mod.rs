@@ -1,5 +1,5 @@
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
-use chrono::{DateTime, Duration, Utc};
+use chrono::{DateTime, Duration, Local, Utc};
 use ed25519_dalek::{Signature, Verifier, VerifyingKey};
 use serde::{Deserialize, Serialize};
 use sqlx::{Sqlite, SqlitePool, Transaction};
@@ -168,6 +168,7 @@ pub async fn award_xp(
     let trait_id = match event_type {
         "focus_milestone" => Some("focus-ready"),
         "keyboard_milestone" => Some("hot-keyboard"),
+        "ai_usage_milestone" => Some("context-runner"),
         _ => None,
     };
     let mut trait_bonus = 0;
@@ -201,6 +202,9 @@ pub async fn award_xp(
             }
         }
     }
+    if event_type == "focus_milestone" {
+        trait_bonus += award_reload_daily_bonus(transaction, occurred_at).await?;
+    }
     let total = amount + bonus + trait_bonus;
     sqlx::query(
         "UPDATE character_state
@@ -212,6 +216,72 @@ pub async fn award_xp(
     .execute(&mut **transaction)
     .await?;
     Ok(total)
+}
+
+async fn award_reload_daily_bonus(
+    transaction: &mut Transaction<'_, Sqlite>,
+    occurred_at: &str,
+) -> Result<i64, sqlx::Error> {
+    let level = crate::progression::trait_level_in(transaction, "reload").await?;
+    if level == 0 {
+        return Ok(0);
+    }
+    let Ok(parsed) = DateTime::parse_from_rfc3339(occurred_at) else {
+        return Ok(0);
+    };
+    let local_date = parsed.with_timezone(&Local).date_naive().to_string();
+    let basis_point_xp = level * 5_000;
+    let inserted = sqlx::query(
+        "INSERT OR IGNORE INTO trait_daily_rewards
+         (trait_id, local_date, awarded_at, basis_point_xp, xp_awarded)
+         VALUES ('reload', ?, ?, ?, 0)",
+    )
+    .bind(&local_date)
+    .bind(occurred_at)
+    .bind(basis_point_xp)
+    .execute(&mut **transaction)
+    .await?;
+    if inserted.rows_affected() == 0 {
+        return Ok(0);
+    }
+
+    let previous: i64 = sqlx::query_scalar(
+        "SELECT COALESCE((SELECT basis_point_xp FROM trait_bonus_accumulators
+         WHERE trait_id = 'reload'), 0)",
+    )
+    .fetch_one(&mut **transaction)
+    .await?;
+    let accumulated = previous + basis_point_xp;
+    let awarded_xp = accumulated / 10_000;
+    sqlx::query(
+        "INSERT INTO trait_bonus_accumulators (trait_id, basis_point_xp)
+         VALUES ('reload', ?)
+         ON CONFLICT(trait_id) DO UPDATE SET basis_point_xp = excluded.basis_point_xp",
+    )
+    .bind(accumulated % 10_000)
+    .execute(&mut **transaction)
+    .await?;
+    if awarded_xp > 0 {
+        sqlx::query(
+            "INSERT INTO xp_events (id, occurred_at, event_type, amount, source_event_id)
+             VALUES (?, ?, 'trait_bonus', ?, ?)",
+        )
+        .bind(Uuid::new_v4().to_string())
+        .bind(occurred_at)
+        .bind(awarded_xp)
+        .bind(format!("trait:reload:{local_date}"))
+        .execute(&mut **transaction)
+        .await?;
+        sqlx::query(
+            "UPDATE trait_daily_rewards SET xp_awarded = ?
+             WHERE trait_id = 'reload' AND local_date = ?",
+        )
+        .bind(awarded_xp)
+        .bind(&local_date)
+        .execute(&mut **transaction)
+        .await?;
+    }
+    Ok(awarded_xp)
 }
 
 fn configured_public_key() -> Result<VerifyingKey, String> {
@@ -347,5 +417,72 @@ mod tests {
             .unwrap();
         assert_eq!(awarded, 30);
         assert_eq!(amounts, vec![10, 20]);
+    }
+
+    #[tokio::test]
+    async fn reload_rewards_only_the_first_focus_milestone_of_each_day() {
+        let pool = SqlitePool::connect("sqlite::memory:").await.unwrap();
+        sqlx::migrate!("./migrations").run(&pool).await.unwrap();
+        sqlx::query("UPDATE character_traits SET level = 1 WHERE trait_id = 'reload'")
+            .execute(&pool)
+            .await
+            .unwrap();
+
+        let awards = [
+            ("focus:2026-08-04:1", "2026-08-04T12:00:00Z"),
+            ("focus:2026-08-04:2", "2026-08-04T12:20:00Z"),
+            ("focus:2026-08-05:1", "2026-08-05T12:00:00Z"),
+        ];
+        for (source, occurred_at) in awards {
+            let mut transaction = pool.begin().await.unwrap();
+            award_xp(&mut transaction, "focus_milestone", 10, source, occurred_at)
+                .await
+                .unwrap();
+            transaction.commit().await.unwrap();
+        }
+
+        let reload_claims: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM trait_daily_rewards")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        let trait_xp: i64 = sqlx::query_scalar(
+            "SELECT COALESCE(SUM(amount), 0) FROM xp_events WHERE event_type = 'trait_bonus'",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(reload_claims, 2);
+        assert_eq!(trait_xp, 1);
+    }
+
+    #[tokio::test]
+    async fn context_runner_adds_ai_xp_beyond_the_base_award() {
+        let pool = SqlitePool::connect("sqlite::memory:").await.unwrap();
+        sqlx::migrate!("./migrations").run(&pool).await.unwrap();
+        sqlx::query("UPDATE character_traits SET level = 20 WHERE trait_id = 'context-runner'")
+            .execute(&pool)
+            .await
+            .unwrap();
+
+        let mut transaction = pool.begin().await.unwrap();
+        let awarded = award_xp(
+            &mut transaction,
+            "ai_usage_milestone",
+            10,
+            "ai-xp:2026-08-10:codex:1",
+            "2026-08-14T12:00:00Z",
+        )
+        .await
+        .unwrap();
+        transaction.commit().await.unwrap();
+
+        let trait_xp: i64 = sqlx::query_scalar(
+            "SELECT COALESCE(SUM(amount), 0) FROM xp_events WHERE event_type = 'trait_bonus'",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(awarded, 11);
+        assert_eq!(trait_xp, 1);
     }
 }

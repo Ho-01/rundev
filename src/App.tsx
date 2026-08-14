@@ -190,7 +190,7 @@ function ProviderInlineDetails({
 }
 
 function AiWeeklyXpProgress({ progress }: { progress: AiWeeklyXp | null }) {
-  const maxXp = progress?.maxXp ?? 210;
+  const maxXp = progress?.maxXp ?? 500;
   const providers = [
     { id: "codex", label: "Codex", xp: progress?.codexXp ?? 0 },
     { id: "claude", label: "Claude", xp: progress?.claudeXp ?? 0 },
@@ -325,6 +325,7 @@ function GrowthSummary({
   xpForNextLevel,
   nextGoal,
   goalKind,
+  availableTraitPoints,
   onOpenTraits
 }: {
   level: number;
@@ -332,6 +333,7 @@ function GrowthSummary({
   xpForNextLevel: number;
   nextGoal: string;
   goalKind: "focus" | "keyboard";
+  availableTraitPoints: number;
   onOpenTraits: () => void;
 }) {
   const tier = getLevelTier(level);
@@ -340,10 +342,18 @@ function GrowthSummary({
   const adornmentLevel = tierAdornmentLevel(tier, level);
 
   return <section className={`growth-summary tier-${tier.id} adornment-${adornmentLevel}`} aria-label="레벨 성장">
-    <button type="button" className="growth-level" onClick={onOpenTraits} aria-label={`레벨 ${level} · ${tier.name} · 특성 열기`}>
+    <button type="button" className="growth-level" onClick={onOpenTraits} aria-label={`레벨 ${level} · ${tier.name} · 특성 열기${availableTraitPoints > 0 ? ` · 사용 가능 포인트 ${availableTraitPoints}` : ""}`}>
       <TierEmblem tier={tier} level={level} />
       <span className="growth-level-copy">
-        <span><span className="growth-tier-title"><strong>{tier.name}</strong><b>Lv. {level}</b></span><small>특성 보기 ›</small></span>
+        <span>
+          <span className="growth-tier-title"><strong>{tier.name}</strong><b>Lv. {level}</b></span>
+          <small className="growth-trait-link">
+            특성 보기 ›
+            {availableTraitPoints > 0
+              ? <i className="growth-trait-alert" title={`사용 가능한 특성 포인트 ${availableTraitPoints}개`} aria-hidden="true" />
+              : null}
+          </small>
+        </span>
         <span><b>{xpIntoLevel} / {xpForNextLevel} XP</b><small>다음 레벨까지 {remainingXp} XP</small></span>
         <Meter value={progress} />
       </span>
@@ -387,8 +397,8 @@ function EmblemShowcase() {
 const traitCopy: Record<TraitId, { name: string; description: string }> = {
   "focus-ready": { name: "몰입 준비", description: "집중시간 XP 획득량 증가" },
   "hot-keyboard": { name: "뜨거운 키보드", description: "키보드 XP 획득량 증가" },
-  reload: { name: "재장전", description: "키보드 보상 요구 횟수 감소" },
-  "context-runner": { name: "컨텍스트 러너", description: "AI 보상 요구 토큰량 감소" }
+  reload: { name: "재장전", description: "매일 첫 집중 20분에 활동 보너스" },
+  "context-runner": { name: "컨텍스트 러너", description: "AI XP 획득량 증가" }
 };
 
 function StatsPeriod({ title, stats }: { title: string; stats: ActivityStats | null }) {
@@ -516,24 +526,17 @@ function TraitDialog({ progress, onUpgrade, onClose }: { progress: TraitProgress
     if (id === "reload") return <RotateCcw size={18} />;
     return <Boxes size={18} />;
   };
-  const actualEffect = (id: TraitId, percent: number, nextPercent: number) => {
+  const actualEffect = (id: TraitId, value: number, nextValue: number) => {
     if (id === "reload") {
-      const current = Math.floor(2_000 * (1 - percent / 100));
-      const next = Math.floor(2_000 * (1 - nextPercent / 100));
-      return `${formatTokens(current)}회 → ${formatTokens(next)}회`;
+      return `활동일 +${value.toFixed(1)} → +${nextValue.toFixed(1)} XP`;
     }
-    if (id === "context-runner") {
-      const current = Math.floor(100_000 * (1 - percent / 100));
-      const next = Math.floor(100_000 * (1 - nextPercent / 100));
-      return `${formatCompactTokens(current)}/${formatCompactTokens(current * 2)}→${formatCompactTokens(next)}/${formatCompactTokens(next * 2)}`;
-    }
-    const current = 10 * (1 + percent / 100);
-    const next = 10 * (1 + nextPercent / 100);
+    const current = 10 * (1 + value / 100);
+    const next = 10 * (1 + nextValue / 100);
     return `${current.toFixed(2)} → ${next.toFixed(2)} XP`;
   };
   const actualLabel = (id: TraitId) => {
-    if (id === "reload") return "보상 간격";
-    if (id === "context-runner") return "Codex·Cursor / Claude";
+    if (id === "reload") return "매일 첫 집중 20분";
+    if (id === "context-runner") return "AI 보상 환산";
     return "보상 환산";
   };
   return <div className="dialog-backdrop trait-backdrop" role="presentation" onMouseDown={onClose}>
@@ -542,14 +545,14 @@ function TraitDialog({ progress, onUpgrade, onClose }: { progress: TraitProgress
       <div className="trait-board">{progress.traits.map((trait) => {
         const atMax = trait.level >= trait.maxLevel;
         const nextEffect = Math.min(trait.maxLevel, trait.level + 1) * 0.5;
-        return <article key={trait.id} className={`trait-card ${trait.id}${progress.availablePoints > 0 && !atMax ? " upgrade-ready" : ""}`}>
+        return <article key={trait.id} className={`trait-card ${trait.id}${progress.availablePoints >= trait.upgradeCost && !atMax ? " upgrade-ready" : ""}`}>
           <header><i>{iconFor(trait.id)}</i><span>Lv. {trait.level}<small>/ {trait.maxLevel}</small></span></header>
           <strong>{traitCopy[trait.id].name}</strong>
           <p>{traitCopy[trait.id].description}</p>
           <div className="trait-level-track"><i style={{ width: `${trait.level / trait.maxLevel * 100}%` }} /></div>
-          <div className="trait-effect"><b>{trait.effectPercent.toFixed(1)}%</b><span>{atMax ? "MAX" : `다음 ${nextEffect.toFixed(1)}%`}</span></div>
-          <div className="trait-actual"><span>{actualLabel(trait.id)}</span><b>{atMax ? "최대 효과" : actualEffect(trait.id, trait.effectPercent, nextEffect)}</b></div>
-          <button type="button" disabled={progress.availablePoints < 1 || atMax} onClick={() => onUpgrade(trait.id)} aria-label={`${traitCopy[trait.id].name} 강화`}>{atMax ? "최대 레벨" : <><Plus size={12}/> 강화</>}</button>
+          <div className="trait-effect"><b>{trait.effectValue.toFixed(1)}{trait.effectUnit === "percent" ? "%" : " XP"}</b><span>{atMax ? "MAX" : `다음 ${nextEffect.toFixed(1)}${trait.effectUnit === "percent" ? "%" : " XP"}`}</span></div>
+          <div className="trait-actual"><span>{actualLabel(trait.id)}</span><b>{atMax ? "최대 효과" : actualEffect(trait.id, trait.effectValue, nextEffect)}</b></div>
+          <button type="button" disabled={progress.availablePoints < trait.upgradeCost || atMax} onClick={() => onUpgrade(trait.id)} aria-label={`${traitCopy[trait.id].name} 강화`}>{atMax ? "최대 레벨" : <><Plus size={12}/> ◆ {trait.upgradeCost} 강화</>}</button>
         </article>;
       })}</div>
       <div className="dialog-actions"><button type="button" onClick={onClose}>닫기</button></div>
@@ -1357,6 +1360,7 @@ export function App() {
         xpForNextLevel={character?.xpForNextLevel ?? 100}
         nextGoal={nextGoal}
         goalKind={nextGoalKind}
+        availableTraitPoints={traitProgress?.availablePoints ?? 0}
         onOpenTraits={() => void openTraits()}
       />
 
