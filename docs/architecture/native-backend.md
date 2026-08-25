@@ -27,6 +27,8 @@ Updater는 GitHub Releases의 `latest.json`을 endpoint로 사용한다. 공개�
 
 ### `database`
 
+- SQLite WAL, `synchronous=NORMAL`, 10초 busy timeout과 단일 pooled connection 구성
+- 앱 내부 쓰기는 단일 연결에서 직렬화하고 외부 읽기는 WAL snapshot으로 분리
 - SQLite 연결 옵션과 migration 실행
 - `AppState`를 통한 pool 공유
 - DB 경로: OS별 Tauri app data directory의 `rundev.db`
@@ -51,6 +53,7 @@ Updater는 GitHub Releases의 `latest.json`을 endpoint로 사용한다. 공개�
 ### `keyboard`
 
 - Windows Raw Input 메시지 창과 macOS listen-only event tap 관리
+- Windows는 정렬된 `RAWINPUT` 버퍼만 사용하고 저수준 키보드 훅을 중복 등록하지 않음
 - 자동 반복과 단독 보조키 제외
 - 키 값이나 입력 순서를 보존하지 않고 횟수 신호만 일별로 저장
 - 2,000회 단위 XP 원장 기록과 `daily_activity_metrics` 갱신
@@ -220,6 +223,10 @@ Cursor 어댑터는 동의와 연동이 모두 활성화된 경우에만 로컬 
 
 백그라운드 주기는 300초다. 트레이에서 팝오버를 표시할 때는 60초 최소 간격과
 single-flight를 적용해 Codex와 Cursor를 병렬 갱신한다.
+
+트레이 애니메이션과 키보드 집계 타이머는 절전 중 놓친 tick을 복귀 후 재생하지 않고
+건너뛴다. 호스트 메트릭은 30초 이상의 wall-clock 공백을 절전 복귀로 간주해 CPU,
+네트워크, 디스크, 온도 소스를 다시 만들며 배터리 플랫폼 manager는 샘플마다 새로 연다.
 ## Claude Code 사용량 수집
 
 `adapters/claude.rs`는 루프백 주소의 OTLP/HTTP JSON 수집기를 실행한다. 사용자가

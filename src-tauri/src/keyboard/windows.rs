@@ -1,5 +1,5 @@
 use super::{set_status, KeyEvent, STATUS_ACTIVE, STATUS_ERROR};
-use std::{mem::size_of, sync::OnceLock};
+use std::{mem::size_of, mem::MaybeUninit, sync::OnceLock};
 use tokio::sync::mpsc::UnboundedSender;
 use windows::{
     core::w,
@@ -12,9 +12,8 @@ use windows::{
                 RAWINPUTHEADER, RIDEV_INPUTSINK, RID_INPUT, RIM_TYPEKEYBOARD,
             },
             WindowsAndMessaging::{
-                CallNextHookEx, CreateWindowExW, DefWindowProcW, DispatchMessageW, GetMessageW,
-                RegisterClassW, SetWindowsHookExW, TranslateMessage, UnhookWindowsHookEx,
-                HWND_MESSAGE, KBDLLHOOKSTRUCT, MSG, WH_KEYBOARD_LL, WINDOW_EX_STYLE, WINDOW_STYLE,
+                CreateWindowExW, DefWindowProcW, DispatchMessageW, GetMessageW, RegisterClassW,
+                TranslateMessage, HWND_MESSAGE, MSG, RIM_INPUT, WINDOW_EX_STYLE, WINDOW_STYLE,
                 WM_INPUT, WM_KEYDOWN, WM_KEYUP, WM_SYSKEYDOWN, WM_SYSKEYUP, WNDCLASSW,
             },
         },
@@ -83,15 +82,6 @@ unsafe fn run_message_window() -> Result<(), String> {
     };
     unsafe { RegisterRawInputDevices(&[keyboard], size_of::<RAWINPUTDEVICE>() as u32) }
         .map_err(|error| error.to_string())?;
-    let hook = unsafe {
-        SetWindowsHookExW(
-            WH_KEYBOARD_LL,
-            Some(low_level_keyboard_proc),
-            Some(instance),
-            0,
-        )
-    }
-    .map_err(|error| error.to_string())?;
 
     set_status(STATUS_ACTIVE);
     let mut message = MSG::default();
@@ -105,20 +95,7 @@ unsafe fn run_message_window() -> Result<(), String> {
             DispatchMessageW(&message);
         }
     }
-    let _ = unsafe { UnhookWindowsHookEx(hook) };
     Ok(())
-}
-
-unsafe extern "system" fn low_level_keyboard_proc(
-    code: i32,
-    wparam: WPARAM,
-    lparam: LPARAM,
-) -> LRESULT {
-    if code >= 0 {
-        let keyboard = unsafe { &*(lparam.0 as *const KBDLLHOOKSTRUCT) };
-        send_key_event(wparam.0 as u32, keyboard.vkCode);
-    }
-    unsafe { CallNextHookEx(None, code, wparam, lparam) }
 }
 
 unsafe extern "system" fn window_proc(
@@ -129,7 +106,13 @@ unsafe extern "system" fn window_proc(
 ) -> LRESULT {
     if message == WM_INPUT {
         unsafe { handle_raw_input(lparam) };
-        return LRESULT(0);
+        // Foreground raw input must still reach DefWindowProcW so Windows can release
+        // the HRAWINPUT resources associated with the message.
+        return if wparam.0 as u32 == RIM_INPUT {
+            unsafe { DefWindowProcW(window, message, wparam, lparam) }
+        } else {
+            LRESULT(0)
+        };
     }
     unsafe { DefWindowProcW(window, message, wparam, lparam) }
 }
@@ -144,21 +127,27 @@ unsafe fn handle_raw_input(lparam: LPARAM) {
         return;
     }
 
-    let mut buffer = vec![0_u8; size as usize];
-    if unsafe {
+    // This window registers only the keyboard usage page, whose payload is one RAWINPUT.
+    // A typed MaybeUninit keeps the output pointer correctly aligned for the Win32 API;
+    // Vec<u8> does not provide that contract when cast to RAWINPUT.
+    if size != size_of::<RAWINPUT>() as u32 {
+        return;
+    }
+    let mut raw = MaybeUninit::<RAWINPUT>::uninit();
+    let copied = unsafe {
         GetRawInputData(
             input,
             RID_INPUT,
-            Some(buffer.as_mut_ptr().cast()),
+            Some(raw.as_mut_ptr().cast()),
             &mut size,
             header_size,
         )
-    } == u32::MAX
-    {
+    };
+    if copied == u32::MAX || copied != size_of::<RAWINPUT>() as u32 {
         return;
     }
 
-    let raw = unsafe { &*(buffer.as_ptr().cast::<RAWINPUT>()) };
+    let raw = unsafe { raw.assume_init() };
     if raw.header.dwType != RIM_TYPEKEYBOARD.0 {
         return;
     }

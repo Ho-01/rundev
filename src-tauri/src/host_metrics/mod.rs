@@ -5,7 +5,7 @@ use std::sync::{
     Arc, Mutex, RwLock,
 };
 use std::thread;
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime};
 use sysinfo::{Components, Disks, Networks, RefreshKind, System};
 use tauri::{AppHandle, Emitter, Manager};
 
@@ -15,7 +15,7 @@ const DETAIL_INTERVAL: Duration = Duration::from_secs(1);
 const DISK_INTERVAL: Duration = Duration::from_secs(30);
 const BATTERY_INTERVAL: Duration = Duration::from_secs(15);
 const TEMP_INTERVAL: Duration = Duration::from_secs(5);
-const GAP_RESET: Duration = Duration::from_secs(5);
+const RESUME_GAP: Duration = Duration::from_secs(30);
 const EVENT_NAME: &str = "system-stats-updated";
 static SAMPLING_MODE: AtomicU8 = AtomicU8::new(0);
 
@@ -149,11 +149,11 @@ fn start_battery_thread(shared: Arc<Mutex<BatterySnapshot>>) {
     thread::Builder::new()
         .name("rundev-battery".into())
         .spawn(move || {
-            let Ok(manager) = battery::Manager::new() else {
-                return;
-            };
             loop {
-                let snapshot = sample_battery(&manager);
+                // The platform manager owns native power-service state. Recreate it for every
+                // sample so a sleep/wake cycle cannot leave RunDev using a stale IOKit or
+                // SetupAPI handle.
+                let snapshot = sample_battery();
                 if let Ok(mut guard) = shared.lock() {
                     *guard = snapshot;
                 }
@@ -163,7 +163,13 @@ fn start_battery_thread(shared: Arc<Mutex<BatterySnapshot>>) {
         .ok();
 }
 
-fn sample_battery(manager: &battery::Manager) -> BatterySnapshot {
+fn sample_battery() -> BatterySnapshot {
+    let Ok(manager) = battery::Manager::new() else {
+        return BatterySnapshot {
+            percent: None,
+            state: None,
+        };
+    };
     let Ok(batteries) = manager.batteries() else {
         return BatterySnapshot {
             percent: None,
@@ -212,16 +218,13 @@ fn run_sampler(
     latest: Arc<RwLock<SystemStats>>,
     battery: Arc<Mutex<BatterySnapshot>>,
 ) {
-    let mut system = System::new_with_specifics(
-        RefreshKind::nothing()
-            .with_cpu(sysinfo::CpuRefreshKind::everything())
-            .with_memory(sysinfo::MemoryRefreshKind::everything()),
-    );
+    let mut system = new_system_source();
     let mut networks = Networks::new_with_refreshed_list();
     let mut disks = Disks::new_with_refreshed_list();
     let mut components = Components::new_with_refreshed_list();
 
     let mut last_tick = Instant::now();
+    let mut last_wall_tick = SystemTime::now();
     let mut last_disk = Instant::now()
         .checked_sub(DISK_INTERVAL)
         .unwrap_or_else(Instant::now);
@@ -256,13 +259,31 @@ fn run_sampler(
         }
         let elapsed = now.saturating_duration_since(last_tick);
         last_tick = now;
+        let wall_now = SystemTime::now();
+        let wall_elapsed = wall_now
+            .duration_since(last_wall_tick)
+            .unwrap_or(Duration::ZERO);
+        last_wall_tick = wall_now;
 
-        let gap_reset = elapsed > GAP_RESET;
-        if gap_reset {
+        // Instant does not include suspended time on every supported OS. Wall time lets us
+        // detect both Windows resume and macOS lid-open after a long sleep.
+        let resumed = resume_gap_detected(wall_elapsed);
+        if resumed {
+            crate::diagnostics::record(
+                "host_metrics_resumed_after_gap",
+                &[("gap_seconds", wall_elapsed.as_secs().to_string())],
+            );
             cpu_warmed = false;
             network_ready = false;
-            system.refresh_cpu_usage();
-            networks.refresh(true);
+            system = new_system_source();
+            networks = Networks::new_with_refreshed_list();
+            disks = Disks::new_with_refreshed_list();
+            components = Components::new_with_refreshed_list();
+            disk = read_disk_snapshot(&disks);
+            temperature_celsius = read_temperature_celsius(&components);
+            temperature_max_celsius = temperature_celsius;
+            last_disk = now;
+            last_temp = now;
         }
 
         system.refresh_cpu_usage();
@@ -288,7 +309,7 @@ fn run_sampler(
             last_temp = now;
         }
 
-        let cpu_percent = if cpu_warmed && !gap_reset {
+        let cpu_percent = if cpu_warmed && !resumed {
             Some(system.global_cpu_usage().clamp(0.0, 100.0))
         } else {
             cpu_warmed = true;
@@ -302,7 +323,7 @@ fn run_sampler(
         let memory_percent =
             ((memory_used_bytes as f64 / total_memory) * 100.0).clamp(0.0, 100.0) as f32;
 
-        let (network_down_bps, network_up_bps) = if gap_reset || !network_ready {
+        let (network_down_bps, network_up_bps) = if resumed || !network_ready {
             network_ready = true;
             (None, None)
         } else {
@@ -355,6 +376,18 @@ fn run_sampler(
 
         next_sample = Instant::now() + sampling_interval(mode);
     }
+}
+
+fn new_system_source() -> System {
+    System::new_with_specifics(
+        RefreshKind::nothing()
+            .with_cpu(sysinfo::CpuRefreshKind::everything())
+            .with_memory(sysinfo::MemoryRefreshKind::everything()),
+    )
+}
+
+fn resume_gap_detected(elapsed: Duration) -> bool {
+    elapsed > RESUME_GAP
 }
 
 fn read_temperature_celsius(components: &Components) -> Option<f32> {
@@ -468,7 +501,7 @@ fn mount_matches(mount: &Path, target: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{mount_matches, sampling_interval};
+    use super::{mount_matches, resume_gap_detected, sampling_interval};
     use std::path::Path;
     use std::time::Duration;
 
@@ -477,6 +510,13 @@ mod tests {
         assert_eq!(sampling_interval(0), Duration::from_secs(10));
         assert_eq!(sampling_interval(1), Duration::from_secs(3));
         assert_eq!(sampling_interval(2), Duration::from_secs(1));
+    }
+
+    #[test]
+    fn detects_only_long_wall_clock_gaps_as_resume() {
+        assert!(!resume_gap_detected(Duration::from_secs(10)));
+        assert!(!resume_gap_detected(Duration::from_secs(30)));
+        assert!(resume_gap_detected(Duration::from_secs(31)));
     }
 
     #[test]

@@ -204,6 +204,7 @@ fn start_animation(app: tauri::AppHandle) {
         let mut cached_runner = u8::MAX;
         let mut decoded_frames = Vec::new();
         let mut ticker = tokio::time::interval(std::time::Duration::from_millis(170));
+        ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
         loop {
             ticker.tick().await;
             let selected_runner = SELECTED_RUNNER.load(Ordering::Relaxed);

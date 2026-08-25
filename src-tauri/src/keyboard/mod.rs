@@ -12,6 +12,7 @@ use std::{
 };
 use tauri::{AppHandle, Emitter};
 use tokio::sync::mpsc;
+use tokio::time::MissedTickBehavior;
 
 const PRESSES_PER_REWARD: i64 = 2_000;
 const XP_PER_REWARD: i64 = 10;
@@ -124,6 +125,8 @@ async fn process_events(
     let mut last_emitted = persisted;
     let mut ui_tick = tokio::time::interval(std::time::Duration::from_millis(250));
     let mut database_flush = tokio::time::interval(std::time::Duration::from_secs(5));
+    ui_tick.set_missed_tick_behavior(MissedTickBehavior::Skip);
+    database_flush.set_missed_tick_behavior(MissedTickBehavior::Skip);
     let mut first_event_recorded = false;
     let mut first_persist_recorded = false;
 
