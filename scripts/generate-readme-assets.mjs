@@ -87,6 +87,12 @@ try {
       name: "tier-emblems",
       query: "?emblemShowcase=1",
       viewport: { width: 920, height: 1040 }
+    },
+    {
+      name: "trait-bonuses",
+      query: "?traitShowcase=1",
+      viewport: { width: 920, height: 1040 },
+      fullPage: true
     }
   ]) {
     await page.setViewportSize(scenario.viewport ?? { width: 320, height: 520 });

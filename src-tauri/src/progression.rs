@@ -4,6 +4,9 @@ use sqlx::{Sqlite, SqlitePool, Transaction};
 use std::collections::HashMap;
 
 pub const TRAIT_MAX_LEVEL: i64 = 20;
+const TRAIT_PERCENT_BASIS_POINTS_PER_LEVEL: i64 = 500;
+const RELOAD_BASIS_POINT_XP_PER_LEVEL: i64 = 20_000;
+const EXAMPLE_BASE_REWARD_XP: f64 = 10.0;
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -11,6 +14,9 @@ pub struct TraitProgress {
     available_points: i64,
     earned_points: i64,
     spent_points: i64,
+    next_focus_reward_xp: i64,
+    next_keyboard_reward_xp: i64,
+    next_ai_reward_xp: i64,
     traits: Vec<TraitLevel>,
 }
 
@@ -21,7 +27,10 @@ pub struct TraitLevel {
     level: i64,
     max_level: i64,
     effect_value: f64,
+    next_effect_value: f64,
     effect_unit: &'static str,
+    example_reward_value: f64,
+    next_example_reward_value: f64,
     upgrade_cost: i64,
 }
 
@@ -65,10 +74,15 @@ pub async fn traits(pool: &SqlitePool) -> Result<TraitProgress, String> {
         .fetch_one(pool)
         .await
         .map_err(|error| error.to_string())?;
-    let rows: Vec<(String, i64)> = sqlx::query_as(
-        "SELECT trait_id, level FROM character_traits ORDER BY CASE trait_id
-         WHEN 'focus-ready' THEN 1 WHEN 'hot-keyboard' THEN 2
-         WHEN 'reload' THEN 3 ELSE 4 END",
+    let rows: Vec<(String, i64, i64)> = sqlx::query_as(
+        "SELECT traits.trait_id, traits.level,
+                COALESCE(accumulators.basis_point_xp, 0)
+         FROM character_traits traits
+         LEFT JOIN trait_bonus_accumulators accumulators
+           ON accumulators.trait_id = traits.trait_id
+         ORDER BY CASE traits.trait_id
+           WHEN 'focus-ready' THEN 1 WHEN 'hot-keyboard' THEN 2
+           WHEN 'reload' THEN 3 ELSE 4 END",
     )
     .fetch_all(pool)
     .await
@@ -78,27 +92,67 @@ pub async fn traits(pool: &SqlitePool) -> Result<TraitProgress, String> {
         .map(|row| trait_points_spent(row.1))
         .sum::<i64>();
     let earned_points = (character_level - 1).max(0);
+    let trait_snapshot = |trait_id: &str| {
+        rows.iter()
+            .find(|row| row.0 == trait_id)
+            .map(|row| (row.1, row.2))
+            .unwrap_or((0, 0))
+    };
+    let (focus_level, focus_accumulator) = trait_snapshot("focus-ready");
+    let (keyboard_level, keyboard_accumulator) = trait_snapshot("hot-keyboard");
+    let (ai_level, ai_accumulator) = trait_snapshot("context-runner");
+    let (reload_level, reload_accumulator) = trait_snapshot("reload");
+    let today = Local::now().date_naive().to_string();
+    let reload_claimed_today: bool = sqlx::query_scalar(
+        "SELECT EXISTS(
+           SELECT 1 FROM trait_daily_rewards
+           WHERE trait_id = 'reload' AND local_date = ?
+         )",
+    )
+    .bind(today)
+    .fetch_one(pool)
+    .await
+    .map_err(|error| error.to_string())?;
+    let next_reload_bonus = if reload_claimed_today {
+        0
+    } else {
+        next_reload_reward(reload_level, reload_accumulator)
+    };
     Ok(TraitProgress {
         available_points: (earned_points - spent_points).max(0),
         earned_points,
         spent_points,
+        next_focus_reward_xp: next_milestone_reward("focus-ready", focus_level, focus_accumulator)
+            + next_reload_bonus,
+        next_keyboard_reward_xp: next_milestone_reward(
+            "hot-keyboard",
+            keyboard_level,
+            keyboard_accumulator,
+        ),
+        next_ai_reward_xp: next_milestone_reward("context-runner", ai_level, ai_accumulator),
         traits: rows
             .into_iter()
-            .map(|(id, level)| TraitLevel {
-                effect_value: level as f64 * 0.5,
-                effect_unit: if id == "reload" {
-                    "xp-per-active-day"
-                } else {
-                    "percent"
-                },
-                upgrade_cost: if level >= TRAIT_MAX_LEVEL {
-                    0
-                } else {
-                    trait_upgrade_cost(level)
-                },
-                id,
-                level,
-                max_level: TRAIT_MAX_LEVEL,
+            .map(|(id, level, _accumulator)| {
+                let next_level = (level + 1).min(TRAIT_MAX_LEVEL);
+                TraitLevel {
+                    effect_value: trait_effect_value(&id, level),
+                    next_effect_value: trait_effect_value(&id, next_level),
+                    effect_unit: if id == "reload" {
+                        "xp-per-active-day"
+                    } else {
+                        "percent"
+                    },
+                    example_reward_value: trait_example_reward(&id, level),
+                    next_example_reward_value: trait_example_reward(&id, next_level),
+                    upgrade_cost: if level >= TRAIT_MAX_LEVEL {
+                        0
+                    } else {
+                        trait_upgrade_cost(level)
+                    },
+                    id,
+                    level,
+                    max_level: TRAIT_MAX_LEVEL,
+                }
             })
             .collect(),
     })
@@ -160,6 +214,44 @@ fn trait_upgrade_cost(current_level: i64) -> i64 {
 
 fn trait_points_spent(level: i64) -> i64 {
     (0..level).map(trait_upgrade_cost).sum()
+}
+
+pub(crate) fn trait_bonus_basis_points(trait_id: &str, level: i64) -> i64 {
+    if matches!(trait_id, "focus-ready" | "hot-keyboard" | "context-runner") {
+        level.clamp(0, TRAIT_MAX_LEVEL) * TRAIT_PERCENT_BASIS_POINTS_PER_LEVEL
+    } else {
+        0
+    }
+}
+
+pub(crate) fn reload_bonus_basis_point_xp(level: i64) -> i64 {
+    level.clamp(0, TRAIT_MAX_LEVEL) * RELOAD_BASIS_POINT_XP_PER_LEVEL
+}
+
+fn trait_effect_value(trait_id: &str, level: i64) -> f64 {
+    if trait_id == "reload" {
+        reload_bonus_basis_point_xp(level) as f64 / 10_000.0
+    } else {
+        trait_bonus_basis_points(trait_id, level) as f64 / 100.0
+    }
+}
+
+fn trait_example_reward(trait_id: &str, level: i64) -> f64 {
+    if trait_id == "reload" {
+        trait_effect_value(trait_id, level)
+    } else {
+        EXAMPLE_BASE_REWARD_XP * (1.0 + trait_effect_value(trait_id, level) / 100.0)
+    }
+}
+
+fn next_milestone_reward(trait_id: &str, level: i64, accumulated_basis_points: i64) -> i64 {
+    let next_bonus =
+        (accumulated_basis_points + 10 * trait_bonus_basis_points(trait_id, level)) / 10_000;
+    10 + next_bonus
+}
+
+fn next_reload_reward(level: i64, accumulated_basis_points: i64) -> i64 {
+    (accumulated_basis_points + reload_bonus_basis_point_xp(level)) / 10_000
 }
 
 pub async fn trait_level_in(
@@ -309,7 +401,11 @@ fn week_start(date: NaiveDate) -> NaiveDate {
 
 #[cfg(test)]
 mod tests {
-    use super::{trait_points_spent, trait_upgrade_cost, traits, upgrade};
+    use super::{
+        next_milestone_reward, next_reload_reward, reload_bonus_basis_point_xp,
+        trait_bonus_basis_points, trait_example_reward, trait_points_spent, trait_upgrade_cost,
+        traits, upgrade,
+    };
     use sqlx::SqlitePool;
 
     #[test]
@@ -330,6 +426,20 @@ mod tests {
         assert_eq!(trait_points_spent(20), 50);
     }
 
+    #[test]
+    fn level_sixteen_traits_have_material_rewards() {
+        assert_eq!(trait_bonus_basis_points("hot-keyboard", 16), 8_000);
+        assert_eq!(trait_example_reward("hot-keyboard", 16), 18.0);
+        assert_eq!(trait_example_reward("focus-ready", 20), 20.0);
+        assert_eq!(trait_example_reward("context-runner", 20), 20.0);
+        assert_eq!(reload_bonus_basis_point_xp(16), 320_000);
+        assert_eq!(trait_example_reward("reload", 16), 32.0);
+        assert_eq!(next_milestone_reward("hot-keyboard", 16, 0), 18);
+        assert_eq!(next_milestone_reward("focus-ready", 1, 0), 10);
+        assert_eq!(next_milestone_reward("focus-ready", 1, 5_000), 11);
+        assert_eq!(next_reload_reward(4, 0), 8);
+    }
+
     #[tokio::test]
     async fn grants_one_point_per_level_after_the_starting_level() {
         let pool = SqlitePool::connect("sqlite::memory:").await.unwrap();
@@ -347,5 +457,50 @@ mod tests {
         assert_eq!(progress.spent_points, 15);
         assert_eq!(progress.available_points, 0);
         assert!(upgrade(&pool, "focus-ready").await.is_err());
+    }
+
+    #[tokio::test]
+    async fn reports_the_exact_next_rewards_from_accumulators_and_daily_reload_state() {
+        let pool = SqlitePool::connect("sqlite::memory:").await.unwrap();
+        sqlx::migrate!("./migrations").run(&pool).await.unwrap();
+        for (trait_id, level) in [
+            ("focus-ready", 1),
+            ("hot-keyboard", 16),
+            ("reload", 4),
+            ("context-runner", 2),
+        ] {
+            sqlx::query("UPDATE character_traits SET level = ? WHERE trait_id = ?")
+                .bind(level)
+                .bind(trait_id)
+                .execute(&pool)
+                .await
+                .unwrap();
+        }
+        sqlx::query(
+            "INSERT INTO trait_bonus_accumulators (trait_id, basis_point_xp)
+             VALUES ('focus-ready', 5000)",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        let progress = traits(&pool).await.unwrap();
+        assert_eq!(progress.next_focus_reward_xp, 19);
+        assert_eq!(progress.next_keyboard_reward_xp, 18);
+        assert_eq!(progress.next_ai_reward_xp, 11);
+
+        let today = chrono::Local::now().date_naive().to_string();
+        sqlx::query(
+            "INSERT INTO trait_daily_rewards
+             (trait_id, local_date, awarded_at, basis_point_xp, xp_awarded)
+             VALUES ('reload', ?, ?, 80000, 8)",
+        )
+        .bind(today)
+        .bind(chrono::Utc::now().to_rfc3339())
+        .execute(&pool)
+        .await
+        .unwrap();
+        let after_reload = traits(&pool).await.unwrap();
+        assert_eq!(after_reload.next_focus_reward_xp, 11);
     }
 }

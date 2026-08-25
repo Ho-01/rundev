@@ -2,6 +2,7 @@
 
 - 상태: Accepted
 - 날짜: 2026-08-14
+- 효과 수치 대체: [ADR 0040](0040-trait-reward-rebalance.md)
 
 ## 맥락
 

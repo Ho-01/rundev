@@ -110,6 +110,10 @@ function formatDuration(seconds: number) {
   return `${hours}시간 ${minutes}분`;
 }
 
+function formatRewardXp(value: number) {
+  return `+${value} XP`;
+}
+
 function formatBoostRemaining(milliseconds: number) {
   const totalMinutes = Math.max(0, Math.ceil(milliseconds / 60_000));
   if (totalMinutes >= 24 * 60) {
@@ -189,7 +193,7 @@ function ProviderInlineDetails({
   );
 }
 
-function AiWeeklyXpProgress({ progress }: { progress: AiWeeklyXp | null }) {
+function AiWeeklyXpProgress({ progress, nextRewardXp }: { progress: AiWeeklyXp | null; nextRewardXp: number }) {
   const maxXp = progress?.maxXp ?? 500;
   const providers = [
     { id: "codex", label: "Codex", xp: progress?.codexXp ?? 0 },
@@ -204,7 +208,7 @@ function AiWeeklyXpProgress({ progress }: { progress: AiWeeklyXp | null }) {
           <strong>이번 주 AI 토큰 사용 XP</strong>
           <span className="reward-rule">
             <BadgeCheck size={11} />
-            사용량 마일스톤마다 <b>+10 XP</b>
+            사용량 마일스톤마다 <b>{formatRewardXp(nextRewardXp)}</b>
           </span>
         </div>
         <b>{progress?.earnedXp ?? 0} / {maxXp} XP</b>
@@ -324,6 +328,7 @@ function GrowthSummary({
   xpIntoLevel,
   xpForNextLevel,
   nextGoal,
+  nextGoalRewardXp,
   goalKind,
   availableTraitPoints,
   onOpenTraits
@@ -332,6 +337,7 @@ function GrowthSummary({
   xpIntoLevel: number;
   xpForNextLevel: number;
   nextGoal: string;
+  nextGoalRewardXp: number;
   goalKind: "focus" | "keyboard";
   availableTraitPoints: number;
   onOpenTraits: () => void;
@@ -361,7 +367,7 @@ function GrowthSummary({
     <div className="growth-next-goal">
       <i>{goalKind === "keyboard" ? <Keyboard size={12} aria-hidden="true" /> : <Target size={12} aria-hidden="true" />}</i>
       <span><small>다음 목표</small>{nextGoal}</span>
-      <b>+10 XP</b>
+      <b>{formatRewardXp(nextGoalRewardXp)}</b>
     </div>
   </section>;
 }
@@ -400,6 +406,39 @@ const traitCopy: Record<TraitId, { name: string; description: string }> = {
   reload: { name: "재장전", description: "매일 첫 집중 20분에 활동 보너스" },
   "context-runner": { name: "컨텍스트 러너", description: "AI XP 획득량 증가" }
 };
+
+function TraitShowcase() {
+  const levels = Array.from({ length: 20 }, (_, index) => index + 1);
+  const columns: Array<{ id: TraitId; kicker: string }> = [
+    { id: "focus-ready", kicker: "집중 마일스톤" },
+    { id: "hot-keyboard", kicker: "키보드 마일스톤" },
+    { id: "reload", kicker: "활동일 1회" },
+    { id: "context-runner", kicker: "AI 마일스톤" }
+  ];
+  return <main className="trait-showcase">
+    <header>
+      <span>RunDev Trait System</span>
+      <h1>개발자 특성 보너스</h1>
+      <p>전문화할수록 활동 보상이 확실하게 성장합니다.</p>
+    </header>
+    <section className="trait-showcase-table">
+      <div className="trait-showcase-head"><b>레벨</b>{columns.map(({ id, kicker }) => <div key={id} className={id}><strong>{traitCopy[id].name}</strong><span>{kicker}</span></div>)}</div>
+      {levels.map((level) => <div key={level} className={`trait-showcase-row${level % 5 === 0 ? " milestone" : ""}`}>
+        <b>Lv. {level}</b>
+        {columns.map(({ id }) => {
+          const reload = id === "reload";
+          const effect = reload ? level * 2 : level * 5;
+          const reward = reload ? effect : 10 * (1 + effect / 100);
+          return <div key={id} className={id}>
+            <strong>+{effect}{reload ? " XP" : "%"}</strong>
+            <span>{reload ? `첫 집중 +${reward} XP` : `10 → ${reward.toFixed(1)} XP`}</span>
+          </div>;
+        })}
+      </div>)}
+    </section>
+    <footer>특성 하나의 최대 레벨은 20 · 기본 마일스톤 보상은 10 XP</footer>
+  </main>;
+}
 
 function StatsPeriod({ title, stats }: { title: string; stats: ActivityStats | null }) {
   const maxSeconds = Math.max(1, ...(stats?.hourly.map((slot) => slot.activeSeconds) ?? [1]));
@@ -526,32 +565,33 @@ function TraitDialog({ progress, onUpgrade, onClose }: { progress: TraitProgress
     if (id === "reload") return <RotateCcw size={18} />;
     return <Boxes size={18} />;
   };
-  const actualEffect = (id: TraitId, value: number, nextValue: number) => {
-    if (id === "reload") {
-      return `활동일 +${value.toFixed(1)} → +${nextValue.toFixed(1)} XP`;
+  const actualEffect = (trait: TraitProgress["traits"][number], atMax: boolean) => {
+    if (trait.id === "reload") {
+      return atMax
+        ? `활동일 +${trait.exampleRewardValue.toFixed(0)} XP`
+        : `활동일 +${trait.exampleRewardValue.toFixed(0)} → +${trait.nextExampleRewardValue.toFixed(0)} XP`;
     }
-    const current = 10 * (1 + value / 100);
-    const next = 10 * (1 + nextValue / 100);
-    return `${current.toFixed(2)} → ${next.toFixed(2)} XP`;
+    return atMax
+      ? `10 → ${trait.exampleRewardValue.toFixed(1)} XP`
+      : `${trait.exampleRewardValue.toFixed(1)} → ${trait.nextExampleRewardValue.toFixed(1)} XP`;
   };
   const actualLabel = (id: TraitId) => {
     if (id === "reload") return "매일 첫 집중 20분";
-    if (id === "context-runner") return "AI 보상 환산";
-    return "보상 환산";
+    if (id === "context-runner") return "AI 평균 보상 환산";
+    return "평균 보상 환산";
   };
   return <div className="dialog-backdrop trait-backdrop" role="presentation" onMouseDown={onClose}>
     <section className="account-dialog trait-dialog" role="dialog" aria-modal="true" aria-label="개발자 특성" onMouseDown={(event) => event.stopPropagation()}>
       <header className="trait-dialog-heading"><div><strong>개발자 특성</strong><span>나만의 개발 스타일을 강화하세요</span></div><div className="trait-points"><span>사용 가능</span><b>◆ {progress.availablePoints}</b></div></header>
       <div className="trait-board">{progress.traits.map((trait) => {
         const atMax = trait.level >= trait.maxLevel;
-        const nextEffect = Math.min(trait.maxLevel, trait.level + 1) * 0.5;
         return <article key={trait.id} className={`trait-card ${trait.id}${progress.availablePoints >= trait.upgradeCost && !atMax ? " upgrade-ready" : ""}`}>
           <header><i>{iconFor(trait.id)}</i><span>Lv. {trait.level}<small>/ {trait.maxLevel}</small></span></header>
           <strong>{traitCopy[trait.id].name}</strong>
           <p>{traitCopy[trait.id].description}</p>
           <div className="trait-level-track"><i style={{ width: `${trait.level / trait.maxLevel * 100}%` }} /></div>
-          <div className="trait-effect"><b>{trait.effectValue.toFixed(1)}{trait.effectUnit === "percent" ? "%" : " XP"}</b><span>{atMax ? "MAX" : `다음 ${nextEffect.toFixed(1)}${trait.effectUnit === "percent" ? "%" : " XP"}`}</span></div>
-          <div className="trait-actual"><span>{actualLabel(trait.id)}</span><b>{atMax ? "최대 효과" : actualEffect(trait.id, trait.effectValue, nextEffect)}</b></div>
+          <div className="trait-effect"><b>{trait.effectValue.toFixed(1)}{trait.effectUnit === "percent" ? "%" : " XP"}</b><span>{atMax ? "MAX" : `다음 ${trait.nextEffectValue.toFixed(1)}${trait.effectUnit === "percent" ? "%" : " XP"}`}</span></div>
+          <div className="trait-actual"><span>{actualLabel(trait.id)}</span><b>{actualEffect(trait, atMax)}</b></div>
           <button type="button" disabled={progress.availablePoints < trait.upgradeCost || atMax} onClick={() => onUpgrade(trait.id)} aria-label={`${traitCopy[trait.id].name} 강화`}>{atMax ? "최대 레벨" : <><Plus size={12}/> ◆ {trait.upgradeCost} 강화</>}</button>
         </article>;
       })}</div>
@@ -652,6 +692,7 @@ export function App() {
   const showXpPreview = new URLSearchParams(window.location.search).has("showXpFx");
   const showLevelShowcase = new URLSearchParams(window.location.search).has("levelShowcase");
   const showEmblemShowcase = new URLSearchParams(window.location.search).has("emblemShowcase");
+  const showTraitShowcase = new URLSearchParams(window.location.search).has("traitShowcase");
   const {
     summary,
     focus,
@@ -966,7 +1007,15 @@ export function App() {
 
   useEffect(() => {
     void getTraitProgress().then(setTraitProgress).catch(() => {});
-  }, [character?.level]);
+  }, [character?.totalXp]);
+
+  useEffect(() => {
+    if (!mainWindowActive) return;
+    const timer = window.setInterval(() => {
+      void getTraitProgress().then(setTraitProgress).catch(() => {});
+    }, 60_000);
+    return () => window.clearInterval(timer);
+  }, [mainWindowActive]);
 
   useEffect(() => {
     const totalXp = character?.totalXp;
@@ -1099,6 +1148,18 @@ export function App() {
   const nextGoal = nextGoalKind === "keyboard"
     ? `키보드 ${formatTokens(keyboardRemaining)}회 더 입력하기`
     : `${formatRemainingMinutes(focusRewardRemaining)} 더 집중하기`;
+  const boostMultiplier = xpBoost?.active
+    && xpBoost.multiplier
+    && (!xpBoost.endsAt || new Date(xpBoost.endsAt).getTime() > boostClock)
+    ? xpBoost.multiplier
+    : 1;
+  const boostBonusXp = 10 * (boostMultiplier - 1);
+  const nextFocusRewardXp = (traitProgress?.nextFocusRewardXp ?? 10) + boostBonusXp;
+  const nextKeyboardRewardXp = (traitProgress?.nextKeyboardRewardXp ?? 10) + boostBonusXp;
+  const nextAiRewardXp = (traitProgress?.nextAiRewardXp ?? 10) + boostBonusXp;
+  const nextGoalRewardXp = nextGoalKind === "keyboard"
+    ? nextKeyboardRewardXp
+    : nextFocusRewardXp;
   const hasUsageDetails =
     aiUsage?.status !== "disconnected" ||
     claudeUsage?.status !== "disconnected" ||
@@ -1132,6 +1193,9 @@ export function App() {
   }
   if (showEmblemShowcase) {
     return <EmblemShowcase />;
+  }
+  if (showTraitShowcase) {
+    return <TraitShowcase />;
   }
 
   function panelTransitionDuration() {
@@ -1372,6 +1436,7 @@ export function App() {
         xpIntoLevel={character?.xpIntoLevel ?? 0}
         xpForNextLevel={character?.xpForNextLevel ?? 100}
         nextGoal={nextGoal}
+        nextGoalRewardXp={nextGoalRewardXp}
         goalKind={nextGoalKind}
         availableTraitPoints={traitProgress?.availablePoints ?? 0}
         onOpenTraits={() => void openTraits()}
@@ -1393,13 +1458,13 @@ export function App() {
             <span><Clock3 size={13} />개발 시간</span>
             <strong>{formatDuration(summary?.activeSeconds ?? 0)}</strong>
             <Meter value={focusRewardProgress} />
-            <small>+10 XP까지 {formatRemainingMinutes(focusRewardRemaining)}</small>
+            <small>{formatRewardXp(nextFocusRewardXp)}까지 {formatRemainingMinutes(focusRewardRemaining)}</small>
           </div>
           <div className="activity-metric">
             <span><Keyboard size={13} />키 입력</span>
             <strong>{formatTokens(keyboard?.pressCount ?? 0)}회</strong>
             <Meter value={keyboardProgress} />
-            <small>+10 XP까지 {formatTokens(keyboardRemaining)}회</small>
+            <small>{formatRewardXp(nextKeyboardRewardXp)}까지 {formatTokens(keyboardRemaining)}회</small>
           </div>
         </div>
         <details className="focus-apps">
@@ -1424,7 +1489,7 @@ export function App() {
         <div className="reward-cycle-summary">
           <span className="reward-rule">
             <BadgeCheck size={11} />
-            20분마다 <b>+10 XP</b>
+            20분마다 <b>{formatRewardXp(nextFocusRewardXp)}</b>
           </span>
           <strong>오늘 {focusRewardCount}회 달성</strong>
         </div>
@@ -1469,7 +1534,7 @@ export function App() {
             <div className="reward-cycle-summary keyboard-reward-summary">
               <span className="reward-rule">
                 <BadgeCheck size={11} />
-                {formatTokens(keyboardRewardInterval)}회마다 <b>+10 XP</b>
+                {formatTokens(keyboardRewardInterval)}회마다 <b>{formatRewardXp(nextKeyboardRewardXp)}</b>
               </span>
               <strong>오늘 {keyboardRewardCount}회 달성</strong>
             </div>
@@ -1740,7 +1805,7 @@ export function App() {
             )}
           </ProviderInlineDetails>
         </details>
-        <AiWeeklyXpProgress progress={aiWeeklyXp} />
+        <AiWeeklyXpProgress progress={aiWeeklyXp} nextRewardXp={nextAiRewardXp} />
       </section>
 
       {loading && <div className="loading-line" />}

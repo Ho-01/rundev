@@ -538,11 +538,14 @@ export async function getTraitProgress(): Promise<TraitProgress> {
       availablePoints: 3,
       earnedPoints: 4,
       spentPoints: 1,
+      nextFocusRewardXp: 10,
+      nextKeyboardRewardXp: 10,
+      nextAiRewardXp: 10,
       traits: [
-        { id: "focus-ready", level: 1, maxLevel: 20, effectValue: 0.5, effectUnit: "percent", upgradeCost: 1 },
-        { id: "hot-keyboard", level: 0, maxLevel: 20, effectValue: 0, effectUnit: "percent", upgradeCost: 1 },
-        { id: "reload", level: 0, maxLevel: 20, effectValue: 0, effectUnit: "xp-per-active-day", upgradeCost: 1 },
-        { id: "context-runner", level: 0, maxLevel: 20, effectValue: 0, effectUnit: "percent", upgradeCost: 1 }
+        { id: "focus-ready", level: 1, maxLevel: 20, effectValue: 5, nextEffectValue: 10, effectUnit: "percent", exampleRewardValue: 10.5, nextExampleRewardValue: 11, upgradeCost: 1 },
+        { id: "hot-keyboard", level: 0, maxLevel: 20, effectValue: 0, nextEffectValue: 5, effectUnit: "percent", exampleRewardValue: 10, nextExampleRewardValue: 10.5, upgradeCost: 1 },
+        { id: "reload", level: 0, maxLevel: 20, effectValue: 0, nextEffectValue: 2, effectUnit: "xp-per-active-day", exampleRewardValue: 0, nextExampleRewardValue: 2, upgradeCost: 1 },
+        { id: "context-runner", level: 0, maxLevel: 20, effectValue: 0, nextEffectValue: 5, effectUnit: "percent", exampleRewardValue: 10, nextExampleRewardValue: 10.5, upgradeCost: 1 }
       ]
     };
   }

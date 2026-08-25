@@ -178,7 +178,8 @@ pub async fn award_xp(
             let previous: i64 = sqlx::query_scalar(
                 "SELECT COALESCE((SELECT basis_point_xp FROM trait_bonus_accumulators WHERE trait_id = ?), 0)",
             ).bind(trait_id).fetch_one(&mut **transaction).await?;
-            let accumulated = previous + amount * level * 50;
+            let accumulated =
+                previous + amount * crate::progression::trait_bonus_basis_points(trait_id, level);
             trait_bonus = accumulated / 10_000;
             sqlx::query(
                 "INSERT INTO trait_bonus_accumulators (trait_id, basis_point_xp) VALUES (?, ?)
@@ -230,7 +231,7 @@ async fn award_reload_daily_bonus(
         return Ok(0);
     };
     let local_date = parsed.with_timezone(&Local).date_naive().to_string();
-    let basis_point_xp = level * 5_000;
+    let basis_point_xp = crate::progression::reload_bonus_basis_point_xp(level);
     let inserted = sqlx::query(
         "INSERT OR IGNORE INTO trait_daily_rewards
          (trait_id, local_date, awarded_at, basis_point_xp, xp_awarded)
@@ -452,7 +453,7 @@ mod tests {
         .await
         .unwrap();
         assert_eq!(reload_claims, 2);
-        assert_eq!(trait_xp, 1);
+        assert_eq!(trait_xp, 4);
     }
 
     #[tokio::test]
@@ -482,7 +483,7 @@ mod tests {
         .fetch_one(&pool)
         .await
         .unwrap();
-        assert_eq!(awarded, 11);
-        assert_eq!(trait_xp, 1);
+        assert_eq!(awarded, 20);
+        assert_eq!(trait_xp, 10);
     }
 }

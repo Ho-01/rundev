@@ -255,3 +255,9 @@ React는 계산이나 DB 접근을 하지 않고 동기화 command가 반환한 
 `trait_bonus_accumulators`에 저장한다. 재장전의 날짜별 지급 여부는
 `trait_daily_rewards`로 중복을 막는다. 실제 추가 XP는 기존 `xp_events` 원장과
 `character_state`를 함께 갱신한다.
+
+반복형 특성의 보너스는 레벨당 500 basis point(5%)이며, 재장전은 활동일의 첫 집중
+마일스톤에 레벨당 20,000 basis-point XP(2 XP)를 지급한다. Rust가 현재·다음 효과와
+10 XP 마일스톤 환산값을 함께 반환하고 React는 이 값을 그대로 표시한다. 다음 보상
+안내에는 특성별 소수 XP 잔여분과 당일 재장전 지급 여부를 반영한 정수 지급량도
+포함한다.

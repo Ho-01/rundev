@@ -41,7 +41,8 @@ ADR은 이미 내려진 중요한 기술 결정을 기록한다. 결정이 바�
 | [0036](0036-character-skin-collection.md) | 로컬 집중 마일스톤 기반 캐릭터 스킨 컬렉션 | Accepted |
 | [0037](0037-trait-economy-and-ai-xp-rebalance.md) | 특성 포인트 경제와 AI XP 재조정 | Accepted |
 | [0038](0038-adaptive-tray-popover-size.md) | 세로형 적응식 트레이 팝오버 크기 | Accepted |
-| [0039](0039-sqlite-wal-and-windows-raw-input-safety.md) | SQLite 쓰기 직렬화와 Windows Raw Input 안전성 | Accepted |
+| [0039](0039-sqlite-wal-and-windows-raw-input-safety.md) | 장시간 실행의 DB, 네이티브 입력, 절전 복귀 안전성 | Accepted |
+| [0040](0040-trait-reward-rebalance.md) | 특성 보상 체감 상향과 표시값 단일화 | Accepted |
 
 ## 새 ADR 작성 형식
 

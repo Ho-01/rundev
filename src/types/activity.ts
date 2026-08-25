@@ -142,12 +142,18 @@ export type TraitProgress = {
   availablePoints: number;
   earnedPoints: number;
   spentPoints: number;
+  nextFocusRewardXp: number;
+  nextKeyboardRewardXp: number;
+  nextAiRewardXp: number;
   traits: Array<{
     id: TraitId;
     level: number;
     maxLevel: number;
     effectValue: number;
+    nextEffectValue: number;
     effectUnit: "percent" | "xp-per-active-day";
+    exampleRewardValue: number;
+    nextExampleRewardValue: number;
     upgradeCost: number;
   }>;
 };
