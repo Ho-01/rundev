@@ -1,5 +1,7 @@
 # 0014. 로컬 호스트 지표의 표시 전용 수집
 
+> 배터리 수집 API와 주기는 [ADR 0041](0041-native-sampler-and-crash-diagnostics.md)에서 대체했다.
+
 - 상태: Accepted
 - 날짜: 2026-07-29
 

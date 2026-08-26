@@ -200,13 +200,41 @@ pub(crate) fn set_roaming(checked: bool) {
 
 fn start_animation(app: tauri::AppHandle) {
     tauri::async_runtime::spawn(async move {
+        const ACTIVE_FRAME_INTERVAL: std::time::Duration = std::time::Duration::from_millis(170);
+        const BACKGROUND_FRAME_INTERVAL: std::time::Duration =
+            std::time::Duration::from_millis(850);
+        const RESUME_GAP: std::time::Duration = std::time::Duration::from_secs(30);
+
         let mut frame_index = 0;
         let mut cached_runner = u8::MAX;
         let mut decoded_frames = Vec::new();
-        let mut ticker = tokio::time::interval(std::time::Duration::from_millis(170));
-        ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+        let mut last_wall_tick = std::time::SystemTime::now();
         loop {
-            ticker.tick().await;
+            let main_visible = app
+                .get_webview_window("main")
+                .and_then(|window| window.is_visible().ok())
+                .unwrap_or(false);
+            tokio::time::sleep(if main_visible {
+                ACTIVE_FRAME_INTERVAL
+            } else {
+                BACKGROUND_FRAME_INTERVAL
+            })
+            .await;
+
+            let wall_now = std::time::SystemTime::now();
+            let wall_elapsed = wall_now
+                .duration_since(last_wall_tick)
+                .unwrap_or(std::time::Duration::ZERO);
+            last_wall_tick = wall_now;
+            if wall_elapsed > RESUME_GAP {
+                crate::diagnostics::record(
+                    "tray_animation_resumed_after_gap",
+                    &[("gap_seconds", wall_elapsed.as_secs().to_string())],
+                );
+                crate::diagnostics::heartbeat("tray");
+                continue;
+            }
+
             let selected_runner = SELECTED_RUNNER.load(Ordering::Relaxed);
             if selected_runner != cached_runner {
                 decoded_frames = selected_frames()
@@ -221,7 +249,12 @@ fn start_animation(app: tauri::AppHandle) {
             }
             frame_index = (frame_index + 1) % decoded_frames.len();
             if let Some(tray) = app.tray_by_id("rundev-tray") {
-                let _ = tray.set_icon(Some(decoded_frames[frame_index].clone()));
+                if tray
+                    .set_icon(Some(decoded_frames[frame_index].clone()))
+                    .is_ok()
+                {
+                    crate::diagnostics::heartbeat("tray");
+                }
             }
         }
     });

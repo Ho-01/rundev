@@ -43,6 +43,7 @@ ADR은 이미 내려진 중요한 기술 결정을 기록한다. 결정이 바�
 | [0038](0038-adaptive-tray-popover-size.md) | 세로형 적응식 트레이 팝오버 크기 | Accepted |
 | [0039](0039-sqlite-wal-and-windows-raw-input-safety.md) | 장시간 실행의 DB, 네이티브 입력, 절전 복귀 안전성 | Accepted |
 | [0040](0040-trait-reward-rebalance.md) | 특성 보상 체감 상향과 표시값 단일화 | Accepted |
+| [0041](0041-native-sampler-and-crash-diagnostics.md) | 네이티브 샘플러와 크래시 진단 안전성 | Accepted |
 
 ## 새 ADR 작성 형식
 

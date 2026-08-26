@@ -177,6 +177,7 @@ async fn process_events(
                 }
             }
             _ = ui_tick.tick() => {
+                crate::diagnostics::heartbeat("keyboard");
                 let projected = persisted + pending;
                 if projected != last_emitted {
                     last_emitted = projected;

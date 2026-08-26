@@ -75,6 +75,7 @@ async fn run(pool: SqlitePool, app: AppHandle) {
 
     loop {
         interval.tick().await;
+        crate::diagnostics::heartbeat("activity");
         let snapshot = platform_snapshot();
         let rundev_is_foreground = snapshot
             .app_identifier

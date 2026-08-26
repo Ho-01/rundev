@@ -26,7 +26,7 @@ pub fn run() {
         )
         .init();
 
-    tauri::Builder::default()
+    let app = tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             tray::show_main_window(app);
         }))
@@ -182,6 +182,16 @@ pub fn run() {
             commands::upgrade_trait,
             commands::get_activity_stats
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running RunDev");
+        .build(tauri::generate_context!())
+        .expect("error while building RunDev");
+
+    app.run(|_, event| match event {
+        tauri::RunEvent::Ready => diagnostics::heartbeat("app"),
+        tauri::RunEvent::Resumed => {
+            diagnostics::record("app_event_loop_resumed", &[]);
+            diagnostics::heartbeat("app");
+        }
+        tauri::RunEvent::Exit => diagnostics::mark_clean_exit(),
+        _ => {}
+    });
 }

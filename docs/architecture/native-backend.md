@@ -47,6 +47,12 @@ Updater는 GitHub Releases의 `latest.json`을 endpoint로 사용한다. 공개�
 - 앱 데이터 디렉터리의 `diagnostics/rundev-diagnostics.jsonl`에 명시적으로 허용한
   진단 이벤트만 기록
 - 1 MiB 단위 회전과 현재 파일 포함 최근 3개 유지
+- 30초 runtime heartbeat와 activity, keyboard, host metrics, battery, tray의 마지막 정상
+  시각을 `runtime-state.json`에 기록하고 정상 종료 시 clean 상태로 전환
+- 다음 시작에서 이전 running state를 `previous-runtime-state.json`으로 보존하고 개발 중
+  자동 재시작과 장시간 뒤 비정상 종료를 구분
+- Windows 치명 예외는 스택 포인터만 남기는 필터 덤프를 최근 2개까지 로컬 보관하고,
+  macOS는 운영체제 DiagnosticReports의 `.ips`를 사용
 - 키 값, 입력 순서, 창 제목, 파일 경로, 프롬프트, 응답, 계정·인증정보 기록 금지
 - 자동 전송 없이 `open_diagnostics_folder` command로 사용자가 직접 폴더를 열어 공유
 
@@ -225,8 +231,10 @@ Cursor 어댑터는 동의와 연동이 모두 활성화된 경우에만 로컬 
 single-flight를 적용해 Codex와 Cursor를 병렬 갱신한다.
 
 트레이 애니메이션과 키보드 집계 타이머는 절전 중 놓친 tick을 복귀 후 재생하지 않고
-건너뛴다. 호스트 메트릭은 30초 이상의 wall-clock 공백을 절전 복귀로 간주해 CPU,
-네트워크, 디스크, 온도 소스를 다시 만들며 배터리 플랫폼 manager는 샘플마다 새로 연다.
+건너뛴다. 트레이 팝오버가 숨겨진 동안 아이콘 갱신은 850ms로 낮추며 30초 이상의
+wall-clock 공백 직후 첫 아이콘 교체도 건너뛴다. 호스트 메트릭은 같은 공백을 절전
+복귀로 간주해 CPU, 네트워크, 디스크, 온도 소스를 다시 만든다. 배터리는 60초마다
+Windows `GetSystemPowerStatus` 또는 격리된 macOS `pmset -g batt` 결과로 갱신한다.
 ## Claude Code 사용량 수집
 
 `adapters/claude.rs`는 루프백 주소의 OTLP/HTTP JSON 수집기를 실행한다. 사용자가

@@ -1,5 +1,7 @@
 # 0039. 장시간 실행의 DB, 네이티브 입력, 절전 복귀 안전성
 
+> 배터리 manager 수명주기 결정은 [ADR 0041](0041-native-sampler-and-crash-diagnostics.md)에서 대체했다.
+
 - 상태: Accepted
 - 날짜: 2026-08-19
 

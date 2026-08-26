@@ -1,3 +1,5 @@
+mod battery;
+
 use serde::Serialize;
 use std::path::Path;
 use std::sync::{
@@ -13,7 +15,7 @@ const BACKGROUND_INTERVAL: Duration = Duration::from_secs(10);
 const SUMMARY_INTERVAL: Duration = Duration::from_secs(3);
 const DETAIL_INTERVAL: Duration = Duration::from_secs(1);
 const DISK_INTERVAL: Duration = Duration::from_secs(30);
-const BATTERY_INTERVAL: Duration = Duration::from_secs(15);
+const BATTERY_INTERVAL: Duration = Duration::from_secs(60);
 const TEMP_INTERVAL: Duration = Duration::from_secs(5);
 const RESUME_GAP: Duration = Duration::from_secs(30);
 const EVENT_NAME: &str = "system-stats-updated";
@@ -148,69 +150,15 @@ pub fn current_stats(app: &AppHandle) -> SystemStats {
 fn start_battery_thread(shared: Arc<Mutex<BatterySnapshot>>) {
     thread::Builder::new()
         .name("rundev-battery".into())
-        .spawn(move || {
-            loop {
-                // The platform manager owns native power-service state. Recreate it for every
-                // sample so a sleep/wake cycle cannot leave RunDev using a stale IOKit or
-                // SetupAPI handle.
-                let snapshot = sample_battery();
-                if let Ok(mut guard) = shared.lock() {
-                    *guard = snapshot;
-                }
-                thread::sleep(BATTERY_INTERVAL);
+        .spawn(move || loop {
+            let snapshot = battery::sample();
+            if let Ok(mut guard) = shared.lock() {
+                *guard = snapshot;
             }
+            crate::diagnostics::heartbeat("battery");
+            thread::sleep(BATTERY_INTERVAL);
         })
         .ok();
-}
-
-fn sample_battery() -> BatterySnapshot {
-    let Ok(manager) = battery::Manager::new() else {
-        return BatterySnapshot {
-            percent: None,
-            state: None,
-        };
-    };
-    let Ok(batteries) = manager.batteries() else {
-        return BatterySnapshot {
-            percent: None,
-            state: None,
-        };
-    };
-
-    let mut energy = 0.0_f64;
-    let mut full = 0.0_f64;
-    let mut state = None::<String>;
-    let mut found = false;
-
-    for battery in batteries.flatten() {
-        found = true;
-        energy += battery.energy().value as f64;
-        full += battery.energy_full().value as f64;
-        if state.is_none() {
-            state = Some(match battery.state() {
-                battery::State::Charging => "charging".into(),
-                battery::State::Discharging => "discharging".into(),
-                battery::State::Full => "full".into(),
-                battery::State::Empty => "discharging".into(),
-                _ => "unknown".into(),
-            });
-        }
-    }
-
-    if !found {
-        return BatterySnapshot {
-            percent: None,
-            state: None,
-        };
-    }
-
-    let percent = if full > 0.0 {
-        Some(((energy / full) * 100.0).clamp(0.0, 100.0) as f32)
-    } else {
-        None
-    };
-
-    BatterySnapshot { percent, state }
 }
 
 fn run_sampler(
@@ -373,6 +321,7 @@ fn run_sampler(
         if let Err(error) = app.emit(EVENT_NAME, &stats) {
             tracing::debug!(%error, "system stats emit skipped");
         }
+        crate::diagnostics::heartbeat("host_metrics");
 
         next_sample = Instant::now() + sampling_interval(mode);
     }
