@@ -16,7 +16,6 @@ pub struct TraitProgress {
     spent_points: i64,
     next_focus_reward_xp: i64,
     next_keyboard_reward_xp: i64,
-    next_ai_reward_xp: i64,
     traits: Vec<TraitLevel>,
 }
 
@@ -80,6 +79,7 @@ pub async fn traits(pool: &SqlitePool) -> Result<TraitProgress, String> {
          FROM character_traits traits
          LEFT JOIN trait_bonus_accumulators accumulators
            ON accumulators.trait_id = traits.trait_id
+         WHERE traits.trait_id IN ('focus-ready', 'hot-keyboard', 'reload')
          ORDER BY CASE traits.trait_id
            WHEN 'focus-ready' THEN 1 WHEN 'hot-keyboard' THEN 2
            WHEN 'reload' THEN 3 ELSE 4 END",
@@ -100,7 +100,6 @@ pub async fn traits(pool: &SqlitePool) -> Result<TraitProgress, String> {
     };
     let (focus_level, focus_accumulator) = trait_snapshot("focus-ready");
     let (keyboard_level, keyboard_accumulator) = trait_snapshot("hot-keyboard");
-    let (ai_level, ai_accumulator) = trait_snapshot("context-runner");
     let (reload_level, reload_accumulator) = trait_snapshot("reload");
     let today = Local::now().date_naive().to_string();
     let reload_claimed_today: bool = sqlx::query_scalar(
@@ -129,7 +128,6 @@ pub async fn traits(pool: &SqlitePool) -> Result<TraitProgress, String> {
             keyboard_level,
             keyboard_accumulator,
         ),
-        next_ai_reward_xp: next_milestone_reward("context-runner", ai_level, ai_accumulator),
         traits: rows
             .into_iter()
             .map(|(id, level, _accumulator)| {
@@ -159,10 +157,7 @@ pub async fn traits(pool: &SqlitePool) -> Result<TraitProgress, String> {
 }
 
 pub async fn upgrade(pool: &SqlitePool, trait_id: &str) -> Result<TraitProgress, String> {
-    if !matches!(
-        trait_id,
-        "focus-ready" | "hot-keyboard" | "reload" | "context-runner"
-    ) {
+    if !matches!(trait_id, "focus-ready" | "hot-keyboard" | "reload") {
         return Err("알 수 없는 특성입니다.".to_string());
     }
     let mut transaction = pool.begin().await.map_err(|error| error.to_string())?;
@@ -170,10 +165,13 @@ pub async fn upgrade(pool: &SqlitePool, trait_id: &str) -> Result<TraitProgress,
         .fetch_one(&mut *transaction)
         .await
         .map_err(|error| error.to_string())?;
-    let levels: Vec<i64> = sqlx::query_scalar("SELECT level FROM character_traits")
-        .fetch_all(&mut *transaction)
-        .await
-        .map_err(|error| error.to_string())?;
+    let levels: Vec<i64> = sqlx::query_scalar(
+        "SELECT level FROM character_traits
+         WHERE trait_id IN ('focus-ready', 'hot-keyboard', 'reload')",
+    )
+    .fetch_all(&mut *transaction)
+    .await
+    .map_err(|error| error.to_string())?;
     let spent = levels.into_iter().map(trait_points_spent).sum::<i64>();
     let current_level: i64 = sqlx::query_scalar(
         "SELECT COALESCE((SELECT level FROM character_traits WHERE trait_id = ?), 0)",
@@ -217,7 +215,7 @@ fn trait_points_spent(level: i64) -> i64 {
 }
 
 pub(crate) fn trait_bonus_basis_points(trait_id: &str, level: i64) -> i64 {
-    if matches!(trait_id, "focus-ready" | "hot-keyboard" | "context-runner") {
+    if matches!(trait_id, "focus-ready" | "hot-keyboard") {
         level.clamp(0, TRAIT_MAX_LEVEL) * TRAIT_PERCENT_BASIS_POINTS_PER_LEVEL
     } else {
         0
@@ -408,6 +406,40 @@ mod tests {
     };
     use sqlx::SqlitePool;
 
+    #[tokio::test]
+    async fn retired_ai_trait_returns_spent_points_without_changing_history() {
+        let pool = SqlitePool::connect("sqlite::memory:").await.unwrap();
+        sqlx::migrate!("./migrations").run(&pool).await.unwrap();
+        sqlx::query("UPDATE character_state SET level = 6, total_xp = 500 WHERE id = 1")
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query("UPDATE character_traits SET level = 5 WHERE trait_id = 'context-runner'")
+            .execute(&pool)
+            .await
+            .unwrap();
+        let progress = traits(&pool).await.unwrap();
+        assert_eq!(progress.available_points, 5);
+        assert_eq!(progress.spent_points, 0);
+        assert_eq!(progress.traits.len(), 3);
+        assert!(progress.traits.iter().all(|t| t.id != "context-runner"));
+        assert!(upgrade(&pool, "context-runner").await.is_err());
+        let upgraded = upgrade(&pool, "focus-ready").await.unwrap();
+        assert_eq!(upgraded.available_points, 4);
+        let saved_level: i64 = sqlx::query_scalar(
+            "SELECT level FROM character_traits WHERE trait_id = 'context-runner'",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let xp: i64 = sqlx::query_scalar("SELECT total_xp FROM character_state WHERE id = 1")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(saved_level, 5);
+        assert_eq!(xp, 500);
+    }
+
     #[test]
     fn trait_upgrade_costs_increase_every_five_levels() {
         assert_eq!(trait_upgrade_cost(0), 1);
@@ -431,7 +463,6 @@ mod tests {
         assert_eq!(trait_bonus_basis_points("hot-keyboard", 16), 8_000);
         assert_eq!(trait_example_reward("hot-keyboard", 16), 18.0);
         assert_eq!(trait_example_reward("focus-ready", 20), 20.0);
-        assert_eq!(trait_example_reward("context-runner", 20), 20.0);
         assert_eq!(reload_bonus_basis_point_xp(16), 320_000);
         assert_eq!(trait_example_reward("reload", 16), 32.0);
         assert_eq!(next_milestone_reward("hot-keyboard", 16, 0), 18);
@@ -487,7 +518,6 @@ mod tests {
         let progress = traits(&pool).await.unwrap();
         assert_eq!(progress.next_focus_reward_xp, 19);
         assert_eq!(progress.next_keyboard_reward_xp, 18);
-        assert_eq!(progress.next_ai_reward_xp, 11);
 
         let today = chrono::Local::now().date_naive().to_string();
         sqlx::query(

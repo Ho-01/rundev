@@ -270,7 +270,7 @@ pub async fn disconnect(pool: &SqlitePool, revoke_consent: bool) -> Result<(), S
 }
 
 pub async fn sync(pool: &SqlitePool) -> Result<(), String> {
-    sync_if_due(pool, Duration::ZERO).await
+    sync_if_due(pool, Duration::from_secs(60)).await
 }
 
 pub async fn sync_if_due(pool: &SqlitePool, minimum_interval: Duration) -> Result<(), String> {

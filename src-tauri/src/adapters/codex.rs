@@ -121,7 +121,7 @@ pub async fn read_account() -> Result<AccountInfo, String> {
         .map_err(|error| format!("Codex 계정 응답 형식이 올바르지 않습니다: {error}"))
 }
 
-async fn request(method: &str, params: Value) -> Result<Value, String> {
+pub(super) async fn request(method: &str, params: Value) -> Result<Value, String> {
     let program = find_codex_program().ok_or_else(|| {
         "Codex CLI를 찾을 수 없습니다. Codex를 설치하거나 CODEX_PATH를 설정해 주세요.".to_string()
     })?;

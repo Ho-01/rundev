@@ -124,6 +124,10 @@ pub async fn award_xp(
     source_event_id: &str,
     occurred_at: &str,
 ) -> Result<i64, sqlx::Error> {
+    // Token-based rewards are retired. Preserve existing ledger entries only.
+    if event_type == "ai_usage_milestone" {
+        return Ok(0);
+    }
     let inserted = sqlx::query(
         "INSERT OR IGNORE INTO xp_events
          (id, occurred_at, event_type, amount, source_event_id)
@@ -168,7 +172,6 @@ pub async fn award_xp(
     let trait_id = match event_type {
         "focus_milestone" => Some("focus-ready"),
         "keyboard_milestone" => Some("hot-keyboard"),
-        "ai_usage_milestone" => Some("context-runner"),
         _ => None,
     };
     let mut trait_bonus = 0;
@@ -457,7 +460,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn context_runner_adds_ai_xp_beyond_the_base_award() {
+    async fn retired_ai_milestones_cannot_award_base_or_trait_xp() {
         let pool = SqlitePool::connect("sqlite::memory:").await.unwrap();
         sqlx::migrate!("./migrations").run(&pool).await.unwrap();
         sqlx::query("UPDATE character_traits SET level = 20 WHERE trait_id = 'context-runner'")
@@ -483,7 +486,12 @@ mod tests {
         .fetch_one(&pool)
         .await
         .unwrap();
-        assert_eq!(awarded, 20);
-        assert_eq!(trait_xp, 10);
+        assert_eq!(awarded, 0);
+        assert_eq!(trait_xp, 0);
+        let events: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM xp_events")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(events, 0);
     }
 }

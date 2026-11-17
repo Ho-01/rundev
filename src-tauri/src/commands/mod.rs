@@ -1,11 +1,39 @@
 use crate::{
-    activity, adapters, ai_xp, database::AppState, diagnostics, host_metrics, keyboard,
-    progression, runner_skins, tray, whip, xp_boost,
+    activity, adapters, database::AppState, diagnostics, host_metrics, keyboard, progression,
+    runner_skins, tray, whip, xp_boost,
 };
 use chrono::{DateTime, Datelike, Duration, Local, NaiveDate, Utc};
 use serde::Serialize;
 use std::collections::HashMap;
 use tauri::{AppHandle, Emitter, State};
+
+#[tauri::command]
+pub async fn get_salary_settings(
+    state: State<'_, AppState>,
+) -> Result<Option<crate::salary::Settings>, String> {
+    crate::salary::load(&state.pool).await
+}
+
+#[tauri::command]
+pub async fn save_salary_settings(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    settings: Option<crate::salary::Settings>,
+) -> Result<(), String> {
+    crate::salary::save(&state.pool, settings).await?;
+    let _ = app.emit("salary-settings-changed", ());
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn get_salary_snapshot(
+    state: State<'_, AppState>,
+) -> Result<Option<crate::salary::Snapshot>, String> {
+    crate::salary::load(&state.pool)
+        .await?
+        .map(|settings| crate::salary::calculate(&settings, Local::now().naive_local()))
+        .transpose()
+}
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -98,11 +126,6 @@ pub async fn get_xp_boost_status(
     state: State<'_, AppState>,
 ) -> Result<xp_boost::XpBoostStatus, String> {
     xp_boost::status(&state.pool).await
-}
-
-#[tauri::command]
-pub async fn sync_ai_weekly_xp(state: State<'_, AppState>) -> Result<ai_xp::AiWeeklyXp, String> {
-    ai_xp::sync(&state.pool).await
 }
 
 #[tauri::command]
@@ -230,13 +253,20 @@ pub fn set_system_panel_expanded(
     expanded: bool,
     expansion_side: Option<String>,
     previous_expansion_side: Option<String>,
+    summary_pinned: Option<bool>,
 ) -> Result<(), String> {
     tray::set_system_panel_expanded(
         &app,
         expanded,
         expansion_side.as_deref(),
         previous_expansion_side.as_deref(),
+        summary_pinned.unwrap_or(false),
     )
+}
+
+#[tauri::command]
+pub fn set_main_window_content_height(app: AppHandle, height: u32) -> Result<(), String> {
+    tray::set_main_window_content_height(&app, height)
 }
 
 #[tauri::command]
@@ -605,6 +635,18 @@ pub async fn get_ai_usage_today(state: State<'_, AppState>) -> Result<AiUsageTod
         latest_available_date: latest.as_ref().map(|row| row.0.clone()),
         latest_available_tokens: latest.map(|row| row.1),
     })
+}
+
+#[tauri::command]
+pub async fn get_account_usage_limits(
+    state: State<'_, AppState>,
+) -> Result<Vec<adapters::usage_limits::ProviderLimits>, String> {
+    let views = adapters::usage_limits::views(&state.pool).await?;
+    let pool = state.pool.clone();
+    tauri::async_runtime::spawn(async move {
+        adapters::usage_limits::refresh(&pool).await;
+    });
+    Ok(views)
 }
 
 #[tauri::command]

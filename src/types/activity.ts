@@ -57,15 +57,6 @@ export type AiUsageToday = {
   latestAvailableTokens: number | null;
 };
 
-export type AiWeeklyXp = {
-  weekStartedOn: string;
-  earnedXp: number;
-  maxXp: number;
-  codexXp: number;
-  claudeXp: number;
-  cursorXp: number;
-};
-
 export type CodexAccountPreview = {
   accountLabel: string;
   authType: string;
@@ -137,14 +128,13 @@ export type KeyboardActivityToday = {
   permissionRequired: boolean;
 };
 
-export type TraitId = "focus-ready" | "hot-keyboard" | "reload" | "context-runner";
+export type TraitId = "focus-ready" | "hot-keyboard" | "reload";
 export type TraitProgress = {
   availablePoints: number;
   earnedPoints: number;
   spentPoints: number;
   nextFocusRewardXp: number;
   nextKeyboardRewardXp: number;
-  nextAiRewardXp: number;
   traits: Array<{
     id: TraitId;
     level: number;

@@ -1,5 +1,5 @@
 use std::sync::{
-    atomic::{AtomicU8, Ordering},
+    atomic::{AtomicU32, AtomicU8, Ordering},
     Mutex, OnceLock,
 };
 use tauri::{
@@ -11,12 +11,14 @@ use tauri::{
 use crate::{adapters, character_window, database::AppState};
 
 static SELECTED_RUNNER: AtomicU8 = AtomicU8::new(0);
+static CONTENT_HEIGHT: AtomicU32 = AtomicU32::new(0);
 static COMPACT_MAIN_X: OnceLock<Mutex<Option<i32>>> = OnceLock::new();
 static FOLLOW_POINTER_ITEM: OnceLock<CheckMenuItem<tauri::Wry>> = OnceLock::new();
 static ROAMING_ITEM: OnceLock<CheckMenuItem<tauri::Wry>> = OnceLock::new();
 
 const COMPACT_WIDTH: f64 = 320.0;
 const EXPANDED_WIDTH: f64 = 492.0;
+const PINNED_SUMMARY_WIDTH: f64 = 52.0;
 const PREFERRED_HEIGHT: f64 = 520.0;
 const COMPACT_HEIGHT: f64 = 480.0;
 const MINIMUM_HEIGHT: f64 = 400.0;
@@ -273,6 +275,7 @@ pub(crate) fn set_system_panel_expanded(
     expanded: bool,
     expansion_side: Option<&str>,
     previous_expansion_side: Option<&str>,
+    summary_pinned: bool,
 ) -> Result<(), String> {
     let window = app
         .get_webview_window("main")
@@ -281,13 +284,8 @@ pub(crate) fn set_system_panel_expanded(
     let monitor = window.current_monitor().ok().flatten();
     let current_size = window.outer_size().map_err(|error| error.to_string())?;
     let current_position = window.outer_position().map_err(|error| error.to_string())?;
-    let target_width = ((if expanded {
-        EXPANDED_WIDTH
-    } else {
-        COMPACT_WIDTH
-    }) * scale)
-        .round() as u32;
-    let target_height = preferred_main_window_height(
+    let target_width = (main_window_width(expanded, summary_pinned) * scale).round() as u32;
+    let target_height = desired_main_window_height(
         scale,
         monitor
             .as_ref()
@@ -351,6 +349,16 @@ pub(crate) fn set_system_panel_expanded(
     Ok(())
 }
 
+fn main_window_width(expanded: bool, summary_pinned: bool) -> f64 {
+    if expanded {
+        EXPANDED_WIDTH
+    } else if summary_pinned {
+        COMPACT_WIDTH + PINNED_SUMMARY_WIDTH
+    } else {
+        COMPACT_WIDTH
+    }
+}
+
 fn preferred_main_window_height(scale: f64, work_area_height: Option<u32>) -> u32 {
     let preferred = (PREFERRED_HEIGHT * scale).round() as u32;
     let compact = (COMPACT_HEIGHT * scale).round() as u32;
@@ -368,6 +376,71 @@ fn preferred_main_window_height(scale: f64, work_area_height: Option<u32>) -> u3
         }
         None => preferred,
     }
+}
+
+fn fitted_main_window_height(
+    scale: f64,
+    work_area_height: Option<u32>,
+    content_height: u32,
+) -> u32 {
+    let desired = (f64::from(content_height.clamp(200, 1200)) * scale).ceil() as u32;
+    let gap = (WORK_AREA_GAP * 2.0 * scale).ceil() as u32;
+    work_area_height
+        .map(|height| desired.min(height.saturating_sub(gap).max(1)))
+        .unwrap_or(desired)
+}
+
+fn desired_main_window_height(scale: f64, work_area_height: Option<u32>) -> u32 {
+    match CONTENT_HEIGHT.load(Ordering::Relaxed) {
+        0 => preferred_main_window_height(scale, work_area_height),
+        height => fitted_main_window_height(scale, work_area_height, height),
+    }
+}
+
+pub(crate) fn set_main_window_content_height(
+    app: &tauri::AppHandle,
+    height: u32,
+) -> Result<(), String> {
+    CONTENT_HEIGHT.store(height.clamp(200, 1200), Ordering::Relaxed);
+    let window = app
+        .get_webview_window("main")
+        .ok_or("main window is unavailable")?;
+    let scale = window.scale_factor().map_err(|error| error.to_string())?;
+    let current = window.outer_size().map_err(|error| error.to_string())?;
+    let origin = window.outer_position().map_err(|error| error.to_string())?;
+    let monitor = window.current_monitor().ok().flatten();
+    let target =
+        desired_main_window_height(scale, monitor.as_ref().map(|m| m.work_area().size.height));
+    if current.height == target {
+        return Ok(());
+    }
+    let mut y = origin.y;
+    if let Some(monitor) = monitor {
+        let area = monitor.work_area();
+        let gap = (WORK_AREA_GAP * scale).round() as i32;
+        let top = area.position.y.saturating_add(gap);
+        let bottom = area
+            .position
+            .y
+            .saturating_add(area.size.height as i32)
+            .saturating_sub(gap);
+        // Keep a bottom-tray popover attached to its bottom edge; top-menu popovers keep their top edge.
+        if i64::from(origin.y) + i64::from(current.height / 2)
+            > i64::from(area.position.y) + i64::from(area.size.height / 2)
+        {
+            y = origin
+                .y
+                .saturating_add(current.height as i32)
+                .saturating_sub(target as i32);
+        }
+        y = y.clamp(top, bottom.saturating_sub(target as i32).max(top));
+    }
+    window
+        .set_size(PhysicalSize::new(current.width, target))
+        .map_err(|error| error.to_string())?;
+    window
+        .set_position(PhysicalPosition::new(origin.x, y))
+        .map_err(|error| error.to_string())
 }
 
 fn toggle_main_window(app: &tauri::AppHandle, tray_rect: Rect) {
@@ -453,7 +526,23 @@ fn position_near_tray(app: &tauri::AppHandle, window: &tauri::WebviewWindow, tra
 
 #[cfg(test)]
 mod tests {
-    use super::preferred_main_window_height;
+    use super::{fitted_main_window_height, main_window_width, preferred_main_window_height};
+
+    #[test]
+    fn fits_measured_content_and_clamps_to_monitor_work_area() {
+        assert_eq!(fitted_main_window_height(1.0, Some(800), 446), 446);
+        assert_eq!(fitted_main_window_height(1.5, Some(1200), 446), 669);
+        assert_eq!(fitted_main_window_height(1.0, Some(430), 446), 414);
+        assert_eq!(fitted_main_window_height(1.0, Some(800), 600), 600);
+    }
+
+    #[test]
+    fn preserves_space_for_pinned_summary_when_details_close() {
+        assert_eq!(main_window_width(false, false), 320.0);
+        assert_eq!(main_window_width(false, true), 372.0);
+        assert_eq!(main_window_width(true, true), 492.0);
+        assert_eq!(main_window_width(true, false), 492.0);
+    }
 
     #[test]
     fn uses_preferred_height_when_the_work_area_has_room() {
