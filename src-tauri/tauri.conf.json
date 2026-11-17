@@ -36,6 +36,22 @@
         "alwaysOnTop": true,
         "skipTaskbar": true,
         "shadow": false
+      },
+      {
+        "label": "character-salary",
+        "parent": "character",
+        "title": "RunDev Salary",
+        "width": 240,
+        "height": 200,
+        "resizable": false,
+        "visible": false,
+        "decorations": false,
+        "transparent": true,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "focus": false,
+        "focusable": false,
+        "shadow": false
       }
     ],
     "security": {

@@ -2,8 +2,82 @@ import { act, fireEvent, render, screen, waitFor, within } from "@testing-librar
 import "@testing-library/jest-dom/vitest";
 import { App } from "./App";
 import { useDashboardStore } from "./store/dashboard";
+import * as rundevService from "./services/rundev";
 
 describe("App", () => {
+  it("unpins the collapsed system summary in one click and saves the collapsed width", () => {
+    localStorage.clear();
+    localStorage.setItem("rundev.systemSummaryPinned", "true");
+    localStorage.setItem("rundev.systemPanelExpanded", "false");
+    const resize = vi.spyOn(rundevService, "setSystemPanelExpanded");
+    const view = render(<App />);
+    expect(screen.getByRole("button", { name: "장치 상세 펼치기" })).toBeInTheDocument();
+    const unpin = screen.getByRole("button", { name: "장치 요약 고정 해제" });
+    expect(unpin).toHaveAttribute("aria-pressed", "true");
+    fireEvent.click(unpin);
+    expect(screen.queryByRole("complementary", { name: "장치 상태" })).not.toBeInTheDocument();
+    expect(document.querySelector(".whip-crack-canvas")).toHaveAttribute("width", "320");
+    expect(resize).toHaveBeenLastCalledWith(false, "right", undefined, false);
+    expect(localStorage.getItem("rundev.systemSummaryPinned")).toBe("false");
+    view.unmount();
+    render(<App />);
+    expect(screen.queryByRole("complementary", { name: "장치 상태" })).not.toBeInTheDocument();
+    resize.mockRestore();
+  });
+
+  it("opens only one AI provider detail at a time and closes it on a second click", () => {
+    localStorage.clear();
+    render(<App />);
+    const providers = Array.from(document.querySelectorAll<HTMLDetailsElement>(".provider-details"));
+    expect(providers).toHaveLength(3);
+    expect(providers.every((provider) => !provider.open)).toBe(true);
+
+    // Claude → Codex reproduces the reported overlap; include repeated switches.
+    for (const index of [1, 0, 2, 0, 1]) {
+      fireEvent.click(providers[index].querySelector("summary")!);
+      expect(providers.filter((provider) => provider.open)).toEqual([providers[index]]);
+      for (const [providerIndex, provider] of providers.entries()) {
+        const detail = provider.querySelector(".provider-inline-detail");
+        if (providerIndex === index) expect(detail).toBeVisible();
+        else expect(detail).not.toBeVisible();
+      }
+    }
+
+    fireEvent.click(providers[1].querySelector("summary")!);
+    expect(providers.every((provider) => !provider.open)).toBe(true);
+
+    fireEvent.click(providers[0].querySelector("summary")!);
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(providers.every((provider) => !provider.open)).toBe(true);
+    expect(providers[0].querySelector("summary")).toHaveFocus();
+    fireEvent.click(providers[2].querySelector("summary")!);
+    fireEvent.pointerDown(document.body);
+    expect(providers.every((provider) => !provider.open)).toBe(true);
+  });
+
+  it("keeps pinned system icons visible after collapse and restores their window width", async () => {
+    localStorage.clear();
+    const resize = vi.spyOn(rundevService, "setSystemPanelExpanded");
+    const view = render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: "시스템 메트릭" }));
+    fireEvent.click(screen.getByRole("button", { name: "장치 요약 고정하기" }));
+    fireEvent.click(screen.getByRole("button", { name: "장치 상세 접기" }));
+    await waitFor(() => expect(document.querySelector(".system-strip")).toHaveClass("compact"));
+    expect(document.querySelector(".whip-crack-canvas")).toHaveAttribute("width", "372");
+    expect(resize).toHaveBeenLastCalledWith(false, "right", "right", true);
+    expect(screen.getByRole("button", { name: "장치 상세 펼치기" })).toBeInTheDocument();
+    view.unmount();
+    render(<App />);
+    expect(document.querySelector(".system-strip")).toHaveClass("compact");
+    expect(resize).toHaveBeenLastCalledWith(false, "right", undefined, true);
+    fireEvent.click(screen.getByRole("button", { name: "장치 상세 펼치기" }));
+    fireEvent.click(screen.getByRole("button", { name: "장치 요약 고정 해제" }));
+    fireEvent.click(screen.getByRole("button", { name: "장치 상세 접기" }));
+    await waitFor(() => expect(screen.queryByRole("complementary", { name: "장치 상태" })).not.toBeInTheDocument());
+    expect(document.querySelector(".whip-crack-canvas")).toHaveAttribute("width", "320");
+    expect(resize).toHaveBeenLastCalledWith(false, "right", "right", false);
+    resize.mockRestore();
+  });
   it("renders the starter dashboard", async () => {
     localStorage.clear();
     render(<App />);
@@ -21,11 +95,15 @@ describe("App", () => {
     expect(await screen.findAllByText(/^오늘 \d+회 달성$/)).toHaveLength(2);
     expect(await screen.findByText("Claude Code")).toBeInTheDocument();
     expect(await screen.findByText("AI 사용량")).toBeInTheDocument();
-    expect((await screen.findAllByText("Cursor")).length).toBeGreaterThanOrEqual(2);
-    expect(screen.getByRole("progressbar", { name: "이번 주 AI 토큰 사용 XP" })).toHaveAttribute(
-      "aria-valuemax",
-      "500"
-    );
+    expect(await screen.findByText("Cursor")).toBeInTheDocument();
+    expect(screen.queryByRole("progressbar", { name: "이번 주 AI 토큰 사용 XP" })).not.toBeInTheDocument();
+    const salary = screen.getByRole("region", { name: "실시간 월급" });
+    expect(salary.closest(".info-section")).toHaveTextContent("AI 사용량");
+    expect(screen.getAllByRole("region", { name: "실시간 월급" })).toHaveLength(1);
+    for (const metric of document.querySelectorAll(".activity-metric")) {
+      expect(metric.querySelector(".activity-metric-heading > span")).toBeInTheDocument();
+      expect(metric.querySelector(".activity-metric-heading > strong")).toBeInTheDocument();
+    }
     fireEvent.click(screen.getByRole("button", { name: "시스템 메트릭" }));
     expect(document.querySelector(".popover-shell")).toHaveClass("panel-right");
     expect(screen.getByRole("button", { name: "장치 상세 접기" })).toHaveAttribute(

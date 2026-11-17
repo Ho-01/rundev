@@ -96,18 +96,17 @@ export function SystemStatusStrip({ stats, expanded, closing, pinned, onToggle, 
       >
         {expanded ? <ChevronLeft size={15} aria-hidden="true" /> : <ChevronRight size={15} aria-hidden="true" />}
       </button>
-      {expanded && (
         <button
           type="button"
           className={`system-strip-pin${pinned ? " active" : ""}`}
           aria-label={pinned ? "장치 요약 고정 해제" : "장치 요약 고정하기"}
+          title={pinned ? "장치 요약 고정 해제" : "장치 요약 고정하기"}
           aria-pressed={pinned}
           onClick={() => onPinnedChange(!pinned)}
         >
           {pinned ? <PinOff size={13} aria-hidden="true" /> : <Pin size={13} aria-hidden="true" />}
-          {pinned ? "요약 고정됨" : "요약 고정"}
+          {expanded && (pinned ? "요약 고정됨" : "요약 고정")}
         </button>
-      )}
       </div>
 
       {expanded ? <div className="system-detail-list">

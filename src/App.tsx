@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import {
   Clock3,
   Cpu,
@@ -48,7 +48,8 @@ import {
   subscribeUsageRefreshed,
   isMainWindowActive,
   subscribeMainWindowActivity,
-  setHostMetricsMode
+  setHostMetricsMode,
+  setMainWindowContentHeight
 } from "./services/rundev";
 import {
   getCharacterWindowState,
@@ -64,6 +65,12 @@ import {
   type UpdateStatus
 } from "./services/updater";
 import { SystemStatusStrip } from "./components/SystemStatusStrip";
+import { SalaryCard } from "./components/SalaryCard";
+import { SalaryCharacterLabel } from "./components/SalaryCharacterLabel";
+import { useSalarySnapshot } from "./hooks/useSalarySnapshot";
+import { useUsageLimits } from "./hooks/useUsageLimits";
+import { AiQuotaSummary, AiQuotaDetails } from "./components/AiQuota";
+import type { ProviderLimits } from "./services/usageLimits";
 import { buildActivityStatus } from "./components/activityStatus";
 import { PingModeOverlay } from "./components/PingModeOverlay";
 import {
@@ -74,7 +81,6 @@ import type {
   ClaudeConnectionPreview,
   CodexAccountPreview,
   CursorAccountPreview,
-  AiWeeklyXp,
   WhipStats,
   XpBoostStatus,
   XpCouponPreview
@@ -169,16 +175,45 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
 }
 
 function ProviderInlineDetails({
+  open,
   rows,
+  quota,
   error,
   children
 }: {
+  open: boolean;
   rows: Array<{ label: string; value: React.ReactNode }>;
+  quota?: ProviderLimits;
   error?: React.ReactNode;
   children: React.ReactNode;
 }) {
+  const panelRef = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const panel = panelRef.current;
+    const summary = panel?.closest("details")?.querySelector("summary");
+    if (!open || !panel || !summary) return;
+    function position() {
+      const anchor = summary!.getBoundingClientRect();
+      const width = Math.min(Math.max(180, anchor.width - 29), window.innerWidth - 16);
+      panel!.style.width = `${width}px`;
+      panel!.style.maxHeight = `${Math.max(0, window.innerHeight - 16)}px`;
+      const height = panel!.getBoundingClientRect().height;
+      const below = window.innerHeight - anchor.bottom - 8;
+      const top = below >= height || below >= anchor.top - 8
+        ? anchor.bottom + 3 : anchor.top - height - 3;
+      panel!.style.left = `${Math.max(8, Math.min(anchor.left + 23, window.innerWidth - width - 8))}px`;
+      panel!.style.top = `${Math.max(8, Math.min(top, window.innerHeight - height - 8))}px`;
+    }
+    position();
+    const observer = typeof ResizeObserver === "undefined" ? undefined : new ResizeObserver(position);
+    observer?.observe(panel);
+    window.addEventListener("resize", position);
+    window.addEventListener("scroll", position, true);
+    return () => { observer?.disconnect(); window.removeEventListener("resize", position); window.removeEventListener("scroll", position, true); };
+  }, [open]);
   return (
-    <div className="provider-inline-detail">
+    <div ref={panelRef} className="provider-inline-detail">
+      <AiQuotaDetails quota={quota} />
       <dl>
         {rows.map((row) => (
           <div key={row.label}>
@@ -189,53 +224,6 @@ function ProviderInlineDetails({
       </dl>
       {error && <p className="provider-inline-error">{error}</p>}
       <div className="provider-inline-actions">{children}</div>
-    </div>
-  );
-}
-
-function AiWeeklyXpProgress({ progress, nextRewardXp }: { progress: AiWeeklyXp | null; nextRewardXp: number }) {
-  const maxXp = progress?.maxXp ?? 500;
-  const providers = [
-    { id: "codex", label: "Codex", xp: progress?.codexXp ?? 0 },
-    { id: "claude", label: "Claude", xp: progress?.claudeXp ?? 0 },
-    { id: "cursor", label: "Cursor", xp: progress?.cursorXp ?? 0 }
-  ];
-
-  return (
-    <div className="ai-weekly-xp">
-      <div className="ai-weekly-xp-heading">
-        <div>
-          <strong>이번 주 AI 토큰 사용 XP</strong>
-          <span className="reward-rule">
-            <BadgeCheck size={11} />
-            사용량 마일스톤마다 <b>{formatRewardXp(nextRewardXp)}</b>
-          </span>
-        </div>
-        <b>{progress?.earnedXp ?? 0} / {maxXp} XP</b>
-      </div>
-      <div
-        className="ai-weekly-xp-track"
-        role="progressbar"
-        aria-label="이번 주 AI 토큰 사용 XP"
-        aria-valuemin={0}
-        aria-valuemax={maxXp}
-        aria-valuenow={progress?.earnedXp ?? 0}
-      >
-        {providers.map((provider) => (
-          <span
-            key={provider.id}
-            className={`ai-weekly-xp-segment ${provider.id}`}
-            style={{ width: `${(provider.xp / maxXp) * 100}%` }}
-          />
-        ))}
-      </div>
-      <div className="ai-weekly-xp-legend">
-        {providers.map((provider) => (
-          <span key={provider.id} className={provider.id}>
-            <i />{provider.label} <b>{provider.xp} XP</b>
-          </span>
-        ))}
-      </div>
     </div>
   );
 }
@@ -329,7 +317,6 @@ function GrowthSummary({
   xpForNextLevel,
   nextGoal,
   nextGoalRewardXp,
-  goalKind,
   availableTraitPoints,
   onOpenTraits
 }: {
@@ -338,7 +325,6 @@ function GrowthSummary({
   xpForNextLevel: number;
   nextGoal: string;
   nextGoalRewardXp: number;
-  goalKind: "focus" | "keyboard";
   availableTraitPoints: number;
   onOpenTraits: () => void;
 }) {
@@ -365,8 +351,7 @@ function GrowthSummary({
       </span>
     </button>
     <div className="growth-next-goal">
-      <i>{goalKind === "keyboard" ? <Keyboard size={12} aria-hidden="true" /> : <Target size={12} aria-hidden="true" />}</i>
-      <span><small>다음 목표</small>{nextGoal}</span>
+      <span><small>다음 목표 : </small>{nextGoal}</span>
       <b>{formatRewardXp(nextGoalRewardXp)}</b>
     </div>
   </section>;
@@ -403,8 +388,7 @@ function EmblemShowcase() {
 const traitCopy: Record<TraitId, { name: string; description: string }> = {
   "focus-ready": { name: "몰입 준비", description: "집중시간 XP 획득량 증가" },
   "hot-keyboard": { name: "뜨거운 키보드", description: "키보드 XP 획득량 증가" },
-  reload: { name: "재장전", description: "매일 첫 집중 20분에 활동 보너스" },
-  "context-runner": { name: "컨텍스트 러너", description: "AI XP 획득량 증가" }
+  reload: { name: "재장전", description: "매일 첫 집중 20분에 활동 보너스" }
 };
 
 function TraitShowcase() {
@@ -412,8 +396,7 @@ function TraitShowcase() {
   const columns: Array<{ id: TraitId; kicker: string }> = [
     { id: "focus-ready", kicker: "집중 마일스톤" },
     { id: "hot-keyboard", kicker: "키보드 마일스톤" },
-    { id: "reload", kicker: "활동일 1회" },
-    { id: "context-runner", kicker: "AI 마일스톤" }
+    { id: "reload", kicker: "활동일 1회" }
   ];
   return <main className="trait-showcase">
     <header>
@@ -577,7 +560,6 @@ function TraitDialog({ progress, onUpgrade, onClose }: { progress: TraitProgress
   };
   const actualLabel = (id: TraitId) => {
     if (id === "reload") return "매일 첫 집중 20분";
-    if (id === "context-runner") return "AI 평균 보상 환산";
     return "평균 보상 환산";
   };
   return <div className="dialog-backdrop trait-backdrop" role="presentation" onMouseDown={onClose}>
@@ -628,6 +610,11 @@ function LevelShowcase() {
 }
 
 export function App() {
+  const usageLimits = useUsageLimits();
+  const salarySnapshot = useSalarySnapshot();
+  const todaySalaryLabel = salarySnapshot
+    ? `오늘 ${new Intl.NumberFormat("ko-KR").format(Math.floor(salarySnapshot.todayWon))}원`
+    : "오늘 —원";
   const [mainWindowActive, setMainWindowActive] = useState(isMainWindowActive);
   const mainWindowActiveRef = useRef(mainWindowActive);
   const latestFocusActivityRef = useRef<FocusActivityUpdate | null>(null);
@@ -637,6 +624,7 @@ export function App() {
   const [cursorPreview, setCursorPreview] = useState<CursorAccountPreview | null>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
+  const [expandedAiProvider, setExpandedAiProvider] = useState<"codex" | "claude" | "cursor" | null>(null);
   const [headerFrame, setHeaderFrame] = useState(0);
   const [runnerDialogOpen, setRunnerDialogOpen] = useState(false);
   const [characterWindowVisible, setCharacterWindowVisibleState] = useState(false);
@@ -660,7 +648,7 @@ export function App() {
   const [permissionRepairPending, setPermissionRepairPending] = useState(
     () => localStorage.getItem(KEYBOARD_PERMISSION_REPAIR_PENDING_KEY) === "true"
   );
-  const [whipStats, setWhipStats] = useState<WhipStats | null>(null);
+  const [, setWhipStats] = useState<WhipStats | null>(null);
   const [whipHitClass, setWhipHitClass] = useState<"hit-a" | "hit-b" | null>(null);
   const [whipSaveError, setWhipSaveError] = useState(false);
   const [lastWhipAt, setLastWhipAt] = useState(0);
@@ -673,6 +661,7 @@ export function App() {
     () => localStorage.getItem("rundev.systemSummaryPinned") === "true"
   );
   const [statsExpanded, setStatsExpanded] = useState(false);
+  const systemSummaryPinnedRef = useRef(systemSummaryPinned);
   const [dailyStats, setDailyStats] = useState<ActivityStats | null>(null);
   const [weeklyStats, setWeeklyStats] = useState<ActivityStats | null>(null);
   const [traitProgress, setTraitProgress] = useState<TraitProgress | null>(null);
@@ -688,6 +677,7 @@ export function App() {
   const headerMenuRef = useRef<HTMLDivElement>(null);
   const panelTransitionTokenRef = useRef(0);
   const shellRef = useRef<HTMLElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
   const freezeRunner = new URLSearchParams(window.location.search).has("freezeRunner");
   const showXpPreview = new URLSearchParams(window.location.search).has("showXpFx");
   const showLevelShowcase = new URLSearchParams(window.location.search).has("levelShowcase");
@@ -700,7 +690,6 @@ export function App() {
     activityHistory,
     character,
     aiUsage,
-    aiWeeklyXp,
     claudeUsage,
     cursorUsage,
     keyboard,
@@ -723,6 +712,41 @@ export function App() {
   const runnerFrames = framesForRunner(runner?.runnerId ?? "coding-cat", runner?.skinId ?? "default");
 
   useEffect(() => subscribeMainWindowActivity(setMainWindowActive), []);
+
+  useEffect(() => {
+    const content = contentRef.current;
+    if (!content) return;
+    let lastHeight = 0;
+    const fit = () => {
+      const contentHeight = content.getBoundingClientRect().height;
+      if (!contentHeight) return;
+      const style = getComputedStyle(content.parentElement!);
+      const height = Math.ceil(contentHeight + parseFloat(style.paddingTop) + parseFloat(style.paddingBottom) + 2);
+      if (height === lastHeight) return;
+      lastHeight = height;
+      void setMainWindowContentHeight(height).catch(() => { lastHeight = 0; });
+    };
+    fit();
+    const observer = typeof ResizeObserver === "undefined" ? undefined : new ResizeObserver(fit);
+    observer?.observe(content);
+    window.addEventListener("resize", fit);
+    return () => { observer?.disconnect(); window.removeEventListener("resize", fit); };
+  }, []);
+
+  useEffect(() => {
+    if (!expandedAiProvider) return;
+    const closeOutside = (event: PointerEvent) => {
+      if (!(event.target instanceof Element) || !event.target.closest(".provider-details")) setExpandedAiProvider(null);
+    };
+    const closeEscape = (event: globalThis.KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      shellRef.current?.querySelector<HTMLElement>(".provider-details[open] > summary")?.focus();
+      setExpandedAiProvider(null);
+    };
+    window.addEventListener("pointerdown", closeOutside);
+    window.addEventListener("keydown", closeEscape);
+    return () => { window.removeEventListener("pointerdown", closeOutside); window.removeEventListener("keydown", closeEscape); };
+  }, [expandedAiProvider]);
 
   useEffect(() => {
     mainWindowActiveRef.current = mainWindowActive;
@@ -1107,7 +1131,7 @@ export function App() {
   }, [mainWindowActive, setSystemStats]);
 
   useEffect(() => {
-    void resizeSystemPanel(systemPanelExpanded);
+    void resizeSystemPanel(systemPanelExpanded, "right", undefined, systemSummaryPinned);
   }, []);
 
   useEffect(() => {
@@ -1156,7 +1180,6 @@ export function App() {
   const boostBonusXp = 10 * (boostMultiplier - 1);
   const nextFocusRewardXp = (traitProgress?.nextFocusRewardXp ?? 10) + boostBonusXp;
   const nextKeyboardRewardXp = (traitProgress?.nextKeyboardRewardXp ?? 10) + boostBonusXp;
-  const nextAiRewardXp = (traitProgress?.nextAiRewardXp ?? 10) + boostBonusXp;
   const nextGoalRewardXp = nextGoalKind === "keyboard"
     ? nextKeyboardRewardXp
     : nextFocusRewardXp;
@@ -1175,6 +1198,7 @@ export function App() {
     : systemPanelExpanded
       ? "right"
       : closingPanelSide;
+  const popoverWidth = renderedPanelSide ? 492 : systemSummaryPinned ? 372 : 320;
 
   useEffect(() => {
     const updateOverlayHeight = () => {
@@ -1216,7 +1240,7 @@ export function App() {
     window.setTimeout(() => {
       if (panelTransitionTokenRef.current !== token) return;
       setClosingPanelSide(null);
-      void resizeSystemPanel(false, side, side);
+      void resizeSystemPanel(false, side, side, systemSummaryPinnedRef.current);
     }, panelTransitionDuration());
   }
 
@@ -1259,8 +1283,12 @@ export function App() {
   }
 
   function changeSystemSummaryPinned(pinned: boolean) {
+    systemSummaryPinnedRef.current = pinned;
     setSystemSummaryPinned(pinned);
     localStorage.setItem("rundev.systemSummaryPinned", String(pinned));
+    if (!systemPanelExpanded && !statsExpanded && !closingPanelSide) {
+      void resizeSystemPanel(false, "right", undefined, pinned);
+    }
   }
 
   async function toggleStatsPanel() {
@@ -1295,25 +1323,27 @@ export function App() {
     >
       <WhipCrackOverlay
         ref={whipCrackRef}
-        width={renderedPanelSide ? 492 : 320}
+        width={popoverWidth}
         height={overlayHeight}
       />
       <PingModeOverlay rootRef={shellRef} onWhip={performWhip} />
       {(statsExpanded || closingPanelSide === "left") && <StatsPanel dailyStats={dailyStats} weeklyStats={weeklyStats} activityHistory={activityHistory} activeHistoryDays={activeHistoryDays} closing={closingPanelSide === "left"} onClose={() => void toggleStatsPanel()} />}
       <div className="popover-main">
+      <div className="popover-content" ref={contentRef}>
       <header className="runner-header">
         <div className={`runner-stage tier-${currentTier.id}`}>
+          <SalaryCharacterLabel snapshot={salarySnapshot} />
           <button
             ref={runnerRef}
             type="button"
             className={`runner${whipHitClass ? ` ${whipHitClass}` : ""}`}
             aria-label="개발자 캐릭터 채찍질하기"
-            title={whipSaveError ? "저장 실패" : `오늘 ${whipStats?.whipCount ?? 0}`}
+            title={whipSaveError ? "저장 실패" : todaySalaryLabel}
             onClick={() => void performWhip()}
           >
             <i className="runner-tier-glow" aria-hidden="true" />
             <img src={runnerFrames[headerFrame]} alt="" aria-hidden="true" />
-            <span className="whip-count">오늘 {whipStats?.whipCount ?? 0}</span>
+            <span className="runner-today-salary">{todaySalaryLabel}</span>
           </button>
           {xpGainFx != null && <span className="runner-xp-gain" aria-live="polite">+{xpGainFx} XP</span>}
         </div>
@@ -1437,7 +1467,6 @@ export function App() {
         xpForNextLevel={character?.xpForNextLevel ?? 100}
         nextGoal={nextGoal}
         nextGoalRewardXp={nextGoalRewardXp}
-        goalKind={nextGoalKind}
         availableTraitPoints={traitProgress?.availablePoints ?? 0}
         onOpenTraits={() => void openTraits()}
       />
@@ -1455,14 +1484,14 @@ export function App() {
         </div>
         <div className="activity-metrics">
           <div className="activity-metric">
-            <span><Clock3 size={13} />개발 시간</span>
-            <strong>{formatDuration(summary?.activeSeconds ?? 0)}</strong>
+            <div className="activity-metric-heading"><span><Clock3 size={13} />개발 시간</span>
+              <strong>{formatDuration(summary?.activeSeconds ?? 0)}</strong></div>
             <Meter value={focusRewardProgress} />
             <small>{formatRewardXp(nextFocusRewardXp)}까지 {formatRemainingMinutes(focusRewardRemaining)}</small>
           </div>
           <div className="activity-metric">
-            <span><Keyboard size={13} />키 입력</span>
-            <strong>{formatTokens(keyboard?.pressCount ?? 0)}회</strong>
+            <div className="activity-metric-heading"><span><Keyboard size={13} />키 입력</span>
+              <strong>{formatTokens(keyboard?.pressCount ?? 0)}회</strong></div>
             <Meter value={keyboardProgress} />
             <small>{formatRewardXp(nextKeyboardRewardXp)}까지 {formatTokens(keyboardRemaining)}회</small>
           </div>
@@ -1552,31 +1581,20 @@ export function App() {
 
       <section className="info-section compact">
         <SectionTitle>AI 사용량</SectionTitle>
-        <details className="provider-details">
-          <summary className="provider-summary-row">
+        <details className="provider-details" open={expandedAiProvider === "codex"}>
+          <summary className="provider-summary-row" onClick={(event) => {
+            event.preventDefault();
+            setExpandedAiProvider((current) => current === "codex" ? null : "codex");
+          }}>
             <span className="provider-icon">
               <img className="openai-icon" src={openAiIcon} alt="" aria-hidden="true" />
             </span>
             <strong>Codex</strong>
-            <div className="provider-summary-value">
-              <div className="provider-summary-today">
-                <span>오늘</span>
-                <b className={aiUsage?.status === "error" ? "needs-attention" : ""}>
-                {aiUsage?.status === "disconnected"
-                  ? "연동하기"
-                  : aiUsage?.status === "error"
-                  ? "확인 필요"
-                  : aiUsage?.totalTokens == null
-                  ? "—"
-                  : formatCompactTokens(aiUsage.totalTokens)}
-                </b>
-              </div>
-              <span className="provider-summary-week">
-                이번 주 {aiUsage?.weekTokens == null ? "—" : formatCompactTokens(aiUsage.weekTokens)}
-              </span>
-            </div>
+            <AiQuotaSummary quota={usageLimits.find((view) => view.provider === "codex")} />
           </summary>
           <ProviderInlineDetails
+            open={expandedAiProvider === "codex"}
+            quota={usageLimits.find((view) => view.provider === "codex")}
             rows={[
               {
                 label: "상태",
@@ -1623,31 +1641,20 @@ export function App() {
           </ProviderInlineDetails>
         </details>
 
-        <details className="provider-details">
-          <summary className="provider-summary-row">
+        <details className="provider-details" open={expandedAiProvider === "claude"}>
+          <summary className="provider-summary-row" onClick={(event) => {
+            event.preventDefault();
+            setExpandedAiProvider((current) => current === "claude" ? null : "claude");
+          }}>
             <span className="provider-icon">
               <img src={claudeIcon} alt="" aria-hidden="true" />
             </span>
             <strong>Claude Code</strong>
-            <div className="provider-summary-value">
-              <div className="provider-summary-today">
-                <span>오늘</span>
-                <b className={claudeUsage?.status === "error" ? "needs-attention" : ""}>
-                  {claudeUsage?.status === "disconnected"
-                    ? "연동하기"
-                    : claudeUsage?.status === "waiting"
-                    ? "대기 중"
-                    : claudeUsage?.status === "error"
-                    ? "확인 필요"
-                    : formatCompactTokens(claudeUsage?.totalTokens ?? 0)}
-                </b>
-              </div>
-              <span className="provider-summary-week">
-                이번 주 {claudeUsage?.status === "disconnected" ? "—" : formatCompactTokens(claudeUsage?.weekTokens ?? 0)}
-              </span>
-            </div>
+            <AiQuotaSummary quota={usageLimits.find((view) => view.provider === "claude")} />
           </summary>
           <ProviderInlineDetails
+            open={expandedAiProvider === "claude"}
+            quota={usageLimits.find((view) => view.provider === "claude")}
             rows={[
               {
                 label: "상태",
@@ -1700,43 +1707,20 @@ export function App() {
           </ProviderInlineDetails>
         </details>
 
-        <details className="provider-details">
-          <summary className="provider-summary-row">
+        <details className="provider-details" open={expandedAiProvider === "cursor"}>
+          <summary className="provider-summary-row" onClick={(event) => {
+            event.preventDefault();
+            setExpandedAiProvider((current) => current === "cursor" ? null : "cursor");
+          }}>
             <span className="provider-icon">
               <img src={cursorIcon} alt="" aria-hidden="true" />
             </span>
             <strong>Cursor</strong>
-            <div className="provider-summary-value">
-              <div className="provider-summary-today">
-                <span>오늘</span>
-                <b
-                  className={
-                    cursorUsage?.status === "reauthRequired" ||
-                    cursorUsage?.status === "unsupportedSchema" ||
-                    cursorUsage?.status === "error"
-                      ? "needs-attention"
-                      : ""
-                  }
-                >
-                  {cursorUsage?.status === "disconnected"
-                    ? "연동하기"
-                    : cursorUsage?.status === "syncing"
-                    ? "동기화 중"
-                    : cursorUsage?.status === "rateLimited"
-                    ? "잠시 후"
-                    : cursorUsage?.status === "reauthRequired" ||
-                      cursorUsage?.status === "unsupportedSchema" ||
-                      cursorUsage?.status === "error"
-                    ? "확인 필요"
-                    : formatCompactTokens(cursorUsage?.totalTokens ?? 0)}
-                </b>
-              </div>
-              <span className="provider-summary-week">
-                이번 주 {cursorUsage?.status === "disconnected" ? "—" : formatCompactTokens(cursorUsage?.weekTokens ?? 0)}
-              </span>
-            </div>
+            <AiQuotaSummary quota={usageLimits.find((view) => view.provider === "cursor")} />
           </summary>
           <ProviderInlineDetails
+            open={expandedAiProvider === "cursor"}
+            quota={usageLimits.find((view) => view.provider === "cursor")}
             rows={[
               {
                 label: "상태",
@@ -1805,17 +1789,18 @@ export function App() {
             )}
           </ProviderInlineDetails>
         </details>
-        <AiWeeklyXpProgress progress={aiWeeklyXp} nextRewardXp={nextAiRewardXp} />
+        <SalaryCard />
       </section>
 
       {loading && <div className="loading-line" />}
       {error && <p className="error-message">{error}</p>}
       </div>
+      </div>
       <SystemStatusStrip
         stats={systemStats}
         expanded={systemPanelExpanded || closingPanelSide === "right"}
         closing={closingPanelSide === "right"}
-        pinned={systemSummaryPinned && !statsExpanded}
+        pinned={systemSummaryPinned && !statsExpanded && closingPanelSide !== "left"}
         onToggle={toggleSystemPanel}
         onPinnedChange={changeSystemSummaryPinned}
       />

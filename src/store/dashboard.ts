@@ -12,7 +12,6 @@ import {
 import type {
   ActivityHistoryDay,
   AiUsageToday,
-  AiWeeklyXp,
   CharacterState,
   ClaudeUsageToday,
   CursorUsage,
@@ -32,7 +31,6 @@ type DashboardStore = {
   activityHistory: ActivityHistoryDay[];
   character: CharacterState | null;
   aiUsage: AiUsageToday | null;
-  aiWeeklyXp: AiWeeklyXp | null;
   claudeUsage: ClaudeUsageToday | null;
   cursorUsage: CursorUsage | null;
   keyboard: KeyboardActivityToday | null;
@@ -60,7 +58,6 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
   activityHistory: [],
   character: null,
   aiUsage: null,
-  aiWeeklyXp: null,
   claudeUsage: null,
   cursorUsage: null,
   keyboard: null,

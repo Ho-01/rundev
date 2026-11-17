@@ -1,6 +1,6 @@
 mod activity;
 mod adapters;
-mod ai_xp;
+mod character_salary;
 mod character_window;
 mod commands;
 mod database;
@@ -10,6 +10,7 @@ mod host_metrics;
 mod keyboard;
 mod progression;
 mod runner_skins;
+mod salary;
 mod tray;
 mod whip;
 mod xp_boost;
@@ -87,6 +88,7 @@ pub fn run() {
             keyboard::start(pool.clone(), app.handle().clone());
             host_metrics::start(app.handle().clone());
             tauri::async_runtime::spawn(adapters::claude::serve(pool.clone()));
+            adapters::usage_limits::start(pool.clone());
             let codex_pool = pool.clone();
             tauri::async_runtime::spawn(async move {
                 loop {
@@ -113,13 +115,19 @@ pub fn run() {
                             tracing::warn!(%error, "Cursor usage synchronization failed");
                         }
                     }
-                    tokio::time::sleep(std::time::Duration::from_secs(300)).await;
+                    tokio::time::sleep(std::time::Duration::from_secs(60)).await;
                 }
             });
             tray::create(app)?;
+            character_salary::start(app.handle().clone())?;
             Ok(())
         })
         .on_window_event(|window, event| match event {
+            tauri::WindowEvent::Moved(_) | tauri::WindowEvent::Resized(_)
+                if window.label() == "character" =>
+            {
+                character_salary::position(window.app_handle());
+            }
             tauri::WindowEvent::CloseRequested { api, .. } => {
                 api.prevent_close();
                 let _ = window.hide();
@@ -130,11 +138,15 @@ pub fn run() {
             _ => {}
         })
         .invoke_handler(tauri::generate_handler![
+            commands::get_salary_settings,
+            commands::save_salary_settings,
+            commands::get_salary_snapshot,
             commands::get_daily_summary,
             commands::get_focus_activity_today,
             commands::get_activity_history,
             commands::get_character_state,
             commands::get_ai_usage_today,
+            commands::get_account_usage_limits,
             commands::set_codex_usage_enabled,
             commands::preview_codex_account,
             commands::connect_codex_account,
@@ -172,12 +184,12 @@ pub fn run() {
             commands::get_system_stats,
             commands::set_host_metrics_mode,
             commands::set_system_panel_expanded,
+            commands::set_main_window_content_height,
             commands::get_whip_stats,
             commands::record_whip,
             commands::preview_xp_coupon,
             commands::redeem_xp_coupon,
             commands::get_xp_boost_status,
-            commands::sync_ai_weekly_xp,
             commands::get_trait_progress,
             commands::upgrade_trait,
             commands::get_activity_stats

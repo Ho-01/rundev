@@ -5,7 +5,6 @@ import { relaunch } from "@tauri-apps/plugin-process";
 import type {
   ActivityHistoryDay,
   AiUsageToday,
-  AiWeeklyXp,
   CharacterState,
   ClaudeConnectionPreview,
   ClaudeUsageToday,
@@ -102,15 +101,6 @@ const previewAiUsage: AiUsageToday = {
   environment: null,
   latestAvailableDate: null,
   latestAvailableTokens: null
-};
-
-const previewAiWeeklyXp: AiWeeklyXp = {
-  weekStartedOn: new Date().toISOString().slice(0, 10),
-  earnedXp: 140,
-  maxXp: 500,
-  codexXp: 50,
-  claudeXp: 60,
-  cursorXp: 30
 };
 
 const previewClaudeUsage: ClaudeUsageToday = {
@@ -248,7 +238,6 @@ function getPreviewDashboard() {
         xpEarned: 40,
         nextRewardAt: 10_000
       },
-      aiWeeklyXp: previewAiWeeklyXp,
       runner: previewRunner()
     };
   }
@@ -263,7 +252,6 @@ function getPreviewDashboard() {
         status: "syncing" as const,
         accountLabel: "Codex 계정"
       },
-      aiWeeklyXp: { ...previewAiWeeklyXp, earnedXp: 0, codexXp: 0, claudeXp: 0, cursorXp: 0 },
       claudeUsage: {
         ...previewClaudeUsage,
         status: "waiting" as const
@@ -279,7 +267,6 @@ function getPreviewDashboard() {
     activityHistory: previewActivityHistory(),
     character: previewCharacter,
     aiUsage: previewAiUsage,
-    aiWeeklyXp: { ...previewAiWeeklyXp, earnedXp: 0, codexXp: 0, claudeXp: 0, cursorXp: 0 },
     claudeUsage: previewClaudeUsage,
     cursorUsage: previewCursorUsage,
     keyboard: previewKeyboard,
@@ -482,16 +469,23 @@ export async function setHostMetricsMode(mode: "background" | "summary" | "detai
   await invoke("set_host_metrics_mode", { mode });
 }
 
+export async function setMainWindowContentHeight(height: number) {
+  if (!isTauri()) return;
+  await invoke("set_main_window_content_height", { height });
+}
+
 export async function setSystemPanelExpanded(
   expanded: boolean,
   expansionSide: "left" | "right" = "right",
-  previousExpansionSide?: "left" | "right"
+  previousExpansionSide?: "left" | "right",
+  summaryPinned = false
 ) {
   if (!isTauri()) return;
   await invoke("set_system_panel_expanded", {
     expanded,
     expansionSide,
-    previousExpansionSide
+    previousExpansionSide,
+    summaryPinned
   });
 }
 
@@ -540,12 +534,10 @@ export async function getTraitProgress(): Promise<TraitProgress> {
       spentPoints: 1,
       nextFocusRewardXp: 10,
       nextKeyboardRewardXp: 10,
-      nextAiRewardXp: 10,
       traits: [
         { id: "focus-ready", level: 1, maxLevel: 20, effectValue: 5, nextEffectValue: 10, effectUnit: "percent", exampleRewardValue: 10.5, nextExampleRewardValue: 11, upgradeCost: 1 },
         { id: "hot-keyboard", level: 0, maxLevel: 20, effectValue: 0, nextEffectValue: 5, effectUnit: "percent", exampleRewardValue: 10, nextExampleRewardValue: 10.5, upgradeCost: 1 },
         { id: "reload", level: 0, maxLevel: 20, effectValue: 0, nextEffectValue: 2, effectUnit: "xp-per-active-day", exampleRewardValue: 0, nextExampleRewardValue: 2, upgradeCost: 1 },
-        { id: "context-runner", level: 0, maxLevel: 20, effectValue: 0, nextEffectValue: 5, effectUnit: "percent", exampleRewardValue: 10, nextExampleRewardValue: 10.5, upgradeCost: 1 }
       ]
     };
   }
@@ -660,7 +652,6 @@ export async function getDashboard() {
     invoke<RunnerSelection>("get_runner_selection")
   ]);
 
-  const aiWeeklyXp = await invoke<AiWeeklyXp>("sync_ai_weekly_xp");
   const [summary, character] = await Promise.all([
     invoke<DailySummary>("get_daily_summary"),
     invoke<CharacterState>("get_character_state")
@@ -672,7 +663,6 @@ export async function getDashboard() {
     activityHistory,
     character,
     aiUsage,
-    aiWeeklyXp,
     claudeUsage,
     cursorUsage,
     keyboard,
