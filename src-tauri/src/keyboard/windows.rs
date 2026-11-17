@@ -9,7 +9,7 @@ use windows::{
         UI::{
             Input::{
                 GetRawInputData, RegisterRawInputDevices, HRAWINPUT, RAWINPUT, RAWINPUTDEVICE,
-                RAWINPUTHEADER, RIDEV_INPUTSINK, RID_INPUT, RIM_TYPEKEYBOARD,
+                RAWINPUTHEADER, RAWKEYBOARD, RIDEV_INPUTSINK, RID_INPUT, RIM_TYPEKEYBOARD,
             },
             WindowsAndMessaging::{
                 CreateWindowExW, DefWindowProcW, DispatchMessageW, GetMessageW, RegisterClassW,
@@ -122,18 +122,14 @@ unsafe fn handle_raw_input(lparam: LPARAM) {
     let header_size = size_of::<RAWINPUTHEADER>() as u32;
     let input = HRAWINPUT(lparam.0 as *mut core::ffi::c_void);
     if unsafe { GetRawInputData(input, RID_INPUT, None, &mut size, header_size) } == u32::MAX
-        || size < size_of::<RAWINPUT>() as u32
+        || !valid_keyboard_packet_size(size)
     {
         return;
     }
 
-    // This window registers only the keyboard usage page, whose payload is one RAWINPUT.
-    // A typed MaybeUninit keeps the output pointer correctly aligned for the Win32 API;
-    // Vec<u8> does not provide that contract when cast to RAWINPUT.
-    if size != size_of::<RAWINPUT>() as u32 {
-        return;
-    }
-    let mut raw = MaybeUninit::<RAWINPUT>::uninit();
+    // Keyboard payloads are smaller than the full mouse-sized RAWINPUT union (40 vs
+    // 48 bytes on x64). Keep aligned storage and initialize the unused union tail.
+    let mut raw = MaybeUninit::<RAWINPUT>::zeroed();
     let copied = unsafe {
         GetRawInputData(
             input,
@@ -143,25 +139,66 @@ unsafe fn handle_raw_input(lparam: LPARAM) {
             header_size,
         )
     };
-    if copied == u32::MAX || copied != size_of::<RAWINPUT>() as u32 {
+    if copied == u32::MAX || copied != size {
         return;
     }
 
     let raw = unsafe { raw.assume_init() };
-    if raw.header.dwType != RIM_TYPEKEYBOARD.0 {
-        return;
+    if let (Some(sender), Some(event)) = (SENDER.get(), keyboard_event(&raw, copied)) {
+        let _ = sender.send(event);
     }
-    let keyboard = unsafe { raw.data.keyboard };
-    send_key_event(keyboard.Message, keyboard.VKey as u32);
 }
 
-fn send_key_event(message: u32, key: u32) {
-    let event = match message {
+fn valid_keyboard_packet_size(size: u32) -> bool {
+    let minimum = std::mem::offset_of!(RAWINPUT, data) + size_of::<RAWKEYBOARD>();
+    (minimum..=size_of::<RAWINPUT>()).contains(&(size as usize))
+}
+
+fn keyboard_event(raw: &RAWINPUT, copied: u32) -> Option<KeyEvent> {
+    if !valid_keyboard_packet_size(copied) || raw.header.dwType != RIM_TYPEKEYBOARD.0 {
+        return None;
+    }
+    let keyboard = unsafe { raw.data.keyboard };
+    let key = keyboard.VKey as u32;
+    match keyboard.Message {
         WM_KEYDOWN | WM_SYSKEYDOWN => Some(KeyEvent::Down(key)),
         WM_KEYUP | WM_SYSKEYUP => Some(KeyEvent::Up(key)),
         _ => None,
-    };
-    if let (Some(sender), Some(event)) = (SENDER.get(), event) {
-        let _ = sender.send(event);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn decodes_keyboard_payload_smaller_than_the_raw_input_union() {
+        let mut raw = RAWINPUT::default();
+        let packet_size = (std::mem::offset_of!(RAWINPUT, data) + size_of::<RAWKEYBOARD>()) as u32;
+        raw.header.dwType = RIM_TYPEKEYBOARD.0;
+        raw.header.dwSize = packet_size;
+        raw.data.keyboard = RAWKEYBOARD {
+            VKey: 0x41,
+            Message: WM_KEYDOWN,
+            ..Default::default()
+        };
+        assert!(packet_size < size_of::<RAWINPUT>() as u32);
+        assert!(matches!(
+            keyboard_event(&raw, packet_size),
+            Some(KeyEvent::Down(0x41))
+        ));
+        raw.data.keyboard = RAWKEYBOARD {
+            VKey: 0x41,
+            Message: WM_KEYUP,
+            ..Default::default()
+        };
+        assert!(matches!(
+            keyboard_event(&raw, packet_size),
+            Some(KeyEvent::Up(0x41))
+        ));
+        assert!(keyboard_event(&raw, packet_size - 1).is_none());
+        assert!(keyboard_event(&raw, size_of::<RAWINPUT>() as u32 + 1).is_none());
+        raw.header.dwType = 0;
+        assert!(keyboard_event(&raw, packet_size).is_none());
     }
 }

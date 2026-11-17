@@ -26,6 +26,7 @@ pub(crate) fn display_name(identifier: &str) -> String {
             "Cursor"
         }
         "windsurf.exe" => "Windsurf",
+        "orca.exe" => "Orca",
         "idea64.exe" | "com.jetbrains.intellij" => "IntelliJ IDEA",
         "webstorm64.exe" | "com.jetbrains.webstorm" => "WebStorm",
         "pycharm64.exe" | "com.jetbrains.pycharm" => "PyCharm",
@@ -68,6 +69,7 @@ const WINDOWS_APPS: &[&str] = &[
     "githubdesktop.exe",
     "goland64.exe",
     "idea64.exe",
+    "orca.exe",
     "phpstorm64.exe",
     "postman.exe",
     "powershell.exe",
@@ -122,6 +124,7 @@ mod tests {
         {
             assert!(is_developer_app("Code.exe"));
             assert!(is_developer_app("WINDOWSTERMINAL.EXE"));
+            assert!(is_developer_app("Orca.exe"));
         }
 
         #[cfg(target_os = "macos")]
@@ -134,6 +137,7 @@ mod tests {
     #[test]
     fn rejects_partial_or_unrelated_names() {
         assert!(!is_developer_app("my-code-wrapper.exe"));
+        assert!(!is_developer_app("orca-slicer.exe"));
         assert!(!is_developer_app("com.apple.Safari"));
     }
 
@@ -142,6 +146,7 @@ mod tests {
         assert_eq!(display_name("code.exe"), "VS Code");
         assert_eq!(display_name("com.microsoft.VSCode"), "VS Code");
         assert_eq!(display_name("cursor.exe"), "Cursor");
+        assert_eq!(display_name("ORCA.EXE"), "Orca");
     }
 
     #[test]
