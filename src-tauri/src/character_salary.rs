@@ -90,14 +90,18 @@ pub fn position(app: &AppHandle) {
 }
 
 pub fn start(app: AppHandle) -> Result<(), tauri::Error> {
-    let Some(overlay) = app.get_webview_window("character-salary") else {
-        return Ok(());
-    };
-    overlay.set_ignore_cursor_events(true)?;
     tauri::async_runtime::spawn(async move {
         let mut configured = false;
         let mut checked = Instant::now() - Duration::from_secs(2);
         loop {
+            let character_visible = app
+                .get_webview_window("character")
+                .is_some_and(|character| character.is_visible().unwrap_or(false));
+            if !character_visible {
+                crate::window_lifecycle::destroy(&app, "character-salary");
+                tokio::time::sleep(Duration::from_secs(1)).await;
+                continue;
+            }
             if checked.elapsed() >= Duration::from_secs(1) {
                 configured = crate::salary::load(&app.state::<crate::database::AppState>().pool)
                     .await
@@ -112,12 +116,18 @@ pub fn start(app: AppHandle) -> Result<(), tauri::Error> {
                     .and_then(|character| character.is_visible().ok())
                     .unwrap_or(false);
             if visible {
+                let Ok(overlay) = crate::window_lifecycle::ensure(&app, "character-salary") else {
+                    tokio::time::sleep(Duration::from_secs(1)).await;
+                    continue;
+                };
+                let _ = overlay.set_ignore_cursor_events(true);
                 position(&app);
                 if !overlay.is_visible().unwrap_or(false) {
                     let _ = overlay.show();
+                    let _ = app.emit_to("character-salary", "rundev-window-visible", true);
                 }
-            } else if overlay.is_visible().unwrap_or(false) {
-                let _ = overlay.hide();
+            } else {
+                crate::window_lifecycle::destroy(&app, "character-salary");
             }
             tokio::time::sleep(Duration::from_millis(250)).await;
         }

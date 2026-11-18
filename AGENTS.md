@@ -91,8 +91,13 @@ cargo test --manifest-path src-tauri/Cargo.toml --lib
 의존성을 변경했다면:
 
 ```powershell
-npm.cmd audit
+npm.cmd run audit:check
 ```
+
+`audit:check`는 배포 의존성의 모든 취약점을 차단한다. 전체 의존성 검사에서는
+사용자가 승인한 개발 전용 공지 `GHSA-fc5q-39xc-vjpf` 한 건만 2026-12-18 UTC 전까지
+허용한다. 새 공지·배포 의존성·기한 만료는 실패하며 상세 근거는
+`docs/releases/versioning.md`를 따른다. 원본 결과는 `npm.cmd audit`로 확인한다.
 
 ## 커밋 메시지
 

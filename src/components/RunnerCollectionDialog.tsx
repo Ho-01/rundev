@@ -124,7 +124,7 @@ export function RunnerCollectionDialog({
                   disabled={busy}
                   onClick={() => void selectCharacter(character.runnerId)}
                 >
-                  <img src={runnerPreviewFrame(character.runnerId)} alt="" aria-hidden="true" />
+                  <img src={runnerPreviewFrame(character.runnerId)} loading="lazy" decoding="async" alt="" aria-hidden="true" />
                   <span>{character.name}</span>
                 </button>
               );
@@ -145,7 +145,7 @@ export function RunnerCollectionDialog({
               const active = collection?.selected.runnerId === activeCharacter.runnerId && skin.equipped;
               return (
                 <article key={skin.skinId} className={`runner-skin-card${active ? " equipped" : ""}${skin.owned ? "" : " locked"}`}>
-                  <img src={runnerPreviewFrame(activeCharacter.runnerId, skin.skinId)} alt="" aria-hidden="true" />
+                  <img src={runnerPreviewFrame(activeCharacter.runnerId, skin.skinId)} loading="lazy" decoding="async" alt="" aria-hidden="true" />
                   <div>
                     <strong>{skin.name}</strong>
                     <p>{skin.description}</p>

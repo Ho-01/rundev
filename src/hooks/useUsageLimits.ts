@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { getAccountUsageLimits, type ProviderLimits } from "../services/usageLimits";
 
-export function useUsageLimits() {
+export function useUsageLimits(enabled = true) {
   const [limits, setLimits] = useState<ProviderLimits[]>([]);
   useEffect(() => {
+    if (!enabled) return;
     let disposed = false;
     let pending = false;
     async function refresh() {
@@ -24,6 +25,6 @@ export function useUsageLimits() {
     // Rust throttles provider requests to 60 seconds; this only reads its cache.
     const timer = window.setInterval(() => void refresh(), 5_000);
     return () => { disposed = true; window.clearInterval(timer); };
-  }, []);
+  }, [enabled]);
   return limits;
 }

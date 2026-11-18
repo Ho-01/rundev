@@ -8,6 +8,22 @@ use std::collections::HashMap;
 use tauri::{AppHandle, Emitter, State};
 
 #[tauri::command]
+pub async fn get_accent_theme(state: State<'_, AppState>) -> Result<String, String> {
+    crate::appearance::load(&state.pool).await
+}
+
+#[tauri::command]
+pub async fn set_accent_theme(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    theme: String,
+) -> Result<(), String> {
+    crate::appearance::save(&state.pool, &theme).await?;
+    let _ = app.emit("accent-theme-changed", &theme);
+    Ok(())
+}
+
+#[tauri::command]
 pub async fn get_salary_settings(
     state: State<'_, AppState>,
 ) -> Result<Option<crate::salary::Settings>, String> {

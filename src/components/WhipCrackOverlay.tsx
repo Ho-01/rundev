@@ -4,14 +4,14 @@ import {
   useImperativeHandle,
   useRef
 } from "react";
-import {
-  Bodies,
-  Body,
-  Composite,
-  Constraint,
-  Engine,
-  type IBodyDefinition
-} from "matter-js";
+import type { Body, Constraint, Engine, IBodyDefinition } from "matter-js";
+
+let physics: typeof import("matter-js");
+let physicsLoading: Promise<void> | undefined;
+function loadPhysics() {
+  return physicsLoading ??= import("matter-js").then((module) => { physics = module.default ?? module; })
+    .catch((error) => { physicsLoading = undefined; throw error; });
+}
 
 type Point = { x: number; y: number };
 type CrackBurst = { x: number; y: number; life: number };
@@ -71,7 +71,7 @@ function createWhipSimulation(
     x: clamp(target.x + side * 236, 28, width - 28),
     y: clamp(target.y + 12, 36, 110)
   };
-  const engine = Engine.create({
+  const engine = physics.Engine.create({
     gravity: { x: 0, y: 0.12, scale: 0.001 },
     positionIterations: 12,
     velocityIterations: 10,
@@ -92,15 +92,15 @@ function createWhipSimulation(
       restitution: 0,
       collisionFilter: { category: 0x0002, mask: 0 }
     };
-    const body = Bodies.circle(x, y, radius, options);
-    Body.setMass(body, lerp(1.15, 0.055, amount ** 1.5));
+    const body = physics.Bodies.circle(x, y, radius, options);
+    physics.Body.setMass(body, lerp(1.15, 0.055, amount ** 1.5));
     bodies.push(body);
   }
 
   const constraints: Constraint[] = [];
   for (let index = 0; index < bodies.length - 1; index++) {
     constraints.push(
-      Constraint.create({
+      physics.Constraint.create({
         bodyA: bodies[index],
         bodyB: bodies[index + 1],
         length: REST_LENGTH,
@@ -116,7 +116,7 @@ function createWhipSimulation(
   for (let index = 0; index < bodies.length - 2; index++) {
     const amount = index / (bodies.length - 3);
     constraints.push(
-      Constraint.create({
+      physics.Constraint.create({
         bodyA: bodies[index],
         bodyB: bodies[index + 2],
         length: REST_LENGTH * 1.94,
@@ -126,14 +126,14 @@ function createWhipSimulation(
     );
   }
 
-  const handlePin = Constraint.create({
+  const handlePin = physics.Constraint.create({
     pointA: { ...handle },
     bodyB: bodies[0],
     length: 0,
     stiffness: 1,
     damping: 0.18
   });
-  const targetPin = Constraint.create({
+  const targetPin = physics.Constraint.create({
     pointA: { ...target },
     bodyB: bodies[bodies.length - 1],
     length: 0,
@@ -141,7 +141,7 @@ function createWhipSimulation(
     damping: 0.2
   });
 
-  Composite.add(engine.world, [
+  physics.Composite.add(engine.world, [
     ...bodies,
     ...constraints,
     handlePin,
@@ -210,8 +210,8 @@ function stepSimulation(simulation: WhipSimulation, now: number) {
     simulation.impacted = true;
     simulation.targetPin.stiffness = 1;
     const tip = simulation.bodies[simulation.bodies.length - 1];
-    Body.setPosition(tip, simulation.target);
-    Body.setVelocity(tip, { x: 0, y: 0 });
+    physics.Body.setPosition(tip, simulation.target);
+    physics.Body.setVelocity(tip, { x: 0, y: 0 });
   }
 
   if (!simulation.frozen) {
@@ -219,7 +219,7 @@ function stepSimulation(simulation: WhipSimulation, now: number) {
     let remaining = elapsed;
     while (remaining > 0) {
       const step = Math.min(FIXED_STEP_MS, remaining);
-      Engine.update(simulation.engine, step);
+      physics.Engine.update(simulation.engine, step);
       remaining -= step;
     }
     simulation.lastFrameAt = now;
@@ -336,9 +336,13 @@ export const WhipCrackOverlay = forwardRef<WhipCrackApi, Props>(
     const animationFrameRef = useRef(0);
     const renderRef = useRef<(now: number) => void>(() => {});
     const reducedMotionRef = useRef(false);
+    const mounted = useRef(true);
+    useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
 
     useImperativeHandle(ref, () => ({
-      crackAt(x, y, _variant) {
+      async crackAt(x, y, _variant) {
+        if (!physics) { try { await loadPhysics(); } catch { return; } }
+        if (!mounted.current) return;
         const target = {
           x: clamp(x, 4, width - 4),
           y: clamp(y, 4, height - 4)

@@ -1,5 +1,6 @@
 mod activity;
 mod adapters;
+mod appearance;
 mod character_salary;
 mod character_window;
 mod commands;
@@ -13,6 +14,7 @@ mod runner_skins;
 mod salary;
 mod tray;
 mod whip;
+mod window_lifecycle;
 mod xp_boost;
 
 use database::AppState;
@@ -78,17 +80,19 @@ pub fn run() {
                 .map_err(std::io::Error::other)?;
             tray::set_runner(&selected_runner.runner_id, &selected_runner.skin_id);
             app.manage(AppState { pool: pool.clone() });
-            if let Err(error) =
-                tauri::async_runtime::block_on(character_window::restore(app.handle(), &pool))
-            {
-                tracing::warn!(%error, "Character window state restoration failed");
-            }
+            let restore_app = app.handle().clone();
+            let restore_pool = pool.clone();
+            tauri::async_runtime::spawn(async move {
+                if let Err(error) = character_window::restore(&restore_app, &restore_pool).await {
+                    tracing::warn!(%error, "Character window state restoration failed");
+                }
+            });
             character_window::start_pointer_follower(app.handle().clone());
             activity::start(pool.clone(), app.handle().clone());
             keyboard::start(pool.clone(), app.handle().clone());
             host_metrics::start(app.handle().clone());
             tauri::async_runtime::spawn(adapters::claude::serve(pool.clone()));
-            adapters::usage_limits::start(pool.clone());
+            adapters::usage_limits::start(pool.clone(), app.handle().clone());
             let codex_pool = pool.clone();
             tauri::async_runtime::spawn(async move {
                 loop {
@@ -130,14 +134,24 @@ pub fn run() {
             }
             tauri::WindowEvent::CloseRequested { api, .. } => {
                 api.prevent_close();
-                let _ = window.hide();
+                if window.label() == "main" {
+                    window_lifecycle::hide_main(window.app_handle());
+                } else if window.label() == "character" {
+                    let app = window.app_handle().clone();
+                    tauri::async_runtime::spawn(async move {
+                        let state = app.state::<AppState>();
+                        let _ = character_window::set_visible(false, app.clone(), state).await;
+                    });
+                }
             }
             tauri::WindowEvent::Focused(false) if window.label() == "main" => {
-                let _ = window.hide();
+                window_lifecycle::hide_main(window.app_handle());
             }
             _ => {}
         })
         .invoke_handler(tauri::generate_handler![
+            commands::get_accent_theme,
+            commands::set_accent_theme,
             commands::get_salary_settings,
             commands::save_salary_settings,
             commands::get_salary_snapshot,
@@ -198,6 +212,10 @@ pub fn run() {
         .expect("error while building RunDev");
 
     app.run(|_, event| match event {
+        // Disposing the last view must not terminate the tray/background collectors.
+        tauri::RunEvent::ExitRequested {
+            code: None, api, ..
+        } => api.prevent_exit(),
         tauri::RunEvent::Ready => diagnostics::heartbeat("app"),
         tauri::RunEvent::Resumed => {
             diagnostics::record("app_event_loop_resumed", &[]);

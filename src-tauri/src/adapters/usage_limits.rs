@@ -98,10 +98,16 @@ pub async fn views(pool: &SqlitePool) -> Result<Vec<ProviderLimits>, String> {
     Ok(result)
 }
 
-pub fn start(pool: SqlitePool) {
+pub fn start(pool: SqlitePool, app: tauri::AppHandle) {
+    use tauri::Manager;
     tauri::async_runtime::spawn(async move {
         loop {
-            refresh(&pool).await;
+            if app
+                .get_webview_window("main")
+                .is_some_and(|window| window.is_visible().unwrap_or(false))
+            {
+                refresh(&pool).await;
+            }
             tokio::time::sleep(Duration::from_secs(60)).await;
         }
     });

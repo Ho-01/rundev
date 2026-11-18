@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Settings } from "lucide-react";
-import { getSalarySettings, getSalarySnapshot, salaryAvailable, saveSalarySettings,
+import { getSalarySettings, salaryAvailable, saveSalarySettings,
   type SalarySettings, type SalarySnapshot } from "../services/salary";
 
 const initial: SalarySettings = { monthlyWon: 3_000_000, payday: 25, startMinute: 540,
@@ -17,10 +17,13 @@ const workStatusLabels: Record<SalarySnapshot["workStatus"], string> = {
 const remainingTime = (seconds: number) => [Math.floor(seconds / 3600), Math.floor(seconds / 60) % 60, seconds % 60]
   .map((value) => String(value).padStart(2, "0")).join(":");
 
-export function SalaryCard() {
+import { useSalarySnapshot } from "../hooks/useSalarySnapshot";
+
+export function SalaryCard({ active = true, snapshot: sharedSnapshot }: { active?: boolean; snapshot?: SalarySnapshot | null }) {
   const [settings, setSettings] = useState<SalarySettings | null>(null);
+  const ownSnapshot = useSalarySnapshot(active && !!settings && sharedSnapshot === undefined);
+  const snapshot = settings ? (sharedSnapshot === undefined ? ownSnapshot : sharedSnapshot) : null;
   const [draft, setDraft] = useState(initial);
-  const [snapshot, setSnapshot] = useState<SalarySnapshot | null>(null);
   const [editing, setEditing] = useState(false);
   const [ready, setReady] = useState(false);
   const [settingsAttempt, setSettingsAttempt] = useState(0);
@@ -59,28 +62,6 @@ export function SalaryCard() {
   }, [settingsAttempt]);
 
   useEffect(() => {
-    if (!settings) { setSnapshot(null); return; }
-    let active = true;
-    let pending = false;
-    const refresh = async () => {
-      if (document.hidden || pending) return;
-      pending = true;
-      try {
-        const value = await getSalarySnapshot();
-        if (active) { setSnapshot(value); setError(""); }
-      } catch {
-        if (active) { setSnapshot(null); setError("급여를 갱신하지 못했습니다. 다시 시도 중입니다."); }
-      } finally { pending = false; }
-    };
-    void refresh();
-    const timer = window.setInterval(() => void refresh(), 1000);
-    document.addEventListener("visibilitychange", refresh);
-    window.addEventListener("focus", refresh);
-    return () => { active = false; window.clearInterval(timer);
-      document.removeEventListener("visibilitychange", refresh); window.removeEventListener("focus", refresh); };
-  }, [settings]);
-
-  useEffect(() => {
     if (editing) dialog.current?.querySelector<HTMLInputElement>("input")?.focus();
   }, [editing]);
 
@@ -89,25 +70,26 @@ export function SalaryCard() {
     setBusy(true); setFormError("");
     try {
       await saveSalarySettings(value);
-      setSettings(value); setSnapshot(null); setEditing(false); settingsButton.current?.focus();
+      setSettings(value); setEditing(false); settingsButton.current?.focus();
     } catch (reason) { setFormError(String(reason)); }
     finally { setBusy(false); }
   }
   function submit(event: FormEvent) { event.preventDefault(); void persist(draft); }
 
   return <section className="salary-card" aria-label="실시간 월급">
-    <header><span>실시간 월급 <small>예상</small></span><button ref={settingsButton} type="button"
+    <header><span>실시간 월급 <small>예상</small></span><div className="salary-header-tools">
+      {snapshot && <span className={`salary-state ${snapshot.workStatus}`}>● {workStatusLabels[snapshot.workStatus]}</span>}
+      <button ref={settingsButton} type="button"
       aria-label="급여 설정" title="급여 설정"
-      disabled={!ready} onClick={() => { setDraft(settings ?? initial); setFormError(""); setEditing(true); }}><Settings size={13} aria-hidden="true" /></button></header>
+      disabled={!ready} onClick={() => { setDraft(settings ?? initial); setFormError(""); setEditing(true); }}><Settings size={13} aria-hidden="true" /></button></div></header>
     {snapshot ? <>
       <div className="salary-total-row" title={`${snapshot.cycleStart} ~ ${snapshot.nextPayday} · 근무 ${snapshot.workdays}일`}>
-        <strong className="salary-amount">{won(snapshot.cycleWon)}</strong>
-        <div className="salary-shift-status">
-          <span className={`salary-state ${snapshot.workStatus}`}>● {workStatusLabels[snapshot.workStatus]}</span>
-          {snapshot.secondsUntilEnd != null && <span className="salary-countdown">퇴근까지 {remainingTime(snapshot.secondsUntilEnd)}</span>}
-        </div>
+        <div className="salary-cycle"><span className="salary-caption">이번 급여 주기 누적</span><strong className="salary-amount">{won(snapshot.cycleWon)}</strong></div>
+        <div className="salary-today"><span className="salary-caption">오늘</span><strong>{won(snapshot.todayWon)}</strong></div>
       </div>
-      <div className="salary-details"><span>오늘 {won(snapshot.todayWon)}</span><span>초당 +{snapshot.wonPerSecond.toFixed(2)}원</span></div>
+      <div className="salary-details"><span>초당 <b>+{snapshot.wonPerSecond.toFixed(2)}원</b></span>
+        {snapshot.secondsUntilEnd != null && <span className="salary-countdown"><span>퇴근까지</span> <b>{remainingTime(snapshot.secondsUntilEnd)}</b></span>}
+      </div>
     </> : <p className="salary-empty">{!ready ? "급여 설정을 불러오는 중…" : settings ? "예상 급여를 계산하고 있어요…" : "급여와 근무시간을 설정해 주세요."}</p>}
     {error && !editing && <p role="alert" className="error-message">{error}</p>}
     {!ready && error && <button className="salary-retry" type="button" onClick={() => {

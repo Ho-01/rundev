@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import {
   Clock3,
   Cpu,
@@ -15,6 +15,7 @@ import {
   Network,
   PanelLeft,
   PanelRight,
+  Palette,
   RotateCcw,
   Sprout,
   SquareTerminal,
@@ -91,7 +92,10 @@ import type {
   ,TraitProgress
 } from "./types/activity";
 import { runnerFrames as framesForRunner } from "./assets/runners";
-import { RunnerCollectionDialog } from "./components/RunnerCollectionDialog";
+const StatsPanel = lazy(() => import("./components/StatsPanel").then((module) => ({ default: module.StatsPanel })));
+const TraitDialog = lazy(() => import("./components/TraitDialog").then((module) => ({ default: module.TraitDialog })));
+const RunnerCollectionDialog = lazy(() => import("./components/RunnerCollectionDialog").then((module) => ({ default: module.RunnerCollectionDialog })));
+const ThemeDialog = lazy(() => import("./components/ThemeDialog").then((module) => ({ default: module.ThemeDialog })));
 import openAiIcon from "./assets/providers/openai.svg";
 
 const KEYBOARD_PERMISSION_REPAIR_PENDING_KEY =
@@ -423,165 +427,6 @@ function TraitShowcase() {
   </main>;
 }
 
-function StatsPeriod({ title, stats }: { title: string; stats: ActivityStats | null }) {
-  const maxSeconds = Math.max(1, ...(stats?.hourly.map((slot) => slot.activeSeconds) ?? [1]));
-  const sourceCopy = {
-    focus: "집중",
-    keyboard: "키보드",
-    ai: "AI",
-    boost: "쿠폰",
-    trait: "특성",
-    other: "기타"
-  } as const;
-  const xpSources = stats?.xpSources.filter((source) => source.amount > 0) ?? [];
-  const sourceTotal = Math.max(1, xpSources.reduce((sum, source) => sum + source.amount, 0));
-  const busiestSlot = stats?.hourly.reduce((busiest, slot) => slot.activeSeconds > busiest.activeSeconds ? slot : busiest, stats.hourly[0]);
-  const heatmapLabel = busiestSlot?.activeSeconds
-    ? `${title} 시간대별 활동. 가장 활발한 시간은 ${busiestSlot.date} ${busiestSlot.hour}시, ${formatDuration(busiestSlot.activeSeconds)}`
-    : `${title} 시간대별 활동 없음`;
-  const sourceLabel = xpSources.length
-    ? `${title} XP 구성. ${xpSources.map((source) => `${sourceCopy[source.id]} ${source.amount} XP`).join(", ")}`
-    : `${title} 획득 XP 없음`;
-  const heatmap = <div className={`hourly-heatmap ${stats?.period ?? "day"}`} role="img" aria-label={heatmapLabel}>
-    {stats?.hourly.map((slot) => <i key={`${slot.date}-${slot.hour}`} style={{ opacity: slot.activeSeconds === 0 ? .14 : .3 + .7 * slot.activeSeconds / maxSeconds }} title={`${slot.date} ${slot.hour}:00 · ${formatDuration(slot.activeSeconds)}`} />)}
-  </div>;
-  return <section className="stats-period">
-    <h3>{title}</h3>
-    <div className="stats-totals">
-      <div><span>집중시간</span><b>{formatDuration(stats?.activeSeconds ?? 0)}</b></div>
-      <div><span>획득 XP</span><b>{stats?.xpEarned ?? 0} XP</b></div>
-      <div><span>키보드</span><b>{formatCompactTokens(stats?.keyboardPresses ?? 0)}</b></div>
-    </div>
-    <div className="xp-composition">
-      <div className="xp-composition-heading"><span>XP 구성</span><b>{stats?.xpEarned ?? 0} XP</b></div>
-      <div className="xp-composition-track" role="img" aria-label={sourceLabel}>
-        {xpSources.map((source) => <i key={source.id} className={source.id} style={{ width: `${source.amount / sourceTotal * 100}%` }} />)}
-      </div>
-      <div className="xp-composition-legend">
-        {xpSources.map((source) => <span key={source.id} className={source.id}><i />{sourceCopy[source.id]} <b>{source.amount}</b></span>)}
-      </div>
-    </div>
-    {stats?.period === "week" ? <div className="weekly-heatmap-layout">
-      <div className="heatmap-weekdays" aria-hidden="true"><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span>토</span><span>일</span></div>
-      <div className="weekly-heatmap-content">
-        {heatmap}
-        <div className="heatmap-hours week-hours"><span>0시</span><span>6시</span><span>12시</span><span>18시</span><span>23시</span></div>
-      </div>
-    </div> : <>
-      {heatmap}
-      <div className="heatmap-hours"><span>0시</span><span>12시</span><span>23시</span></div>
-    </>}
-  </section>;
-}
-
-function ActivityGrass({ activityHistory, activeDays, compact = false }: {
-  activityHistory: ActivityHistoryDay[];
-  activeDays: number;
-  compact?: boolean;
-}) {
-  return <div className={`activity-history${compact ? " compact-grass" : ""}`}>
-    <div className="activity-history-heading">
-      <span>최근 20주 활동</span>
-      <strong>{activeDays}일</strong>
-    </div>
-    <div className="activity-grass" role="img" aria-label={`최근 20주 중 ${activeDays}일 개발 활동`}>
-      {activityHistory.map((day) => <i key={day.date} className={`activity-cell intensity-${day.intensity}`} title={`${day.date} · ${formatDuration(day.activeSeconds)}`} />)}
-    </div>
-    <div className="activity-legend" aria-hidden="true">
-      <span>적음</span>
-      {[0, 1, 2, 3, 4].map((intensity) => <i key={intensity} className={`activity-cell intensity-${intensity}`} />)}
-      <span>많음</span>
-    </div>
-  </div>;
-}
-
-function FocusAppBreakdown({ apps, title }: { apps: ActivityStats["apps"] | undefined; title: string }) {
-  return <section className="stats-app-breakdown">
-    <h3>{title}</h3>
-    {apps?.length ? apps.map((app) => <div key={app.appName}>
-      <span>{app.appName}</span>
-      <strong>{formatDuration(app.activeSeconds)}</strong>
-    </div>) : <p>오늘 기록된 개발 도구가 없습니다.</p>}
-  </section>;
-}
-
-function StatsPanel({ dailyStats, weeklyStats, activityHistory, activeHistoryDays, closing, onClose }: {
-  dailyStats: ActivityStats | null;
-  weeklyStats: ActivityStats | null;
-  activityHistory: ActivityHistoryDay[];
-  activeHistoryDays: number;
-  closing?: boolean;
-  onClose: () => void;
-}) {
-  const [activeTab, setActiveTab] = useState<"today" | "week" | "history">("today");
-  const tabs = [
-    { id: "today" as const, label: "오늘" },
-    { id: "week" as const, label: "이번 주" },
-    { id: "history" as const, label: "20주" }
-  ];
-  function moveTab(event: KeyboardEvent<HTMLButtonElement>, index: number) {
-    let nextIndex = index;
-    if (event.key === "ArrowRight") nextIndex = (index + 1) % tabs.length;
-    else if (event.key === "ArrowLeft") nextIndex = (index - 1 + tabs.length) % tabs.length;
-    else if (event.key === "Home") nextIndex = 0;
-    else if (event.key === "End") nextIndex = tabs.length - 1;
-    else return;
-    event.preventDefault();
-    setActiveTab(tabs[nextIndex].id);
-    event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>("[role=tab]")[nextIndex]?.focus();
-  }
-  return <aside className={`stats-panel${closing ? " closing" : ""}`} aria-label="활동 통계">
-    <header><strong>활동 통계</strong><button type="button" onClick={onClose} aria-label="통계 접기"><X size={14}/></button></header>
-    <div className="stats-tabs" role="tablist" aria-label="통계 기간">
-      {tabs.map((tab, index) => <button key={tab.id} id={`stats-tab-${tab.id}`} type="button" role="tab" aria-selected={activeTab === tab.id} aria-controls={`stats-panel-${tab.id}`} tabIndex={activeTab === tab.id ? 0 : -1} onClick={() => setActiveTab(tab.id)} onKeyDown={(event) => moveTab(event, index)}>{tab.label}</button>)}
-    </div>
-    {activeTab === "today" && <div className="stats-tab-panel" id="stats-panel-today" role="tabpanel" aria-labelledby="stats-tab-today"><StatsPeriod title="오늘" stats={dailyStats} /><FocusAppBreakdown apps={dailyStats?.apps} title="오늘 사용한 개발 도구" /></div>}
-    {activeTab === "week" && <div className="stats-tab-panel" id="stats-panel-week" role="tabpanel" aria-labelledby="stats-tab-week"><StatsPeriod title="이번 주" stats={weeklyStats} /><FocusAppBreakdown apps={weeklyStats?.apps} title="이번 주 사용한 개발 도구" /></div>}
-    {activeTab === "history" && <div className="stats-tab-panel" id="stats-panel-history" role="tabpanel" aria-labelledby="stats-tab-history"><ActivityGrass activityHistory={activityHistory} activeDays={activeHistoryDays} compact /></div>}
-  </aside>;
-}
-
-function TraitDialog({ progress, onUpgrade, onClose }: { progress: TraitProgress; onUpgrade: (id: TraitId) => void; onClose: () => void }) {
-  const iconFor = (id: TraitId) => {
-    if (id === "focus-ready") return <Target size={18} />;
-    if (id === "hot-keyboard") return <Flame size={18} />;
-    if (id === "reload") return <RotateCcw size={18} />;
-    return <Boxes size={18} />;
-  };
-  const actualEffect = (trait: TraitProgress["traits"][number], atMax: boolean) => {
-    if (trait.id === "reload") {
-      return atMax
-        ? `활동일 +${trait.exampleRewardValue.toFixed(0)} XP`
-        : `활동일 +${trait.exampleRewardValue.toFixed(0)} → +${trait.nextExampleRewardValue.toFixed(0)} XP`;
-    }
-    return atMax
-      ? `10 → ${trait.exampleRewardValue.toFixed(1)} XP`
-      : `${trait.exampleRewardValue.toFixed(1)} → ${trait.nextExampleRewardValue.toFixed(1)} XP`;
-  };
-  const actualLabel = (id: TraitId) => {
-    if (id === "reload") return "매일 첫 집중 20분";
-    return "평균 보상 환산";
-  };
-  return <div className="dialog-backdrop trait-backdrop" role="presentation" onMouseDown={onClose}>
-    <section className="account-dialog trait-dialog" role="dialog" aria-modal="true" aria-label="개발자 특성" onMouseDown={(event) => event.stopPropagation()}>
-      <header className="trait-dialog-heading"><div><strong>개발자 특성</strong><span>나만의 개발 스타일을 강화하세요</span></div><div className="trait-points"><span>사용 가능</span><b>◆ {progress.availablePoints}</b></div></header>
-      <div className="trait-board">{progress.traits.map((trait) => {
-        const atMax = trait.level >= trait.maxLevel;
-        return <article key={trait.id} className={`trait-card ${trait.id}${progress.availablePoints >= trait.upgradeCost && !atMax ? " upgrade-ready" : ""}`}>
-          <header><i>{iconFor(trait.id)}</i><span>Lv. {trait.level}<small>/ {trait.maxLevel}</small></span></header>
-          <strong>{traitCopy[trait.id].name}</strong>
-          <p>{traitCopy[trait.id].description}</p>
-          <div className="trait-level-track"><i style={{ width: `${trait.level / trait.maxLevel * 100}%` }} /></div>
-          <div className="trait-effect"><b>{trait.effectValue.toFixed(1)}{trait.effectUnit === "percent" ? "%" : " XP"}</b><span>{atMax ? "MAX" : `다음 ${trait.nextEffectValue.toFixed(1)}${trait.effectUnit === "percent" ? "%" : " XP"}`}</span></div>
-          <div className="trait-actual"><span>{actualLabel(trait.id)}</span><b>{actualEffect(trait, atMax)}</b></div>
-          <button type="button" disabled={progress.availablePoints < trait.upgradeCost || atMax} onClick={() => onUpgrade(trait.id)} aria-label={`${traitCopy[trait.id].name} 강화`}>{atMax ? "최대 레벨" : <><Plus size={12}/> ◆ {trait.upgradeCost} 강화</>}</button>
-        </article>;
-      })}</div>
-      <div className="dialog-actions"><button type="button" onClick={onClose}>닫기</button></div>
-    </section>
-  </div>;
-}
-
 function LevelShowcase() {
   return (
     <main className="level-showcase">
@@ -610,12 +455,12 @@ function LevelShowcase() {
 }
 
 export function App() {
-  const usageLimits = useUsageLimits();
-  const salarySnapshot = useSalarySnapshot();
+  const [mainWindowActive, setMainWindowActive] = useState(isMainWindowActive);
+  const usageLimits = useUsageLimits(mainWindowActive);
+  const salarySnapshot = useSalarySnapshot(mainWindowActive);
   const todaySalaryLabel = salarySnapshot
     ? `오늘 ${new Intl.NumberFormat("ko-KR").format(Math.floor(salarySnapshot.todayWon))}원`
     : "오늘 —원";
-  const [mainWindowActive, setMainWindowActive] = useState(isMainWindowActive);
   const mainWindowActiveRef = useRef(mainWindowActive);
   const latestFocusActivityRef = useRef<FocusActivityUpdate | null>(null);
   const [accountPreview, setAccountPreview] = useState<CodexAccountPreview | null>(null);
@@ -627,6 +472,7 @@ export function App() {
   const [expandedAiProvider, setExpandedAiProvider] = useState<"codex" | "claude" | "cursor" | null>(null);
   const [headerFrame, setHeaderFrame] = useState(0);
   const [runnerDialogOpen, setRunnerDialogOpen] = useState(false);
+  const [themeDialogOpen, setThemeDialogOpen] = useState(false);
   const [characterWindowVisible, setCharacterWindowVisibleState] = useState(false);
   const [infoDialogOpen, setInfoDialogOpen] = useState(false);
   const [headerMenuOpen, setHeaderMenuOpen] = useState(false);
@@ -662,6 +508,7 @@ export function App() {
   );
   const [statsExpanded, setStatsExpanded] = useState(false);
   const systemSummaryPinnedRef = useRef(systemSummaryPinned);
+  const nativeLayoutInitialized = useRef(false);
   const [dailyStats, setDailyStats] = useState<ActivityStats | null>(null);
   const [weeklyStats, setWeeklyStats] = useState<ActivityStats | null>(null);
   const [traitProgress, setTraitProgress] = useState<TraitProgress | null>(null);
@@ -990,13 +837,14 @@ export function App() {
   }, []);
 
   useEffect(() => {
+    if (!mainWindowActive) return;
     void runUpdateCheck(false);
     const timer = window.setInterval(
       () => void runUpdateCheck(false),
       UPDATE_CHECK_INTERVAL_MS
     );
     return () => window.clearInterval(timer);
-  }, []);
+  }, [mainWindowActive]);
 
   useEffect(() => {
     if (!infoDialogOpen) return;
@@ -1024,10 +872,11 @@ export function App() {
   }, [headerMenuOpen]);
 
   useEffect(() => {
+    if (!mainWindowActive) return;
     void getXpBoostStatus().then(setXpBoost).catch(() => {});
     const timer = window.setInterval(() => setBoostClock(Date.now()), 30_000);
     return () => window.clearInterval(timer);
-  }, []);
+  }, [mainWindowActive]);
 
   useEffect(() => {
     void getTraitProgress().then(setTraitProgress).catch(() => {});
@@ -1131,8 +980,13 @@ export function App() {
   }, [mainWindowActive, setSystemStats]);
 
   useEffect(() => {
-    void resizeSystemPanel(systemPanelExpanded, "right", undefined, systemSummaryPinned);
-  }, []);
+    if (!mainWindowActive && nativeLayoutInitialized.current) return;
+    nativeLayoutInitialized.current = true;
+    // Reconcile cached/recreated native windows on each open as well as mount.
+    // In particular, a delayed collapse must not leave an expanded window with
+    // only the pinned 52px summary rendered inside it.
+    void resizeSystemPanel(Boolean(renderedPanelSide), renderedPanelSide ?? "right", renderedPanelSide ?? undefined, systemSummaryPinned);
+  }, [mainWindowActive]);
 
   useEffect(() => {
     if (!mainWindowActive) return;
@@ -1327,7 +1181,7 @@ export function App() {
         height={overlayHeight}
       />
       <PingModeOverlay rootRef={shellRef} onWhip={performWhip} />
-      {(statsExpanded || closingPanelSide === "left") && <StatsPanel dailyStats={dailyStats} weeklyStats={weeklyStats} activityHistory={activityHistory} activeHistoryDays={activeHistoryDays} closing={closingPanelSide === "left"} onClose={() => void toggleStatsPanel()} />}
+      {(statsExpanded || closingPanelSide === "left") && <Suspense fallback={null}><StatsPanel dailyStats={dailyStats} weeklyStats={weeklyStats} activityHistory={activityHistory} activeHistoryDays={activeHistoryDays} closing={closingPanelSide === "left"} onClose={() => void toggleStatsPanel()} /></Suspense>}
       <div className="popover-main">
       <div className="popover-content" ref={contentRef}>
       <header className="runner-header">
@@ -1407,6 +1261,12 @@ export function App() {
                     >
                       <Crown size={14} />
                       <span>개발자 컬렉션</span>
+                    </button>
+                    <button type="button" role="menuitem" onClick={() => {
+                      setHeaderMenuOpen(false); setThemeDialogOpen(true);
+                    }}>
+                      <Palette size={14} />
+                      <span>색상 테마</span>
                     </button>
                     <i className="header-menu-divider" aria-hidden="true" />
                     <button
@@ -1789,7 +1649,7 @@ export function App() {
             )}
           </ProviderInlineDetails>
         </details>
-        <SalaryCard />
+        <SalaryCard active={mainWindowActive} snapshot={salarySnapshot} />
       </section>
 
       {loading && <div className="loading-line" />}
@@ -1804,7 +1664,7 @@ export function App() {
         onToggle={toggleSystemPanel}
         onPinnedChange={changeSystemSummaryPinned}
       />
-      {traitDialogOpen && traitProgress && <TraitDialog progress={traitProgress} onUpgrade={(id) => void improveTrait(id)} onClose={() => setTraitDialogOpen(false)} />}
+      {traitDialogOpen && traitProgress && <Suspense fallback={null}><TraitDialog progress={traitProgress} onUpgrade={(id) => void improveTrait(id)} onClose={() => setTraitDialogOpen(false)} /></Suspense>}
       {infoDialogOpen && (
         <div className="dialog-backdrop" role="presentation">
           <section
@@ -1944,7 +1804,11 @@ export function App() {
           </section>
         </div>
       )}
+      {themeDialogOpen && <Suspense fallback={null}><ThemeDialog onClose={() => {
+        setThemeDialogOpen(false); headerMenuRef.current?.querySelector("button")?.focus();
+      }} /></Suspense>}
       {runnerDialogOpen && (
+        <Suspense fallback={<div role="status">캐릭터 불러오는 중…</div>}>
         <RunnerCollectionDialog
           selection={runner}
           characterWindowVisible={characterWindowVisible}
@@ -1953,6 +1817,7 @@ export function App() {
           onSelectionChanged={refresh}
           onToggleCharacterWindow={toggleCharacterWindow}
         />
+        </Suspense>
       )}
       {cursorConsentOpen && (
         <div className="dialog-backdrop" role="presentation">
