@@ -50,6 +50,24 @@ npm.cmd run version:check
 5. `git tag -a vX.Y.Z -m "RunDev vX.Y.Z"`를 생성하고 푸시한다.
 6. 태그 워크플로의 Windows installer와 Apple Silicon/Intel macOS DMG를 확인한다.
 
+### 한시적인 개발 의존성 보안 예외
+
+CI에서는 `npm run audit:check`를 실행한다. 이 명령은 정책 회귀 테스트 후 배포
+의존성(`npm audit --omit=dev`)과 전체 의존성(`npm audit`)을 각각 검사한다.
+배포 의존성의 취약점과 새 보안 공지는 계속 릴리스를 차단한다.
+
+2026-11-18 사용자 승인에 따라 개발 도구 Vite/Vitest가 참조하는 picomatch의
+[GHSA-fc5q-39xc-vjpf](https://github.com/advisories/GHSA-fc5q-39xc-vjpf)만
+2026-12-18 00:00 UTC 전까지 예외로 허용한다. 승인 시점에는 공식 수정 버전이 없다.
+공격자가 제공한 반복 extglob 패턴 처리 시 ReDoS가 발생할 수 있으며, RunDev는
+해당 도구에 사용자 제공 glob 패턴을 전달하지 않는다. 빌드·테스트 의존성으로만
+사용하며 배포 번들에서는 실행하지 않는다. 개발 서버를 외부에 공개하지 않는다.
+
+예외 검사는 package-lock의 모든 관련 설치 경로가 `dev: true`인지 검증하고
+해당 공지만 원인인 의존성 전파에 한해서 허용한다. 다른 공지나 불명확한 검사
+결과는 실패한다. 수정 버전이 나오면 업데이트하고 예외를 제거하며, 만료 후에는
+자동으로 실패하므로 재검토 없이 기한을 연장하지 않는다.
+
 릴리스 본문은 태그 버전에 해당하는 `CHANGELOG.md` 섹션에서 자동 생성된다.
 버전 섹션이 없거나 비어 있으면 릴리스 생성을 실패시킨다.
 

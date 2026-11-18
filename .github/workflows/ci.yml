@@ -61,4 +61,4 @@ jobs:
         run: cargo test --manifest-path src-tauri/Cargo.toml --lib
 
       - name: Audit npm dependencies
-        run: npm audit
+        run: npm run audit:check

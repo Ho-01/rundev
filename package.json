@@ -9,6 +9,7 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "test": "vitest run",
+    "audit:check": "node --test scripts/audit-policy.test.mjs && node scripts/audit.mjs",
     "test:watch": "vitest",
     "version:set": "node scripts/version.mjs set",
     "version:check": "node scripts/version.mjs check",

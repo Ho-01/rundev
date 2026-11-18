@@ -95,6 +95,21 @@ npm.cmd run docs:assets
 `main`에 UI 또는 개발자 캐릭터 애셋 변경이 푸시되면 GitHub Actions가 이미지를 다시 만들고,
 변경된 결과만 자동 커밋합니다.
 
+릴리스 전 검증:
+
+```powershell
+npm.cmd run version:check
+npm.cmd run build
+npm.cmd test
+npm.cmd run audit:check
+cargo check --manifest-path src-tauri/Cargo.toml
+cargo test --manifest-path src-tauri/Cargo.toml --lib
+git diff --check
+```
+
+보안 검사는 배포 의존성의 모든 취약점을 차단합니다. 승인된 개발 전용 보안 공지
+1건의 한시 예외와 만료일은 [릴리스 정책](docs/releases/versioning.md)에 기록합니다.
+
 ## 버전
 
 앱 버전은 여러 패키지와 번들 설정에서 동일하게 유지합니다. 직접 개별 파일을
@@ -126,6 +141,8 @@ npm.cmd run version:set -- 0.2.0
 - 레벨업 포인트로 강화하는 네 가지 개발자 특성
 - Rust command를 통한 요약·캐릭터·AI 상태 조회
 - React + Zustand 대시보드
+- 앱 메뉴에서 선택하는 13가지 강조색 테마와 실시간 급여 요약
+- 필요할 때 생성하고 숨김 후 해제하는 웹뷰와 기능별 지연 로딩
 - GitHub Releases 기반 앱 업데이트 확인과 수동 설치
 
 Updater는 서명된 `latest.json` endpoint로 새 버전을 확인합니다. Updater가 처음
