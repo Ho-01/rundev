@@ -26,6 +26,7 @@ import {
   X
 } from "lucide-react";
 import { useDashboardStore } from "./store/dashboard";
+import { tierEmblemAsset } from "./assets/emblems";
 import {
   openDiagnosticsFolder,
   previewClaudeConnection,
@@ -283,14 +284,14 @@ function LevelStatus({
   return (
     <div className={`level-row tier-${tier.id}${onOpenTraits ? " trait-launcher" : ""}`} onClick={onOpenTraits}>
       <div className="level-badge" aria-label={`${tier.name} 엠블럼`}>
-        <TierIcon tierId={tier.id} size={21} />
+        <TierEmblem tier={tier} level={level} />
       </div>
       <div className="level-copy">
         <div>
           <strong className="tier-name">
+            <span className="level-label">Lv. {level}</span>
             <TierIcon tierId={tier.id} />
             {tier.name}
-            <span className="level-label">Lv. {level}</span>
           </strong>
           <span>{xpIntoLevel} / {xpForNextLevel} XP</span>
         </div>
@@ -307,11 +308,10 @@ function tierAdornmentLevel(tier: LevelTier, level: number) {
 }
 
 function TierEmblem({ tier, level }: { tier: LevelTier; level: number }) {
-  return <span className="growth-tier-mark" aria-hidden="true" data-level={level}>
-    <i className="tier-plate plate-2" />
-    <i className="tier-plate plate-1" />
-    <span className="growth-tier-emblem"><TierIcon tierId={tier.id} size={17} /></span>
-    <span className="tier-chevron"><i /><i /></span>
+  const stage = tierAdornmentLevel(tier, level);
+  const asset = tierEmblemAsset(tier.id, stage);
+  return <span className="growth-tier-mark" aria-hidden="true" data-level={level} data-stage={stage}>
+    <img className="tier-pixel-sprite" src={asset.src} alt="" width={asset.width} height={asset.height} loading="lazy" decoding="async" draggable={false} />
   </span>;
 }
 
@@ -342,7 +342,7 @@ function GrowthSummary({
       <TierEmblem tier={tier} level={level} />
       <span className="growth-level-copy">
         <span>
-          <span className="growth-tier-title"><strong>{tier.name}</strong><b>Lv. {level}</b></span>
+          <span className="growth-tier-title"><b>Lv. {level}</b><strong>{tier.name}</strong></span>
           <small className="growth-trait-link">
             특성 보기 ›
             {availableTraitPoints > 0
@@ -369,8 +369,9 @@ function EmblemShowcase() {
       <p>티어마다 실루엣과 아이콘이 달라지고, 같은 티어에서도 레벨 구간에 따라 장식이 성장합니다.</p>
     </header>
     <div className="emblem-showcase-rule">
-      <span><b>기본</b> 티어 진입</span><i />
-      <span><b>장식 I</b> 구간 1/3</span><i />
+      <span aria-hidden="true" />
+      <span><b>기본</b> 티어 진입</span>
+      <span><b>장식 I</b> 구간 1/3</span>
       <span><b>장식 II</b> 구간 2/3</span>
     </div>
     <section className="emblem-showcase-list">

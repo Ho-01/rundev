@@ -48,6 +48,9 @@ jobs:
       - name: Test frontend
         run: npm test
 
+      - name: Check tier emblem geometry
+        run: node scripts/check-tier-emblems.mjs
+
       - name: Build frontend
         run: npm run build
 
