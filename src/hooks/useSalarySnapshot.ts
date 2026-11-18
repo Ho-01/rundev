@@ -1,9 +1,12 @@
 import { useEffect, useState } from "react";
 import { getSalarySnapshot, subscribeSalaryChanges, type SalarySnapshot } from "../services/salary";
+import { useWindowVisibility } from "./useWindowVisibility";
 
-export function useSalarySnapshot() {
+export function useSalarySnapshot(enabled = true) {
   const [snapshot, setSnapshot] = useState<SalarySnapshot | null>(null);
+  const visible = useWindowVisibility();
   useEffect(() => {
+    if (!enabled || !visible) return;
     let active = true;
     let pending = false;
     let unlisten = () => {};
@@ -25,6 +28,6 @@ export function useSalarySnapshot() {
     window.addEventListener("focus", refresh);
     return () => { active = false; unlisten(); window.clearInterval(timer);
       document.removeEventListener("visibilitychange", refresh); window.removeEventListener("focus", refresh); };
-  }, []);
+  }, [enabled, visible]);
   return snapshot;
 }

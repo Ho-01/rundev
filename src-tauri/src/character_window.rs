@@ -172,9 +172,36 @@ pub struct CharacterMotionState {
 }
 
 pub async fn restore(app: &AppHandle, pool: &SqlitePool) -> Result<(), String> {
-    let Some(window) = app.get_webview_window("character") else {
-        return Err("character window is unavailable".to_string());
-    };
+    restore_preferences(pool).await?;
+    crate::tray::set_pointer_following(is_pointer_following());
+    crate::tray::set_roaming(is_roaming());
+    if setting(pool, VISIBLE_KEY).await?.as_deref() != Some("true") {
+        return Ok(());
+    }
+    restore_window(app, pool).await
+}
+
+async fn restore_preferences(pool: &SqlitePool) -> Result<(), String> {
+    set_window_logical_size(
+        setting(pool, SIZE_KEY)
+            .await?
+            .and_then(|value| value.parse().ok())
+            .unwrap_or(DEFAULT_WINDOW_LOGICAL_SIZE),
+    );
+    FOLLOW_POINTER.store(
+        setting(pool, FOLLOW_POINTER_KEY).await?.as_deref() == Some("true"),
+        Ordering::Relaxed,
+    );
+    ROAMING.store(
+        setting(pool, ROAMING_KEY).await?.as_deref() == Some("true") && !is_pointer_following(),
+        Ordering::Relaxed,
+    );
+    Ok(())
+}
+
+async fn restore_window(app: &AppHandle, pool: &SqlitePool) -> Result<(), String> {
+    let window =
+        crate::window_lifecycle::ensure(app, "character").map_err(|error| error.to_string())?;
     FILE_DROP_ACTIVE.store(false, Ordering::Relaxed);
     DRAGGING.store(false, Ordering::Relaxed);
     RESIZING.store(false, Ordering::Relaxed);
@@ -237,29 +264,35 @@ pub async fn set_visible(
     app: AppHandle,
     state: tauri::State<'_, AppState>,
 ) -> Result<CharacterWindowState, String> {
-    let window = app
-        .get_webview_window("character")
-        .ok_or_else(|| "character window is unavailable".to_string())?;
-    let size = window_logical_size();
-    window
-        .set_size(LogicalSize::new(size, size))
-        .map_err(|error| error.to_string())?;
     if visible {
-        if setting(&state.pool, LAYOUT_KEY).await?.as_deref() != Some(COMPACT_LAYOUT)
-            || setting(&state.pool, X_KEY).await?.is_none()
-            || setting(&state.pool, Y_KEY).await?.is_none()
-        {
-            position_near_main(&app, &window);
-            let position = window.outer_position().map_err(|error| error.to_string())?;
-            save_setting(&state.pool, X_KEY, position.x.to_string()).await?;
-            save_setting(&state.pool, Y_KEY, position.y.to_string()).await?;
-            save_setting(&state.pool, LAYOUT_KEY, COMPACT_LAYOUT.to_string()).await?;
-        }
-        window.show()
-    } else {
-        window.hide()
+        restore_window(&app, &state.pool).await?;
     }
-    .map_err(|error| error.to_string())?;
+    let window = app.get_webview_window("character");
+    if let Some(window) = window {
+        let size = window_logical_size();
+        window
+            .set_size(LogicalSize::new(size, size))
+            .map_err(|error| error.to_string())?;
+        if visible {
+            if setting(&state.pool, LAYOUT_KEY).await?.as_deref() != Some(COMPACT_LAYOUT)
+                || setting(&state.pool, X_KEY).await?.is_none()
+                || setting(&state.pool, Y_KEY).await?.is_none()
+            {
+                position_near_main(&app, &window);
+                let position = window.outer_position().map_err(|error| error.to_string())?;
+                save_setting(&state.pool, X_KEY, position.x.to_string()).await?;
+                save_setting(&state.pool, Y_KEY, position.y.to_string()).await?;
+                save_setting(&state.pool, LAYOUT_KEY, COMPACT_LAYOUT.to_string()).await?;
+            }
+            window.show()
+        } else {
+            window.hide()
+        }
+        .map_err(|error| error.to_string())?;
+        if !visible {
+            save_current_position(&app, &state.pool).await?;
+        }
+    }
     save_setting(&state.pool, VISIBLE_KEY, visible.to_string()).await?;
     if !visible {
         DRAGGING.store(false, Ordering::Relaxed);
@@ -276,6 +309,10 @@ pub async fn set_visible(
         size: window_logical_size(),
     };
     let _ = app.emit("character-window-state-changed", &next);
+    if !visible {
+        crate::window_lifecycle::destroy(&app, "character-salary");
+        crate::window_lifecycle::destroy(&app, "character");
+    }
     Ok(next)
 }
 
@@ -876,9 +913,9 @@ pub async fn save_position(
 }
 
 async fn save_current_position(app: &AppHandle, pool: &SqlitePool) -> Result<(), String> {
-    let window = app
-        .get_webview_window("character")
-        .ok_or_else(|| "character window is unavailable".to_string())?;
+    let Some(window) = app.get_webview_window("character") else {
+        return Ok(());
+    };
     let position = window.outer_position().map_err(|error| error.to_string())?;
     save_setting(pool, X_KEY, position.x.to_string()).await?;
     save_setting(pool, Y_KEY, position.y.to_string()).await

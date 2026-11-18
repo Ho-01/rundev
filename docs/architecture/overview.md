@@ -22,6 +22,10 @@ flowchart LR
 
 ## 프로세스 모델
 
+화면은 필요할 때 생성한다. 숨긴 메인 팝오버는 30초 뒤 파괴하고 플로팅을 끄면
+캐릭터·급여 창을 해제한다. 마지막 화면이 없어도 Rust 수집·저장·트레이는 계속
+실행된다. 화면 수명 정책은 [ADR 0046](../decisions/0046-disposable-webviews-and-lazy-loading.md)을 따른다.
+
 RunDev는 하나의 Tauri 프로세스로 실행된다.
 
 ```text
@@ -146,3 +150,9 @@ React는 근무/점심/퇴근 상태와 퇴근 시각까지의 시·분·초만 
 `set_main_window_content_height`를 통해 Rust가 DPI·작업 영역에 맞춰 창 높이를 조절한다.
 AI 상세는 창 안에 고정 배치하는 오버레이이므로 행이나 창 높이를 밀지 않는다.
 긴 설정 모달은 스크롤을 허용하며 스크롤바는 숨긴다(ADR 0045).
+
+강조색 설정은 Rust `appearance` 모듈이 기존 `app_settings`에 보관한다.
+React의 `services/appearance`는 설정 command와 `accent-theme-changed` 이벤트를
+캡슐화하고, 모든 창의 시작 시 CSS 강조색 변수를 복원한다. localStorage는
+초기 표시용 캐시이며 SQLite가 원본이다. 테마 모달은 필요할 때만 로딩하고,
+미리보기는 현재 창에만 적용하며 취소 시 복원한다(ADR 0047).

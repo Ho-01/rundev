@@ -1,6 +1,7 @@
 import type { RunnerId, RunnerSkinId } from "../../types/activity";
 
-const masterFrames = import.meta.glob("./master/**/*.png", {
+// Idle needs only four frames; feeding/grabbed/roaming have their own catalogs.
+const masterFrames = import.meta.glob("./master/**/0[1-4].png", {
   eager: true,
   query: "?url",
   import: "default"

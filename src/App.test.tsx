@@ -5,6 +5,42 @@ import { useDashboardStore } from "./store/dashboard";
 import * as rundevService from "./services/rundev";
 
 describe("App", () => {
+  it("opens the color theme dialog from the app menu", async () => {
+    localStorage.clear();
+    render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: "앱 메뉴" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "색상 테마" }));
+    expect(await screen.findByRole("dialog", { name: "색상 테마" })).toBeInTheDocument();
+    expect(await screen.findAllByRole("radio")).toHaveLength(13);
+    fireEvent.click(screen.getByRole("button", { name: "취소" }));
+    expect(screen.queryByRole("dialog", { name: "색상 테마" })).not.toBeInTheDocument();
+  });
+  it("reconciles the pinned summary width every time the tray regains focus", async () => {
+    localStorage.clear();
+    localStorage.setItem("rundev.systemSummaryPinned", "true");
+    let notify: ((active: boolean) => void) | undefined;
+    const subscribe = vi.spyOn(rundevService, "subscribeMainWindowActivity").mockImplementation((callback) => {
+      notify = callback;
+      return () => {};
+    });
+    const resize = vi.spyOn(rundevService, "setSystemPanelExpanded");
+    const view = render(<App />);
+    try {
+      for (let reopen = 0; reopen < 3; reopen += 1) {
+        act(() => notify?.(false));
+        resize.mockClear();
+        act(() => notify?.(true));
+        expect(resize).toHaveBeenLastCalledWith(false, "right", undefined, true);
+        expect(document.querySelector(".whip-crack-canvas")).toHaveAttribute("width", "372");
+        expect(document.querySelector(".system-strip")).toHaveClass("compact");
+      }
+    } finally {
+      view.unmount();
+      resize.mockRestore();
+      subscribe.mockRestore();
+    }
+  });
+
   it("unpins the collapsed system summary in one click and saves the collapsed width", () => {
     localStorage.clear();
     localStorage.setItem("rundev.systemSummaryPinned", "true");

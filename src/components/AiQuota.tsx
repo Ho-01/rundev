@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import type { ProviderLimits } from "../services/usageLimits";
+import { useWindowVisibility } from "../hooks/useWindowVisibility";
 
 export function resetRemaining(resetsAt: number | null, now: number) {
   if (resetsAt == null) return "초기화 시각 없음";
@@ -13,10 +14,13 @@ export function resetRemaining(resetsAt: number | null, now: number) {
 
 function useClock() {
   const [now, setNow] = useState(Date.now());
+  const visible = useWindowVisibility();
   useEffect(() => {
+    if (!visible) return;
+    setNow(Date.now());
     const timer = window.setInterval(() => setNow(Date.now()), 30_000);
     return () => window.clearInterval(timer);
-  }, []);
+  }, [visible]);
   return now;
 }
 

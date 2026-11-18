@@ -5,7 +5,8 @@ import { getSalarySettings, getSalarySnapshot, saveSalarySettings } from "../ser
 
 vi.mock("../services/salary", () => ({
   salaryAvailable: () => true,
-  getSalarySettings: vi.fn(), getSalarySnapshot: vi.fn(), saveSalarySettings: vi.fn()
+  getSalarySettings: vi.fn(), getSalarySnapshot: vi.fn(), saveSalarySettings: vi.fn(),
+  subscribeSalaryChanges: () => Promise.resolve(() => {})
 }));
 const settings = { monthlyWon: 3000000, payday: 25, startMinute: 540, endMinute: 1080,
   lunchStartMinute: 720, lunchEndMinute: 780, dailyMinutes: 480, weekdays: [0,1,2,3,4] };
@@ -20,6 +21,12 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe("SalaryCard", () => {
+  it("reuses the dashboard snapshot without a second salary polling loop", async () => {
+    vi.mocked(getSalarySettings).mockResolvedValue(settings);
+    render(<SalaryCard snapshot={null} />);
+    await waitFor(() => expect(screen.getByRole("button", { name: "급여 설정" })).toBeEnabled());
+    expect(getSalarySnapshot).not.toHaveBeenCalled();
+  });
   it.each([
     ["working", "근무 중", 7384, "퇴근까지 02:03:04"],
     ["lunch", "점심시간", 6 * 3600, "퇴근까지 06:00:00"],
@@ -33,7 +40,7 @@ describe("SalaryCard", () => {
       workStatus, secondsUntilEnd, workdays: 22 });
     render(<SalaryCard />);
     expect(await screen.findByText(`● ${label}`)).toHaveClass(workStatus);
-    if (countdown) expect(screen.getByText(countdown)).toBeInTheDocument();
+    if (countdown) expect(screen.getByText("퇴근까지").parentElement).toHaveTextContent(countdown);
     else expect(screen.queryByText(/^퇴근까지/)).not.toBeInTheDocument();
   });
 

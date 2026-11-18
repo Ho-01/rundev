@@ -1,5 +1,5 @@
 use std::sync::{
-    atomic::{AtomicU32, AtomicU8, Ordering},
+    atomic::{AtomicBool, AtomicU32, AtomicU8, Ordering},
     Mutex, OnceLock,
 };
 use tauri::{
@@ -12,6 +12,10 @@ use crate::{adapters, character_window, database::AppState};
 
 static SELECTED_RUNNER: AtomicU8 = AtomicU8::new(0);
 static CONTENT_HEIGHT: AtomicU32 = AtomicU32::new(0);
+// Window size changes can be queued by the OS. Never read the old outer width
+// back to preserve it during a concurrent content-height update.
+static LAYOUT_WIDTH: AtomicU32 = AtomicU32::new(320);
+static MAIN_OPENING: AtomicBool = AtomicBool::new(false);
 static COMPACT_MAIN_X: OnceLock<Mutex<Option<i32>>> = OnceLock::new();
 static FOLLOW_POINTER_ITEM: OnceLock<CheckMenuItem<tauri::Wry>> = OnceLock::new();
 static ROAMING_ITEM: OnceLock<CheckMenuItem<tauri::Wry>> = OnceLock::new();
@@ -263,11 +267,32 @@ fn start_animation(app: tauri::AppHandle) {
 }
 
 pub(crate) fn show_main_window(app: &tauri::AppHandle) {
-    if let Some(window) = app.get_webview_window("main") {
-        let _ = window.show();
-        let _ = window.set_focus();
-        refresh_usage_on_open(app);
+    open_main_window(app, None);
+}
+
+fn open_main_window(app: &tauri::AppHandle, tray_rect: Option<Rect>) {
+    crate::window_lifecycle::main_opened();
+    if MAIN_OPENING.swap(true, Ordering::Relaxed) {
+        return;
     }
+    let app = app.clone();
+    // WebView2 creation can deadlock inside synchronous native event handlers.
+    std::thread::spawn(move || {
+        if let Ok(window) = crate::window_lifecycle::ensure(&app, "main") {
+            if let Some(rect) = tray_rect {
+                position_near_tray(&app, &window, rect);
+            } else if let Some(tray) = app.tray_by_id("rundev-tray") {
+                if let Ok(Some(rect)) = tray.rect() {
+                    position_near_tray(&app, &window, rect);
+                }
+            }
+            let _ = window.show();
+            let _ = app.emit_to("main", "rundev-window-visible", true);
+            let _ = window.set_focus();
+            refresh_usage_on_open(&app);
+        }
+        MAIN_OPENING.store(false, Ordering::Relaxed);
+    });
 }
 
 pub(crate) fn set_system_panel_expanded(
@@ -285,6 +310,10 @@ pub(crate) fn set_system_panel_expanded(
     let current_size = window.outer_size().map_err(|error| error.to_string())?;
     let current_position = window.outer_position().map_err(|error| error.to_string())?;
     let target_width = (main_window_width(expanded, summary_pinned) * scale).round() as u32;
+    LAYOUT_WIDTH.store(
+        main_window_width(expanded, summary_pinned) as u32,
+        Ordering::Relaxed,
+    );
     let target_height = desired_main_window_height(
         scale,
         monitor
@@ -397,6 +426,10 @@ fn desired_main_window_height(scale: f64, work_area_height: Option<u32>) -> u32 
     }
 }
 
+fn layout_size(scale: f64, logical_width: u32, height: u32) -> PhysicalSize<u32> {
+    PhysicalSize::new((f64::from(logical_width) * scale).round() as u32, height)
+}
+
 pub(crate) fn set_main_window_content_height(
     app: &tauri::AppHandle,
     height: u32,
@@ -411,7 +444,8 @@ pub(crate) fn set_main_window_content_height(
     let monitor = window.current_monitor().ok().flatten();
     let target =
         desired_main_window_height(scale, monitor.as_ref().map(|m| m.work_area().size.height));
-    if current.height == target {
+    let target_size = layout_size(scale, LAYOUT_WIDTH.load(Ordering::Relaxed), target);
+    if current == target_size {
         return Ok(());
     }
     let mut y = origin.y;
@@ -436,7 +470,7 @@ pub(crate) fn set_main_window_content_height(
         y = y.clamp(top, bottom.saturating_sub(target as i32).max(top));
     }
     window
-        .set_size(PhysicalSize::new(current.width, target))
+        .set_size(target_size)
         .map_err(|error| error.to_string())?;
     window
         .set_position(PhysicalPosition::new(origin.x, y))
@@ -444,26 +478,24 @@ pub(crate) fn set_main_window_content_height(
 }
 
 fn toggle_main_window(app: &tauri::AppHandle, tray_rect: Rect) {
-    let Some(window) = app.get_webview_window("main") else {
-        return;
-    };
-
-    if window.is_visible().unwrap_or(false) {
-        let _ = window.hide();
+    if app
+        .get_webview_window("main")
+        .is_some_and(|window| window.is_visible().unwrap_or(false))
+    {
+        crate::window_lifecycle::hide_main(app);
         return;
     }
-
-    position_near_tray(app, &window, tray_rect);
-    let _ = window.show();
-    let _ = window.set_focus();
-    refresh_usage_on_open(app);
+    open_main_window(app, Some(tray_rect));
 }
 
 fn refresh_usage_on_open(app: &tauri::AppHandle) {
     let pool = app.state::<AppState>().pool.clone();
     let app = app.clone();
     tauri::async_runtime::spawn(async move {
-        adapters::cursor::refresh_codex_and_cursor_on_open(pool).await;
+        tokio::join!(
+            adapters::usage_limits::refresh(&pool),
+            adapters::cursor::refresh_codex_and_cursor_on_open(pool.clone()),
+        );
         let _ = app.emit("usage-refreshed", ());
     });
 }
@@ -526,7 +558,24 @@ fn position_near_tray(app: &tauri::AppHandle, window: &tauri::WebviewWindow, tra
 
 #[cfg(test)]
 mod tests {
-    use super::{fitted_main_window_height, main_window_width, preferred_main_window_height};
+    use super::{
+        fitted_main_window_height, layout_size, main_window_width, preferred_main_window_height,
+    };
+
+    #[test]
+    fn content_height_updates_keep_the_collapsed_pinned_width_at_each_dpi() {
+        for scale in [1.0, 1.25, 1.5, 2.0] {
+            // The OS may still report the old 492px expanded window after
+            // collapse. Content-height changes must use the chosen layout.
+            let width = main_window_width(false, true) as u32;
+            for height in [446, 460, 446] {
+                let target =
+                    layout_size(scale, width, fitted_main_window_height(scale, None, height));
+                assert_eq!(target.width, (372.0 * scale).round() as u32);
+                assert_ne!(target.width, (492.0 * scale).round() as u32);
+            }
+        }
+    }
 
     #[test]
     fn fits_measured_content_and_clamps_to_monitor_work_area() {
