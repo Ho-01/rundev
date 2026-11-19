@@ -1196,11 +1196,12 @@ html.character-body #root { height: 100%; }
 .salary-header-tools { display: flex; align-items: center; gap: 6px; }
 .salary-card > header button { display: grid; place-items: center; width: 20px; height: 20px; padding: 0; background: transparent; border: 0; border-radius: 4px; color: #a7a7b1; cursor: pointer; }
 .salary-card > header button:hover { background: rgba(255,255,255,.05); }
-.salary-total-row { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); align-items: end; gap: 12px; margin: 8px 0 9px; }
+.salary-total-row { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); align-items: baseline; gap: 12px; margin: 8px 0 9px; }
 .salary-caption { display: block; margin-bottom: 2px; color: #a7a7b1; font-size: 9px; }
-.salary-amount { display: block; overflow-wrap: anywhere; font-size: 23px; line-height: 1.15; letter-spacing: -.6px; font-weight: 500; font-variant-numeric: tabular-nums; color: var(--rundev-accent); }
-.salary-today { text-align: right; }
-.salary-today strong { display: block; overflow-wrap: anywhere; color: #e8e8ed; font-size: 14px; font-weight: 500; font-variant-numeric: tabular-nums; }
+.salary-amount { display: block; white-space: nowrap; font-size: clamp(12px, calc(25px - var(--salary-digits) * .65px), 18px); line-height: 1.15; letter-spacing: -.6px; font-weight: 500; font-variant-numeric: tabular-nums; color: var(--rundev-accent); }
+.salary-today { display: flex; align-items: baseline; justify-content: flex-end; gap: 4px; min-width: 0; text-align: right; }
+.salary-today .salary-caption { flex: 0 0 auto; margin-bottom: 0; }
+.salary-today strong { display: block; white-space: nowrap; color: #e8e8ed; font-size: clamp(10px, calc(17px - var(--salary-digits) * .4px), 12px); font-weight: 500; font-variant-numeric: tabular-nums; }
 .salary-card .salary-state { color: #a7a7b1; font-size: 10px; font-weight: 400; white-space: nowrap; }
 .salary-card .salary-state.working { color: #9bce5a; }
 .salary-card .salary-state.lunch { color: #efa85b; }
