@@ -191,7 +191,7 @@ describe("App", () => {
     expect(screen.getByRole("img", { name: /^이번 주 XP 구성/ })).toBeInTheDocument();
     expect(screen.getByRole("tabpanel")).toHaveTextContent("월화수목금토일");
     fireEvent.click(screen.getByRole("tab", { name: "20주" }));
-    expect(screen.getByRole("img", { name: /최근 20주 중/ })).toBeInTheDocument();
+    expect(await screen.findByRole("img", { name: /최근 20주 중/ })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "통계 접기" }));
     fireEvent.click(screen.getByRole("button", { name: /새싹 개발자 · 특성 열기/ }));
     expect(await screen.findByRole("dialog", { name: "개발자 특성" })).toBeInTheDocument();

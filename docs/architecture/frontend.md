@@ -90,6 +90,11 @@ flowchart LR
 
 ## 컴포넌트 추가 기준
 
+- 활동 통계의 오늘·이번 주·최근 20주는 동일한 합계·XP 구성·개발 도구 목록을 사용한다.
+  20주 상세 통계는 탭을 열 때 `get_activity_stats`의 `history` 기간으로 요청하고 패널이
+  열린 동안 재사용한다. 집계는 Rust가 담당하며 오늘을 포함한 최근 140일을 조회한다.
+  장기 활동 그래프는 기존 일별 잔디를 유지한다.
+
 - 두 화면 이상에서 반복될 때 공통 컴포넌트로 추출한다.
 - shadcn/ui는 Dialog, Tabs, Switch, Tooltip, Progress, Dropdown Menu 범위에서 우선
   검토한다.
