@@ -1,0 +1,82 @@
+.popover-shell .dialog-backdrop.trait-backdrop { left: 0; width: 100%; padding: 8px; }
+.account-dialog.trait-dialog { display: flex; flex-direction: column; width: 100%; max-width: 380px; height: min(340px, calc(100vh - 16px)); max-height: 100%; min-height: 0; padding: 0; overflow: hidden; background: #1c1d21; color: #e5e6ee; }
+.trait-board-header { display: flex; flex: 0 0 auto; align-items: center; gap: 12px; padding: 15px 20px; }
+.trait-board-header > div:first-child { display: flex; align-items: baseline; gap: 10px; }
+.trait-board-header strong { font-size: 14px; font-weight: 600; }
+.trait-board-header span { color: #a0a5b4; font-size: 10px; }
+.trait-board-points { display: flex; align-items: baseline; gap: 9px; margin-left: auto; }
+.trait-board-points b { font-size: 15px; color: var(--rundev-accent); font-variant-numeric: tabular-nums; }
+.trait-board-header > button { display: grid; place-items: center; width: 25px; height: 25px; padding: 0; border: 0; border-radius: 4px; background: transparent; color: #a0a5b4; cursor: pointer; }
+.trait-board-header > button:hover { background: #303139; }
+.trait-board-viewport { position: relative; flex: 1 1 auto; min-height: 120px; width: 100%; overflow: clip; background: #17181c; border-top: 1px solid #3a3e49; border-bottom: 1px solid #3a3e49; touch-action: none; cursor: grab; user-select: none; }
+.trait-board-viewport.dragging { cursor: grabbing; }
+.trait-board-world { position: absolute; left: 50%; top: 50%; width: 840px; height: 540px; transform-origin: 0 0; background: radial-gradient(circle, #2a2d35 1px, transparent 1px); background-size: 24px 24px; }
+.trait-board-orbit { position: absolute; border: 1px solid #292c34; border-radius: 50%; pointer-events: none; }
+.trait-board-orbit.inner { width: 231.2px; height: 231.2px; left: 304.4px; top: 154.4px; }
+.trait-board-orbit.outer { width: 435.2px; height: 435.2px; left: 202.4px; top: 52.4px; }
+.trait-board-edge { position: absolute; height: 1px; transform-origin: 0 50%; background: #3a3e49; pointer-events: none; }
+.trait-board-edge.selected { background: color-mix(in srgb, var(--rundev-accent) 65%, #3a3e49); }
+.trait-board-core { position: absolute; left: 382px; top: 232px; width: 76px; height: 76px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; color: var(--rundev-accent); background: #24252b; border: 1px solid color-mix(in srgb, var(--rundev-accent) 50%, #3a3e49); outline: 5px solid #1e2025; border-radius: 50%; }
+.trait-board-core b { color: #e5e6ee; font-size: 12px; font-weight: 600; }
+.trait-board-node { position: absolute; width: 46px; height: 46px; padding: 3px; border: 0; border-radius: 50%; transform: translate(-50%, -50%); background: conic-gradient(var(--rundev-accent) var(--trait-progress), #3a3e49 var(--trait-progress) 360deg); color: var(--rundev-accent); cursor: pointer; }
+.trait-board-node[aria-pressed="true"] { outline: 1px solid var(--rundev-accent); outline-offset: 5px; box-shadow: 0 0 20px rgba(var(--rundev-accent-rgb), .13); }
+.trait-board-node > span { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; width: 100%; height: 100%; border-radius: 50%; background: #24252b; }
+.trait-board-node small { color: #e5e6ee; font-size: 9px; line-height: 1; font-variant-numeric: tabular-nums; }
+.trait-board-node.future { width: 40px; height: 40px; padding: 2px; color: color-mix(in srgb, var(--rundev-accent) 35%, #a0a5b4); background: #3a3e49; }
+.trait-board-node.future > span { background: #17181c; }
+.trait-board-node.future small { color: #a0a5b4; }
+.trait-board-node.future svg { width: 15px; height: 15px; }
+.trait-board-hint { position: absolute; left: 12px; bottom: 12px; padding: 3px 5px; border-radius: 4px; background: #17181c; color: #a0a5b4; font-size: 9px; pointer-events: none; }
+.trait-board-camera { position: absolute; right: 12px; bottom: 10px; display: flex; align-items: center; gap: 2px; padding: 3px; background: #24252b; border: 1px solid #3a3e49; border-radius: 5px; }
+.trait-board-camera button { min-width: 27px; height: 25px; padding: 0 6px; border: 0; border-radius: 3px; background: transparent; color: #e5e6ee; font-size: 12px; cursor: pointer; }
+.trait-board-camera button:hover { background: #34363e; }
+.trait-board-camera button:disabled { color: #626671; cursor: default; }
+.trait-board-camera button:last-child { border-left: 1px solid #3a3e49; border-radius: 0; font-size: 10px; }
+.trait-board-camera > span { min-width: 34px; color: #a0a5b4; text-align: center; font-size: 10px; font-variant-numeric: tabular-nums; }
+.trait-board-legend { display: flex; flex: 0 0 auto; gap: 16px; padding: 9px 20px; color: #a0a5b4; font-size: 9px; }
+.trait-board-legend span { display: flex; align-items: center; gap: 5px; }
+.trait-board-legend i { width: 7px; height: 7px; border-radius: 50%; background: var(--rundev-accent); }
+.trait-board-legend span:last-child i { background: #505662; }
+.trait-board-detail { flex: 0 0 auto; min-height: 148px; padding: 14px 20px 17px; border-top: 1px solid #3a3e49; }
+.trait-board-detail > header { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.trait-board-detail > header > div { display: flex; align-items: center; gap: 8px; }
+.trait-board-detail > header svg { color: var(--rundev-accent); }
+.trait-board-detail strong { font-size: 12px; font-weight: 600; }
+.trait-board-detail > header > span { color: #a0a5b4; font-size: 10px; }
+.trait-board-detail > p { margin: 7px 0 13px; color: #a0a5b4; font-size: 10px; }
+.trait-board-detail-body { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; gap: 20px; align-items: end; }
+.trait-board-detail-body > div > span { display: block; margin-bottom: 5px; color: #a0a5b4; font-size: 10px; }
+.trait-board-detail-body b { font-size: 13px; font-weight: 500; font-variant-numeric: tabular-nums; }
+.trait-board-detail-body em { color: var(--rundev-accent); font-style: normal; }
+.trait-board-detail-body > button { padding: 9px 14px; color: var(--rundev-accent); background: color-mix(in srgb, var(--rundev-accent) 9%, #24252b); border: 1px solid color-mix(in srgb, var(--rundev-accent) 45%, #3a3e49); border-radius: 5px; font-size: 11px; white-space: nowrap; cursor: pointer; }
+.trait-board-detail-body > button:disabled { color: #a0a5b4; border-color: #3a3e49; background: #24252b; cursor: default; }
+.trait-board-coming-soon { color: var(--rundev-accent); font-size: 14px; }
+.trait-board-coming-soon > span { display: block; margin-top: 8px; color: #a0a5b4; font-size: 10px; }
+.trait-board-detail > .trait-board-error { color: #ff9a91; margin-bottom: 0; }
+@media (max-width: 480px) {
+  .trait-board-header { padding: 11px 12px; }
+  .trait-board-header > div:first-child > span { display: none; }
+  .trait-board-detail { padding: 12px; }
+  .trait-board-detail-body { grid-template-columns: 1fr 1fr; gap: 12px; }
+  .trait-board-detail-body > button { grid-column: 1 / -1; }
+  .trait-board-detail-body b { font-size: 11px; }
+  .trait-board-legend { padding: 8px 12px; }
+  .trait-board-hint { bottom: 51px; left: 7px; }
+}
+.trait-dialog .trait-board-header { padding: 8px 10px; gap: 6px; }
+.trait-dialog .trait-board-header strong { font-size: 12px; }
+.trait-dialog .trait-board-header > div:first-child > span { display: none; }
+.trait-dialog .trait-board-points { gap: 5px; }
+.trait-dialog .trait-board-points b { font-size: 12px; }
+.trait-dialog .trait-board-legend { padding: 5px 10px; }
+.trait-dialog .trait-board-detail { min-height: 0; padding: 8px 10px; }
+.trait-dialog .trait-board-detail > p { margin: 4px 0 7px; }
+.trait-dialog .trait-board-detail-body { grid-template-columns: 1fr 1fr auto; gap: 6px; }
+.trait-dialog .trait-board-detail-body b { font-size: 10px; }
+.trait-dialog .trait-board-detail-body > div > span { margin-bottom: 3px; font-size: 9px; }
+.trait-dialog .trait-board-detail-body > button { grid-column: auto; padding: 6px; font-size: 10px; }
+.trait-dialog .trait-board-coming-soon { font-size: 12px; }
+.trait-dialog .trait-board-coming-soon > span { margin-top: 5px; }
+.trait-dialog .trait-board-hint { left: 6px; bottom: 39px; font-size: 8px; }
+.trait-dialog .trait-board-camera { right: 6px; bottom: 5px; padding: 1px; }
+.trait-dialog .trait-board-camera button { min-width: 22px; height: 22px; }

@@ -1,6 +1,7 @@
-import { useState, type KeyboardEvent } from "react";
+import { useEffect, useState, type KeyboardEvent, type ReactNode } from "react";
 import { X } from "lucide-react";
 import type { ActivityStats, ActivityHistoryDay } from "../types/activity";
+import { getActivityStats } from "../services/rundev";
 const formatTokens = (tokens: number) => new Intl.NumberFormat("ko-KR").format(tokens);
 function formatDuration(seconds: number) {
   const hours = Math.floor(seconds / 3600);
@@ -22,7 +23,7 @@ function formatCompactTokens(tokens: number) {
   return `${value.toFixed(1).replace(/\.0$/, "")}${unit.suffix}`;
 }
 
-function StatsPeriod({ title, stats }: { title: string; stats: ActivityStats | null }) {
+function StatsPeriod({ title, stats, children }: { title: string; stats: ActivityStats | null; children?: ReactNode }) {
   const maxSeconds = Math.max(1, ...(stats?.hourly.map((slot) => slot.activeSeconds) ?? [1]));
   const sourceCopy = {
     focus: "집중",
@@ -60,7 +61,7 @@ function StatsPeriod({ title, stats }: { title: string; stats: ActivityStats | n
         {xpSources.map((source) => <span key={source.id} className={source.id}><i />{sourceCopy[source.id]} <b>{source.amount}</b></span>)}
       </div>
     </div>
-    {stats?.period === "week" ? <div className="weekly-heatmap-layout">
+    {stats?.period === "history" ? children : stats?.period === "week" ? <div className="weekly-heatmap-layout">
       <div className="heatmap-weekdays" aria-hidden="true"><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span>토</span><span>일</span></div>
       <div className="weekly-heatmap-content">
         {heatmap}
@@ -100,7 +101,7 @@ function FocusAppBreakdown({ apps, title }: { apps: ActivityStats["apps"] | unde
     {apps?.length ? apps.map((app) => <div key={app.appName}>
       <span>{app.appName}</span>
       <strong>{formatDuration(app.activeSeconds)}</strong>
-    </div>) : <p>오늘 기록된 개발 도구가 없습니다.</p>}
+    </div>) : <p>기록된 개발 도구가 없습니다.</p>}
   </section>;
 }
 
@@ -113,6 +114,18 @@ export function StatsPanel({ dailyStats, weeklyStats, activityHistory, activeHis
   onClose: () => void;
 }) {
   const [activeTab, setActiveTab] = useState<"today" | "week" | "history">("today");
+  const [historyStats, setHistoryStats] = useState<ActivityStats | null>(null);
+  const [historyError, setHistoryError] = useState(false);
+  const [historyAttempt, setHistoryAttempt] = useState(0);
+  useEffect(() => {
+    if (activeTab !== "history" || historyStats) return;
+    let current = true;
+    setHistoryError(false);
+    void getActivityStats("history").then((stats) => {
+      if (current) setHistoryStats(stats);
+    }).catch(() => { if (current) setHistoryError(true); });
+    return () => { current = false; };
+  }, [activeTab, historyStats, historyAttempt]);
   const tabs = [
     { id: "today" as const, label: "오늘" },
     { id: "week" as const, label: "이번 주" },
@@ -136,7 +149,13 @@ export function StatsPanel({ dailyStats, weeklyStats, activityHistory, activeHis
     </div>
     {activeTab === "today" && <div className="stats-tab-panel" id="stats-panel-today" role="tabpanel" aria-labelledby="stats-tab-today"><StatsPeriod title="오늘" stats={dailyStats} /><FocusAppBreakdown apps={dailyStats?.apps} title="오늘 사용한 개발 도구" /></div>}
     {activeTab === "week" && <div className="stats-tab-panel" id="stats-panel-week" role="tabpanel" aria-labelledby="stats-tab-week"><StatsPeriod title="이번 주" stats={weeklyStats} /><FocusAppBreakdown apps={weeklyStats?.apps} title="이번 주 사용한 개발 도구" /></div>}
-    {activeTab === "history" && <div className="stats-tab-panel" id="stats-panel-history" role="tabpanel" aria-labelledby="stats-tab-history"><ActivityGrass activityHistory={activityHistory} activeDays={activeHistoryDays} compact /></div>}
+    {activeTab === "history" && <div className="stats-tab-panel" id="stats-panel-history" role="tabpanel" aria-labelledby="stats-tab-history">
+      {historyStats ? <>
+        <StatsPeriod title="최근 20주" stats={historyStats}><ActivityGrass activityHistory={activityHistory} activeDays={activeHistoryDays} compact /></StatsPeriod>
+        <FocusAppBreakdown apps={historyStats.apps} title="최근 20주 사용한 개발 도구" />
+      </> : historyError ? <div className="stats-history-status" role="alert">20주 통계를 불러오지 못했습니다.<button type="button" onClick={() => setHistoryAttempt(value => value + 1)}>다시 시도</button></div>
+        : <p className="stats-history-status" role="status">20주 통계를 불러오는 중…</p>}
+    </div>}
   </aside>;
 }
 

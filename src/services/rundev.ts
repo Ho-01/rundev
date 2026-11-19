@@ -549,10 +549,10 @@ export async function upgradeTrait(traitId: TraitId): Promise<TraitProgress> {
   return invoke<TraitProgress>("upgrade_trait", { traitId });
 }
 
-export async function getActivityStats(period: "day" | "week"): Promise<ActivityStats> {
+export async function getActivityStats(period: ActivityStats["period"]): Promise<ActivityStats> {
   if (!isTauri()) {
     const now = new Date();
-    const days = period === "week" ? 7 : 1;
+    const days = period === "history" ? 140 : period === "week" ? 7 : 1;
     const hourly = Array.from({ length: days * 24 }, (_, index) => {
       const day = Math.floor(index / 24);
       const date = new Date(now);

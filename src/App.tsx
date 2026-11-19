@@ -1665,7 +1665,7 @@ export function App() {
         onToggle={toggleSystemPanel}
         onPinnedChange={changeSystemSummaryPinned}
       />
-      {traitDialogOpen && traitProgress && <Suspense fallback={null}><TraitDialog progress={traitProgress} onUpgrade={(id) => void improveTrait(id)} onClose={() => setTraitDialogOpen(false)} /></Suspense>}
+      {traitDialogOpen && traitProgress && <Suspense fallback={null}><TraitDialog progress={traitProgress} onUpgrade={improveTrait} onClose={() => setTraitDialogOpen(false)} /></Suspense>}
       {infoDialogOpen && (
         <div className="dialog-backdrop" role="presentation">
           <section

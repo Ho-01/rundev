@@ -148,7 +148,7 @@ export type TraitProgress = {
   }>;
 };
 export type ActivityStats = {
-  period: "day" | "week";
+  period: "day" | "week" | "history";
   activeSeconds: number;
   xpEarned: number;
   keyboardPresses: number;

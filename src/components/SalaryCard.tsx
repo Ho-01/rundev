@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type FormEvent } from "react";
 import { Settings } from "lucide-react";
 import { getSalarySettings, salaryAvailable, saveSalarySettings,
   type SalarySettings, type SalarySnapshot } from "../services/salary";
@@ -75,6 +75,8 @@ export function SalaryCard({ active = true, snapshot: sharedSnapshot }: { active
     finally { setBusy(false); }
   }
   function submit(event: FormEvent) { event.preventDefault(); void persist(draft); }
+  const cycleAmount = snapshot ? won(snapshot.cycleWon) : "";
+  const todayAmount = snapshot ? won(snapshot.todayWon) : "";
 
   return <section className="salary-card" aria-label="실시간 월급">
     <header><span>실시간 월급 <small>예상</small></span><div className="salary-header-tools">
@@ -84,8 +86,8 @@ export function SalaryCard({ active = true, snapshot: sharedSnapshot }: { active
       disabled={!ready} onClick={() => { setDraft(settings ?? initial); setFormError(""); setEditing(true); }}><Settings size={13} aria-hidden="true" /></button></div></header>
     {snapshot ? <>
       <div className="salary-total-row" title={`${snapshot.cycleStart} ~ ${snapshot.nextPayday} · 근무 ${snapshot.workdays}일`}>
-        <div className="salary-cycle"><span className="salary-caption">이번 급여 주기 누적</span><strong className="salary-amount">{won(snapshot.cycleWon)}</strong></div>
-        <div className="salary-today"><span className="salary-caption">오늘</span><strong>{won(snapshot.todayWon)}</strong></div>
+        <div className="salary-cycle"><strong className="salary-amount" title={`이번 급여 주기 누적 ${cycleAmount}`} style={{ "--salary-digits": cycleAmount.length } as CSSProperties}>{cycleAmount}</strong></div>
+        <div className="salary-today"><span className="salary-caption">오늘</span><strong title={todayAmount} style={{ "--salary-digits": todayAmount.length } as CSSProperties}>{todayAmount}</strong></div>
       </div>
       <div className="salary-details"><span>초당 <b>+{snapshot.wonPerSecond.toFixed(2)}원</b></span>
         {snapshot.secondsUntilEnd != null && <span className="salary-countdown"><span>퇴근까지</span> <b>{remainingTime(snapshot.secondsUntilEnd)}</b></span>}

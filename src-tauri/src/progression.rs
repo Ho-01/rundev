@@ -265,16 +265,22 @@ pub async fn trait_level_in(
 }
 
 pub async fn stats(pool: &SqlitePool, period: &str) -> Result<ActivityStats, String> {
-    if !matches!(period, "day" | "week") {
+    if !matches!(period, "day" | "week" | "history") {
         return Err("지원하지 않는 통계 기간입니다.".to_string());
     }
     let today = Local::now().date_naive();
-    let start = if period == "week" {
+    let start = if period == "history" {
+        today - chrono::Duration::days(139)
+    } else if period == "week" {
         week_start(today)
     } else {
         today
     };
-    let days = if period == "week" { 7 } else { 1 };
+    let days = match period {
+        "history" => 140,
+        "week" => 7,
+        _ => 1,
+    };
     let start_text = start.to_string();
     let end_text = (start + chrono::Duration::days(days - 1)).to_string();
     let activity_sessions: Vec<(String, i64)> = sqlx::query_as(
@@ -405,6 +411,52 @@ mod tests {
         traits, upgrade,
     };
     use sqlx::SqlitePool;
+
+    #[tokio::test]
+    async fn history_stats_include_exactly_the_last_140_local_dates() {
+        use chrono::{Duration, Local, TimeZone};
+        let pool = SqlitePool::connect("sqlite::memory:").await.unwrap();
+        sqlx::migrate!("./migrations").run(&pool).await.unwrap();
+        let today = Local::now().date_naive();
+        for (index, offset) in [0, 139, 140].into_iter().enumerate() {
+            let date = today - Duration::days(offset);
+            let timestamp = Local
+                .from_local_datetime(&date.and_hms_opt(12, 0, 0).unwrap())
+                .earliest()
+                .unwrap()
+                .to_rfc3339();
+            sqlx::query("INSERT INTO activity_sessions (id, started_at, active_seconds, activity_type, source) VALUES (?, ?, 600, 'development', 'foreground:code.exe')")
+                .bind(format!("history-session-{index}")).bind(&timestamp).execute(&pool).await.unwrap();
+            sqlx::query("INSERT INTO xp_events (id, occurred_at, event_type, amount) VALUES (?, ?, 'focus_milestone', 10)")
+                .bind(format!("history-xp-{index}")).bind(&timestamp).execute(&pool).await.unwrap();
+            sqlx::query("INSERT INTO keyboard_daily_stats (local_date, press_count, updated_at) VALUES (?, 100, ?)")
+                .bind(date.to_string()).bind(&timestamp).execute(&pool).await.unwrap();
+        }
+        let stats = super::stats(&pool, "history").await.unwrap();
+        assert_eq!(stats.period, "history");
+        assert_eq!(stats.hourly.len(), 140 * 24);
+        assert_eq!(
+            stats.hourly.first().unwrap().date,
+            (today - Duration::days(139)).to_string()
+        );
+        assert_eq!(stats.hourly.last().unwrap().date, today.to_string());
+        assert_eq!(stats.active_seconds, 1200);
+        assert_eq!(stats.xp_earned, 20);
+        assert_eq!(stats.keyboard_presses, 200);
+        assert_eq!(
+            stats
+                .xp_sources
+                .iter()
+                .map(|source| source.amount)
+                .sum::<i64>(),
+            20
+        );
+        assert_eq!(
+            stats.apps.iter().map(|app| app.active_seconds).sum::<i64>(),
+            1200
+        );
+        assert!(super::stats(&pool, "unsupported").await.is_err());
+    }
 
     #[tokio::test]
     async fn retired_ai_trait_returns_spent_points_without_changing_history() {
