@@ -5,6 +5,26 @@ import { useDashboardStore } from "./store/dashboard";
 import * as rundevService from "./services/rundev";
 
 describe("App", () => {
+  it("opens and closes the trait modal without moving or resizing the native popover", async () => {
+    // This regression checks native layout calls, independent of cold chunk loading.
+    await import("./components/TraitDialog");
+    localStorage.clear();
+    const resize = vi.spyOn(rundevService, "setSystemPanelExpanded");
+    const view = render(<App />);
+    try {
+      const button = await screen.findByRole("button", { name: /특성 열기/ });
+      resize.mockClear();
+      fireEvent.click(button);
+      expect(await screen.findByRole("dialog", { name: "개발자 특성" })).toBeInTheDocument();
+      expect(resize).not.toHaveBeenCalled();
+      fireEvent.click(screen.getByRole("button", { name: "특성 닫기" }));
+      expect(screen.queryByRole("dialog", { name: "개발자 특성" })).not.toBeInTheDocument();
+      expect(resize).not.toHaveBeenCalled();
+    } finally {
+      view.unmount();
+      resize.mockRestore();
+    }
+  });
   it("opens the color theme dialog from the app menu", async () => {
     localStorage.clear();
     render(<App />);
