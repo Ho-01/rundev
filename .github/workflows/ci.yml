@@ -45,6 +45,9 @@ jobs:
       - name: Check synchronized version
         run: npm run version:check
 
+      - name: Test updater manifest generation
+        run: node --test scripts/release-manifest.test.mjs
+
       - name: Test frontend
         run: npm test
 
