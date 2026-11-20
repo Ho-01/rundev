@@ -1206,7 +1206,10 @@ export function App() {
           <div className="runner-header-top">
             <div className="runner-copy">
               <div className="runner-title-row">
-                <strong>RunDev</strong>
+                <strong className="rundev-wordmark" role="img" aria-label="RunDev">
+                  <span aria-hidden="true">Run<span className="rundev-wordmark-dev">Dev</span></span>
+                  <i className="rundev-wordmark-dot" aria-hidden="true" />
+                </strong>
                 {xpBoost?.active && xpBoost.multiplier && xpBoost.endsAt ? (
                   <div className="xp-boost-badge" title={`경험치 ${xpBoost.multiplier}배 적용 중`}>
                     <Zap size={10} fill="currentColor" />

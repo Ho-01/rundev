@@ -1,5 +1,14 @@
 @import "tailwindcss";
 
+@font-face {
+  font-family: "RunDev Oxanium";
+  src: url("./assets/fonts/oxanium-wordmark.woff2?no-inline") format("woff2");
+  font-style: normal;
+  font-weight: 600 700;
+  font-display: swap;
+  unicode-range: U+44, U+52, U+65, U+6e, U+75-76;
+}
+
 :root {
   --rundev-accent: #b9e69b;
   --rundev-accent-rgb: 185, 230, 155;
@@ -668,6 +677,9 @@ html.character-body #root { height: 100%; }
 .runner-header-top { position: relative; z-index: 10; display: flex; min-width: 0; align-items: center; }
 .runner-copy { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 4px; }
 .runner-copy strong { font-size: 15px; letter-spacing: -.01em; }
+.runner-copy .rundev-wordmark { display: inline-flex; flex: 0 0 auto; align-items: center; color: #f7f7fa; font-family: "RunDev Oxanium", sans-serif; font-size: 18px; font-weight: 700; line-height: 1.15; letter-spacing: -.65px; white-space: nowrap; }
+.rundev-wordmark-dev { margin-left: .02em; font-weight: 600; }
+.rundev-wordmark-dot { flex: 0 0 auto; width: .12em; height: .12em; margin: .39em 0 0 .07em; background: currentColor; }
 .runner-title-row { display: flex; min-width: 0; align-items: center; gap: 7px; }
 .xp-boost-badge { display: flex; min-width: 0; align-items: center; gap: 3px; padding: 2px 5px; color: #f3c969; background: rgba(243,201,105,.11); border: 1px solid rgba(243,201,105,.25); border-radius: 999px; font-size: 8px; line-height: 1; white-space: nowrap; }
 .xp-boost-badge b { font-size: 9px; }
