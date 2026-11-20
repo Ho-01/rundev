@@ -89,6 +89,11 @@ macOS 빌드는 `app,dmg` 번들을 함께 생성한다. DMG는 수동 설치용
 번들에서 생성되는 `.app.tar.gz`와 `.sig`가 자동 업데이트에 사용된다.
 `latest.json`에는 `darwin-aarch64`와 `darwin-x86_64`가 모두 포함되어야 한다.
 
+플랫폼 빌드가 병렬로 생성한 `latest.json`은 중간 결과로 취급한다. 모든 빌드가
+성공한 뒤 `Finalize updater manifest` 작업이 Release의 설치 파일·서명 목록에서
+Windows와 macOS 두 아키텍처를 다시 구성해 한 번만 게시한다. 필요한 파일이나
+서명이 없으면 게시를 실패시켜 일부 플랫폼만 남는 동시 갱신 충돌을 막는다.
+
 GitHub repository secrets:
 
 - `TAURI_SIGNING_PRIVATE_KEY`: `tauri signer generate`로 만든 비밀키 전체
