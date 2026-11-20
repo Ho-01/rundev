@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type CSSProperties, type PointerEvent } from "react";
-import { Terminal, X } from "lucide-react";
+import { Clock3, LocateFixed, Terminal, X } from "lucide-react";
 import type { TraitId, TraitProgress } from "../types/activity";
 import { traitBoardEdges, traitBoardNodes } from "./traitBoard";
 import "./traitBoard.css";
@@ -52,7 +52,8 @@ export function TraitDialog({ progress, onUpgrade, onClose }: {
     setCamera(current => {
       const px = clientWidth / 2 + current.x + (x - 420) * current.scale;
       const py = clientHeight / 2 + current.y + (y - 270) * current.scale;
-      return px < 30 || px > clientWidth - 30 || py < 30 || py > clientHeight - 65
+      const margin = Math.max(22, 26 * current.scale);
+      return px < margin || px > clientWidth - margin || py < margin || py > clientHeight - 50
         ? { ...current, x: -(x - 420) * current.scale, y: -(y - 270) * current.scale } : current;
     });
   }
@@ -85,11 +86,13 @@ export function TraitDialog({ progress, onUpgrade, onClose }: {
       <div ref={viewport} className={`trait-board-viewport${dragging ? " dragging" : ""}`} onPointerDown={pointerDown}
         onPointerMove={event => { if (drag.current) setCamera({ ...drag.current.camera, x: drag.current.camera.x + event.clientX - drag.current.x, y: drag.current.camera.y + event.clientY - drag.current.y }); }}
         onPointerUp={() => { drag.current = null; setDragging(false); }} onPointerCancel={() => { drag.current = null; setDragging(false); }}>
-        <div className="trait-board-world" style={{ transform: `translate(${camera.x}px, ${camera.y}px) scale(${camera.scale}) translate(-420px, -270px)` }}>
-          <div className="trait-board-orbit inner" /><div className="trait-board-orbit outer" />
+        <div className="trait-board-world" data-labels-visible={camera.scale >= .6}
+          style={{ "--trait-zoom": camera.scale, transform: `translate(${camera.x}px, ${camera.y}px) scale(${camera.scale}) translate(-420px, -270px)` } as CSSProperties}>
           {traitBoardEdges.map(([from, to]) => {
             const a = positions.get(from)!, b = positions.get(to)!;
-            return <i key={to} className={`trait-board-edge${to === selectedId ? " selected" : ""}`} style={{ left: a.x, top: a.y, width: Math.hypot(b.x - a.x, b.y - a.y), transform: `rotate(${Math.atan2(b.y - a.y, b.x - a.x)}rad)` }} />;
+            const traitId = traitBoardNodes.find(node => node.id === to)?.traitId;
+            const upgraded = progress.traits.some(item => item.id === traitId && item.level > 0);
+            return <i key={to} className={`trait-board-edge${upgraded ? " upgraded" : ""}`} style={{ left: a.x, top: a.y, width: Math.hypot(b.x - a.x, b.y - a.y), transform: `rotate(${Math.atan2(b.y - a.y, b.x - a.x)}rad)` }} />;
           })}
           <div className="trait-board-core"><Terminal size={20} /><b>RunDev</b></div>
           {traitBoardNodes.map((node, index) => {
@@ -98,18 +101,19 @@ export function TraitDialog({ progress, onUpgrade, onClose }: {
               aria-pressed={selectedId === node.id} title={node.traitId ? `${node.name} · Lv. ${value?.level ?? 0} / ${value?.maxLevel ?? 20}` : "확장 노드 · Coming soon"}
               style={{ left: node.x, top: node.y, "--trait-progress": `${value ? Math.max(0, Math.min(1, value.level / value.maxLevel)) * 360 : 0}deg` } as CSSProperties}
               onFocus={() => revealNode(node.x, node.y)} onClick={() => { setSelectedId(node.id); setError(""); }}>
-              <span><NodeIcon size={17} /><small>{value?.level ?? "–"}</small></span>
+              <span className="trait-board-node-icon"><NodeIcon size={17} /></span>
+              {node.traitId && <><small className="trait-board-node-level">Lv.{value?.level ?? 0}</small><span className="trait-board-node-name">{node.name}</span></>}
             </button>;
           })}
         </div>
-        <div className="trait-board-camera"><button type="button" aria-label="보드 축소" disabled={camera.scale <= .2} onClick={() => zoom(-.1)}>−</button><span>{Math.round(camera.scale * 100)}%</span><button type="button" aria-label="보드 확대" disabled={camera.scale >= 1.5} onClick={() => zoom(.1)}>+</button><button type="button" onClick={center}>중앙</button></div>
+        <div className="trait-board-legend"><span><i />특성 3개</span><span><i />확장 예정 13개</span></div>
+        <div className="trait-board-camera"><button type="button" aria-label="보드 축소" disabled={camera.scale <= .2} onClick={() => zoom(-.1)}>−</button><span>{Math.round(camera.scale * 100)}%</span><button type="button" aria-label="보드 확대" disabled={camera.scale >= 1.5} onClick={() => zoom(.1)}>+</button><button type="button" aria-label="보드 중앙으로" title="중앙으로" onClick={center}><LocateFixed size={14} /></button></div>
       </div>
-      <div className="trait-board-legend"><span><i />특성 3개</span><span><i />확장 예정 13개</span></div>
       <section className="trait-board-detail" aria-label="선택한 특성 상세">
         <header><div><Icon size={18} /><strong>{selected.name}</strong></div><span>{trait ? `Lv. ${trait.level} / ${trait.maxLevel}` : "확장 예정"}</span></header>
         <p>{trait ? selected.description : "새로운 특성이 추가될 공간입니다."}</p>
-        {trait ? <div className="trait-board-detail-body"><div><span>현재 → 다음 효과</span><b>{effect} → <em>{atMax ? "MAX" : nextEffect}</em></b></div><div><span>{trait.id === "reload" ? "매일 첫 집중 20분" : "평균 보상 환산"}</span><b>{reward}</b></div><button type="button" aria-label={`${selected.name} 강화`} disabled={busy || atMax || progress.availablePoints < trait.upgradeCost} onClick={() => void upgrade()}>{busy ? "강화 중…" : atMax ? "최대 레벨" : progress.availablePoints < trait.upgradeCost ? "포인트 부족" : "강화"} · ◆ {trait.upgradeCost}</button></div>
-          : <div className="trait-board-coming-soon">Coming soon<span>새로운 개발자 특성이 준비되면 이곳에서 확인할 수 있어요.</span></div>}
+        {trait ? <><div className="trait-board-detail-body"><div><span>{atMax ? "현재 효과" : "현재 → 다음 효과"}</span><b>{effect}{!atMax && <> <span className="trait-board-effect-arrow">→</span> <em>{nextEffect}</em></>}</b></div><button type="button" aria-label={`${selected.name} 강화`} disabled={busy || atMax || progress.availablePoints < trait.upgradeCost} onClick={() => void upgrade()}>{busy ? "강화 중…" : atMax ? "최대 레벨" : progress.availablePoints < trait.upgradeCost ? "포인트 부족" : "강화"}{!atMax && <> · ◆ {trait.upgradeCost}</>}</button></div><p className="trait-board-reward"><span>{trait.id === "reload" ? "매일 첫 집중 20분" : "평균 보상 환산"}</span><span>{reward}</span></p></>
+          : <div className="trait-board-coming-soon"><Clock3 size={18} /><div>Coming soon<span>새로운 개발자 특성이 준비되면 이곳에서 확인할 수 있어요.</span></div></div>}
         {error && <p role="alert" className="trait-board-error">{error}</p>}
       </section>
     </section>

@@ -1,11 +1,13 @@
 import { BatteryCharging, Braces, Brain, CodeXml, Coffee, Cpu, Focus, GitBranch, Keyboard, Layers, RotateCcw, Target, Terminal, Timer, Workflow, Zap } from "lucide-react";
 import type { TraitId } from "../types/activity";
+const core = { x: 420, y: 270 };
+const primaryDistance = 120;
 export const traitBoardNodes = [
-  { id: "focus-ready", name: "몰입 준비", icon: Target, x: 420, y: 142, description: "집중시간 XP 획득량 증가", traitId: "focus-ready" as TraitId },
-  { id: "hot-keyboard", name: "뜨거운 키보드", icon: Keyboard, x: 560, y: 270, description: "키보드 XP 획득량 증가", traitId: "hot-keyboard" as TraitId },
-  { id: "reload", name: "재장전", icon: RotateCcw, x: 280, y: 270, description: "매일 첫 집중 20분에 활동 보너스", traitId: "reload" as TraitId },
+  { id: "focus-ready", name: "몰입 준비", icon: Target, x: core.x, y: core.y - primaryDistance, description: "집중시간 XP 획득량 증가", traitId: "focus-ready" as TraitId },
+  { id: "hot-keyboard", name: "뜨거운 키보드", icon: Keyboard, x: core.x + primaryDistance, y: core.y, description: "키보드 XP 획득량 증가", traitId: "hot-keyboard" as TraitId },
+  { id: "reload", name: "재장전", icon: RotateCcw, x: core.x - primaryDistance, y: core.y, description: "매일 첫 집중 20분에 활동 보너스", traitId: "reload" as TraitId },
   ...[
-    { id: "branch-s", icon: GitBranch, x: 420, y: 398 },
+    { id: "branch-s", icon: GitBranch, x: core.x, y: core.y + primaryDistance },
     { id: "branch-nw", icon: Brain, x: 280, y: 70 },
     { id: "branch-n", icon: Focus, x: 420, y: 32 },
     { id: "branch-ne", icon: Timer, x: 560, y: 70 },
