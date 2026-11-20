@@ -1,5 +1,14 @@
 @import "tailwindcss";
 
+@font-face {
+  font-family: "RunDev Oxanium";
+  src: url("./assets/fonts/oxanium-wordmark.woff2?no-inline") format("woff2");
+  font-style: normal;
+  font-weight: 600 700;
+  font-display: swap;
+  unicode-range: U+44, U+52, U+65, U+6e, U+75-76;
+}
+
 :root {
   --rundev-accent: #b9e69b;
   --rundev-accent-rgb: 185, 230, 155;
@@ -668,6 +677,9 @@ html.character-body #root { height: 100%; }
 .runner-header-top { position: relative; z-index: 10; display: flex; min-width: 0; align-items: center; }
 .runner-copy { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 4px; }
 .runner-copy strong { font-size: 15px; letter-spacing: -.01em; }
+.runner-copy .rundev-wordmark { display: inline-flex; flex: 0 0 auto; align-items: center; color: #f7f7fa; font-family: "RunDev Oxanium", sans-serif; font-size: 18px; font-weight: 700; line-height: 1.15; letter-spacing: -.65px; white-space: nowrap; }
+.rundev-wordmark-dev { margin-left: .02em; font-weight: 600; }
+.rundev-wordmark-dot { flex: 0 0 auto; width: .12em; height: .12em; margin: .39em 0 0 .07em; background: currentColor; }
 .runner-title-row { display: flex; min-width: 0; align-items: center; gap: 7px; }
 .xp-boost-badge { display: flex; min-width: 0; align-items: center; gap: 3px; padding: 2px 5px; color: #f3c969; background: rgba(243,201,105,.11); border: 1px solid rgba(243,201,105,.25); border-radius: 999px; font-size: 8px; line-height: 1; white-space: nowrap; }
 .xp-boost-badge b { font-size: 9px; }
@@ -1252,7 +1264,7 @@ html.character-body #root { height: 100%; }
 @keyframes salary-gain-fade { 0%, 55%, 100% { opacity: 0; transform: translate(-50%, -50%); } 8% { opacity: 1; transform: translate(-50%, -50%); } 25% { opacity: .65; transform: translate(-50%, -50%); } }
 .character-salary-window { position: relative; width: 100%; height: 100vh; overflow: hidden; pointer-events: none; }
 .character-salary-window .salary-character-label { position: absolute; inset: 0; }
-.character-salary-window .salary-character-gain { z-index: 2; left: var(--salary-anchor-x, 50%); top: var(--salary-anchor-y, 50%); font-size: 13px; --salary-rise-distance: calc(var(--salary-character-size, 48px) * .32); }
+.character-salary-window .salary-character-gain { z-index: 2; left: var(--salary-anchor-x, 50%); top: var(--salary-anchor-y, 50%); font-size: calc(13px * var(--salary-bubble-scale, 1)); line-height: calc(16px * var(--salary-bubble-scale, 1)); text-shadow: 0 calc(1px * var(--salary-bubble-scale, 1)) calc(3px * var(--salary-bubble-scale, 1)) #000, 0 0 calc(5px * var(--salary-bubble-scale, 1)) #000; --salary-rise-distance: calc(var(--salary-character-size, 48px) * .32); }
 .character-salary-window .salary-character-bubble { position: absolute; z-index: 1; left: 0; bottom: calc(100% - var(--salary-anchor-y, 100px) + var(--salary-character-size, 48px) / 2 + 10px * var(--salary-bubble-scale, 1)); width: max-content; max-width: calc(100vw - 12px); --salary-bubble-left: clamp(6px, calc(var(--salary-anchor-x, 50vw) - 50%), calc(100vw - 100% - 6px)); transform: translateX(var(--salary-bubble-left)); --salary-tail-x: clamp(calc(8px * var(--salary-bubble-scale, 1)), calc(var(--salary-anchor-x, 50vw) - var(--salary-bubble-left)), calc(100% - 8px * var(--salary-bubble-scale, 1))); }
 .character-salary-window[data-bubble-below="true"] .salary-character-bubble { bottom: auto; top: calc(var(--salary-anchor-y) + var(--salary-character-size, 48px) / 2 + 10px * var(--salary-bubble-scale, 1)); }
 .salary-character-bubble { padding: calc(2px * var(--salary-bubble-scale, 1)) calc(4px * var(--salary-bubble-scale, 1)); border: calc(1px * var(--salary-bubble-scale, 1)) solid rgba(255,255,255,.28); border-radius: calc(5px * var(--salary-bubble-scale, 1)); background: rgba(34,34,38,.94); color: #fff; font-size: calc(7px * var(--salary-bubble-scale, 1)); line-height: 1.3; text-align: center; overflow-wrap: anywhere; box-shadow: 0 2px 5px #0004; font-variant-numeric: tabular-nums; }

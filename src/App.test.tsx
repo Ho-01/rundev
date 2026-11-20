@@ -139,7 +139,7 @@ describe("App", () => {
     render(<App />);
     expect(document.querySelector(".whip-crack-canvas")).toHaveAttribute("width", "320");
     expect(document.querySelector(".whip-crack-canvas")).toHaveAttribute("height", "520");
-    expect(await screen.findByText("RunDev")).toBeInTheDocument();
+    expect(await screen.findByRole("img", { name: "RunDev" })).toBeInTheDocument();
     const levelButton = await screen.findByRole("button", { name: /레벨 1 · 새싹 개발자 · 특성 열기/ });
     expect(levelButton).toHaveAccessibleName(/사용 가능 포인트 3/);
     expect(levelButton.querySelector(".growth-trait-alert")).toHaveAttribute("title", "사용 가능한 특성 포인트 3개");
@@ -220,7 +220,7 @@ describe("App", () => {
   it("offers permission recovery directly from the keyboard card", async () => {
     localStorage.clear();
     render(<App />);
-    expect(await screen.findByText("RunDev")).toBeInTheDocument();
+    expect(await screen.findByRole("img", { name: "RunDev" })).toBeInTheDocument();
 
     act(() => {
       useDashboardStore.setState({
